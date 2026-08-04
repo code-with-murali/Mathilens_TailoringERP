@@ -17,7 +17,7 @@ Tracks the phased delivery plan for Mathilens Tailoring ERP, from repository set
 
 - [x] Solution scaffolding (Clean Architecture: Domain, Application, Infrastructure, Api, Shared, UnitTests, IntegrationTests)
 - [x] Shared kernel (Result type, guard clauses, common constants)
-- [ ] Domain base entity (audit columns, soft delete, concurrency token)
+- [x] Domain base entity (audit columns, soft delete, concurrency token)
 - [ ] Database foundation (PostgreSQL + EF Core Code First, ASP.NET Core Identity, initial migration)
 - [ ] Authentication module (login, JWT issuance/refresh, role assignment)
 - [ ] Dashboard shell (Next.js frontend scaffold + authenticated shell layout)
