@@ -16,7 +16,7 @@ Tracks the phased delivery plan for Mathilens Tailoring ERP, from repository set
 ## Phase 1 — Platform Foundation (MVP Core)
 
 - [x] Solution scaffolding (Clean Architecture: Domain, Application, Infrastructure, Api, Shared, UnitTests, IntegrationTests)
-- [ ] Shared kernel (Result type, guard clauses, common constants)
+- [x] Shared kernel (Result type, guard clauses, common constants)
 - [ ] Domain base entity (audit columns, soft delete, concurrency token)
 - [ ] Database foundation (PostgreSQL + EF Core Code First, ASP.NET Core Identity, initial migration)
 - [ ] Authentication module (login, JWT issuance/refresh, role assignment)
