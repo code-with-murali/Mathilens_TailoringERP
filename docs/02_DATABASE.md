@@ -178,6 +178,7 @@ erDiagram
     ORDERS ||--o{ INVOICES : "billed via"
     INVOICES ||--o{ PAYMENTS : "settled by"
     USERS ||--o{ AUDITLOGS : performs
+    USERS ||--o{ REFRESHTOKENS : issues
     SETTINGS ||--|| SETTINGS : "shop-level configuration"
 ```
 
@@ -369,6 +370,22 @@ Every entity below is documented to the same standard: Purpose, Responsibilities
 | **Index Recommendations** | Index on affected entity type + entity ID (primary lookup path: "show me the history of this record"); index on `UserId`; index on `CreatedAtUtc` for chronological/compliance queries |
 | **Future Partitioning Considerations** | The second-highest-growth entity by row count after `MeasurementHistory` — a strong candidate for PostgreSQL native partitioning and cold-storage archival as volume grows; see [13.6 Future Partitioning](#136-future-partitioning) and [13.7 Archiving Strategy](#137-archiving-strategy) |
 
+### 10.14 RefreshTokens
+
+> Added during Phase 1 implementation: the refresh-token rotation behavior in [00_MASTER_SPEC.md § 10.1](./00_MASTER_SPEC.md#101-authentication) and [01_ARCHITECTURE.md § 17 Authentication Flow](./01_ARCHITECTURE.md#17-authentication-flow) requires persistent storage that the original 13-entity list did not enumerate. Documented here to keep this file authoritative, per [00_MASTER_SPEC.md § 14](./00_MASTER_SPEC.md#14-documentation).
+
+| Aspect | Detail |
+|--------|--------|
+| **Purpose** | Represents a single issued refresh token in a rotation chain, supporting the single-use, rotate-on-refresh JWT flow |
+| **Responsibilities** | Tracks the token's hash, expiry, and revocation state; enables replay detection (a revoked token presented again signals token theft) |
+| **Relationships** | Many-to-one with `Users` ([10.1](#101-users)) via `UserId`; self-referencing via `ReplacedByTokenId` to trace the rotation chain |
+| **Future Expansion** | Device/client metadata (for a "manage active sessions" UI); geographic/IP anomaly detection |
+| **Data Ownership** | Owned by the Authentication module; written only by the authentication flow itself, never directly by other modules |
+| **Validation Rules** | `TokenHash` is required and unique — only the hash is ever persisted, never the raw token; `ExpiresAtUtc` must be after the token's issued time |
+| **Retention Rules** | Not soft-deleted ([5. Soft Delete](#5-soft-delete) does not apply — a refresh token's lifecycle is active → rotated/revoked or expired, not the soft-delete lifecycle of a business record); expired/revoked tokens are retained for a security-audit window, then eligible for archival/purge per [13.7 Archiving Strategy](#137-archiving-strategy) |
+| **Index Recommendations** | Unique index on `TokenHash` (the primary lookup path on every refresh request); index on `UserId` (to revoke all of a user's active tokens on replay detection) |
+| **Future Partitioning Considerations** | High-growth, short-lived-relevance data — a candidate for aggressive archival/purge of expired rows well before `MeasurementHistory` or `AuditLogs` need it |
+
 ---
 
 ## 11. Backup Strategy
@@ -448,7 +465,7 @@ Every entity below is documented to the same standard: Purpose, Responsibilities
 
 This section is the database-level companion to [01_ARCHITECTURE.md § 24 Future Multi-Tenant Strategy](./01_ARCHITECTURE.md#24-future-multi-tenant-strategy).
 
-- **Not part of the Version 1 schema.** None of the 13 entities documented in [10. Required Entities](#10-required-entities) carry a `TenantId` column today — Version 1's deployment model is one database per shop deployment (or a small number of pilot shops sharing one deployment), not a shared multi-tenant database.
+- **Not part of the Version 1 schema.** None of the 14 entities documented in [10. Required Entities](#10-required-entities) carry a `TenantId` column today — Version 1's deployment model is one database per shop deployment (or a small number of pilot shops sharing one deployment), not a shared multi-tenant database.
 - **Planned isolation model:** when multi-tenant SaaS operation begins — triggered by real commercial demand for a shared platform, **not** by any database-engine constraint, since PostgreSQL already supports the target isolation model natively — a `Tenants` entity is introduced, and every entity in [10. Required Entities](#10-required-entities) gains a `TenantId` foreign key, enforced via an EF Core global query filter so no query can ever cross tenants, mirroring [01_ARCHITECTURE.md § 24](./01_ARCHITECTURE.md#24-future-multi-tenant-strategy).
 - **Why this is deferred, not designed now:** adding `TenantId` to every entity before there is a second tenant sharing infrastructure would be speculative schema complexity with no current user, which [00_MASTER_SPEC.md § 4.5 YAGNI](./00_MASTER_SPEC.md#45-yagni) explicitly rules out.
 - **Why this remains low-risk to defer:** every entity's persistence access already goes through the Repository Pattern ([01_ARCHITECTURE.md § 25.1](./01_ARCHITECTURE.md#251-repository-pattern)), so introducing tenant-scoped filtering later is a contained, centralized `Infrastructure`-layer change. Because PostgreSQL is already the Version 1 database, activating multi-tenancy requires **zero database-engine migration** — it is purely a schema/tenancy-model change on the same database the product has run on since day one, which is strictly simpler than the combined provider-migration-plus-tenancy-activation this document previously anticipated.

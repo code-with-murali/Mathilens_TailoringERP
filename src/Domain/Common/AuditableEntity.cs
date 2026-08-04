@@ -11,7 +11,7 @@ namespace MathilensERP.Domain.Common;
 /// Infrastructure's EF Core entity configuration, so Domain stays free of any
 /// persistence-technology detail (01_ARCHITECTURE.md § 9.3).
 /// </summary>
-public abstract class AuditableEntity
+public abstract class AuditableEntity : IAuditable, ISoftDeletable
 {
     public Guid Id { get; protected set; }
 
