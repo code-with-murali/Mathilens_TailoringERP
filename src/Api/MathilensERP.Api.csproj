@@ -1,0 +1,13 @@
+<Project Sdk="Microsoft.NET.Sdk.Web">
+
+  <ItemGroup>
+    <ProjectReference Include="..\Application\MathilensERP.Application.csproj" />
+    <ProjectReference Include="..\Infrastructure\MathilensERP.Infrastructure.csproj" />
+    <ProjectReference Include="..\Domain\MathilensERP.Domain.csproj" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <PackageReference Include="Swashbuckle.AspNetCore" Version="10.2.3" />
+  </ItemGroup>
+
+</Project>

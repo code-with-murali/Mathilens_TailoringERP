@@ -1,0 +1,8 @@
+<Project Sdk="Microsoft.NET.Sdk">
+
+  <ItemGroup>
+    <ProjectReference Include="..\Domain\MathilensERP.Domain.csproj" />
+    <ProjectReference Include="..\Shared\MathilensERP.Shared.csproj" />
+  </ItemGroup>
+
+</Project>
