@@ -34,7 +34,7 @@ Tracks the phased delivery plan for Mathilens Tailoring ERP, from repository set
 ## Phase 3 — Commercial Modules (MVP)
 
 - [ ] Billing — backend complete: `Invoice` aggregate root (owns `Payment`s), a strict enforced billing status (`Unpaid → PartiallyPaid → Paid`, or `Void` — recomputed automatically as payments are recorded, per 02_DATABASE.md §§ 10.9-10.10), EF migration with real FKs to Orders/Customers, Application CQRS (create invoice from an order's items, record payment, void, get/search), `InvoicesController` REST endpoints, 40 tests. Invoicing is an explicit staff action, not automatic on order delivery — there's no domain-event dispatch mechanism wired up yet (01_ARCHITECTURE.md § 26 is future work). Same gaps as Phase 2: no frontend UI, no live-database verification
-- [ ] WhatsApp
+- [ ] WhatsApp — backend complete: `WhatsAppMessage` log entity (00_MASTER_SPEC.md § 3: order updates, reminders, delivery notices), EF migration with real FKs to Customers/Orders, Application CQRS (send, get/search), `WhatsAppMessagesController` REST endpoints, 24 tests. Sends via a `MetaWhatsAppSender` targeting Meta's WhatsApp Cloud API directly (the user's explicit provider choice) behind an `IWhatsAppSender` port — **unverified against a live account**: no real Meta credentials have been available, so this client has never actually sent a message, only been written to match Meta's documented API contract. The integration is optional-at-startup (the API still starts fine unconfigured) and fails gracefully per-send if credentials are missing. Same gaps as the rest of Phase 3: no frontend UI, no live-database verification
 - [ ] Reports
 - [ ] Settings
 

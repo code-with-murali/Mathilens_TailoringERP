@@ -6,6 +6,7 @@ using MathilensERP.Domain.Employees;
 using MathilensERP.Domain.Identity;
 using MathilensERP.Domain.Measurements;
 using MathilensERP.Domain.Orders;
+using MathilensERP.Domain.WhatsApp;
 using MathilensERP.Infrastructure.Identity;
 using Microsoft.AspNetCore.Identity;
 using Microsoft.AspNetCore.Identity.EntityFrameworkCore;
@@ -45,6 +46,8 @@ public class ApplicationDbContext : IdentityDbContext<ApplicationUser, Applicati
     public DbSet<Invoice> Invoices => Set<Invoice>();
 
     public DbSet<Payment> Payments => Set<Payment>();
+
+    public DbSet<WhatsAppMessage> WhatsAppMessages => Set<WhatsAppMessage>();
 
     protected override void OnModelCreating(ModelBuilder builder)
     {

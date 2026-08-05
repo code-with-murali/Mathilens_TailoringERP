@@ -4,6 +4,7 @@ using MathilensERP.Application.Customers;
 using MathilensERP.Application.Employees;
 using MathilensERP.Application.Measurements;
 using MathilensERP.Application.Orders;
+using MathilensERP.Application.WhatsApp;
 using MathilensERP.Infrastructure.Identity;
 using MathilensERP.Infrastructure.Persistence;
 using MathilensERP.Infrastructure.Persistence.Billing;
@@ -12,11 +13,14 @@ using MathilensERP.Infrastructure.Persistence.Employees;
 using MathilensERP.Infrastructure.Persistence.Interceptors;
 using MathilensERP.Infrastructure.Persistence.Measurements;
 using MathilensERP.Infrastructure.Persistence.Orders;
+using MathilensERP.Infrastructure.Persistence.WhatsApp;
 using MathilensERP.Infrastructure.Services;
+using MathilensERP.Infrastructure.WhatsApp;
 using Microsoft.AspNetCore.Identity;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
+using Microsoft.Extensions.Options;
 
 namespace MathilensERP.Infrastructure;
 
@@ -74,6 +78,15 @@ public static class DependencyInjection
         services.AddScoped<IEmployeeRepository, EmployeeRepository>();
         services.AddScoped<IOrderRepository, OrderRepository>();
         services.AddScoped<IInvoiceRepository, InvoiceRepository>();
+        services.AddScoped<IWhatsAppMessageRepository, WhatsAppMessageRepository>();
+
+        services.AddOptions<WhatsAppOptions>().Bind(configuration.GetSection(WhatsAppOptions.SectionName));
+
+        services.AddHttpClient<IWhatsAppSender, MetaWhatsAppSender>((sp, client) =>
+        {
+            var whatsAppOptions = sp.GetRequiredService<IOptions<WhatsAppOptions>>().Value;
+            client.BaseAddress = new Uri(whatsAppOptions.BaseUrl.TrimEnd('/') + "/");
+        });
 
         return services;
     }
