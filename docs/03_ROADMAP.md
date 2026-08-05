@@ -27,7 +27,7 @@ Tracks the phased delivery plan for Mathilens Tailoring ERP, from repository set
 
 - [ ] Customer Management — backend complete (Domain, Infrastructure/EF migration, Application CQRS, `CustomersController` REST endpoints, 35 tests); not yet done per 00_MASTER_SPEC.md § 15 Definition of Done: frontend UI (Next.js pages) not yet built, and no live PostgreSQL instance exists yet to verify the create/search/update/delete paths end-to-end (same blocker noted under Phase 1 Database foundation)
 - [ ] Measurement Management — backend complete (`Measurement`/`MeasurementHistory` domain entities, EF migration, Application CQRS, `MeasurementsController` REST endpoints, 34 tests); measurement points are a flexible name/value set rather than fixed per-garment-type columns, since 02_DATABASE.md § 10.4 explicitly defers garment-type templates to a future phase — see CHANGELOG.md for the full design rationale. Same gaps as Customer Management: no frontend UI, no live-database verification yet
-- [ ] Employee Management
+- [ ] Employee Management — backend complete (`Employee` domain entity, EF migration with a real FK + filtered-unique-index to `Users`, Application CQRS, `EmployeesController` REST endpoints, 22 tests); schema includes the optional `UserId` link to a system login (02_DATABASE.md § 10.6) but no command sets it yet — linking an employee to a login account is an admin/role-management flow, already deferred in Phase 1's Authentication entry for the same live-database reason. Same gaps as the other Phase 2 modules so far: no frontend UI, no live-database verification
 - [ ] Tailoring Orders
 - [ ] Fabric Details
 

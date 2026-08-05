@@ -1,9 +1,11 @@
 using MathilensERP.Application.Common.Interfaces;
 using MathilensERP.Application.Customers;
+using MathilensERP.Application.Employees;
 using MathilensERP.Application.Measurements;
 using MathilensERP.Infrastructure.Identity;
 using MathilensERP.Infrastructure.Persistence;
 using MathilensERP.Infrastructure.Persistence.Customers;
+using MathilensERP.Infrastructure.Persistence.Employees;
 using MathilensERP.Infrastructure.Persistence.Interceptors;
 using MathilensERP.Infrastructure.Persistence.Measurements;
 using MathilensERP.Infrastructure.Services;
@@ -65,6 +67,7 @@ public static class DependencyInjection
         services.AddScoped<IIdentityService, IdentityService>();
         services.AddScoped<ICustomerRepository, CustomerRepository>();
         services.AddScoped<IMeasurementRepository, MeasurementRepository>();
+        services.AddScoped<IEmployeeRepository, EmployeeRepository>();
 
         return services;
     }

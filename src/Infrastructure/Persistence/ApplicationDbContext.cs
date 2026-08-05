@@ -1,6 +1,7 @@
 using System.Linq.Expressions;
 using MathilensERP.Domain.Common;
 using MathilensERP.Domain.Customers;
+using MathilensERP.Domain.Employees;
 using MathilensERP.Domain.Identity;
 using MathilensERP.Domain.Measurements;
 using MathilensERP.Infrastructure.Identity;
@@ -30,6 +31,8 @@ public class ApplicationDbContext : IdentityDbContext<ApplicationUser, Applicati
     public DbSet<Measurement> Measurements => Set<Measurement>();
 
     public DbSet<MeasurementHistory> MeasurementHistory => Set<MeasurementHistory>();
+
+    public DbSet<Employee> Employees => Set<Employee>();
 
     protected override void OnModelCreating(ModelBuilder builder)
     {
