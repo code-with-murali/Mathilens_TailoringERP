@@ -1,4 +1,5 @@
 using MathilensERP.Api.Contracts.Common;
+using MathilensERP.Shared.Pagination;
 using MathilensERP.Shared.Results;
 using Microsoft.AspNetCore.Mvc;
 
@@ -16,6 +17,12 @@ public abstract class ApiControllerBase : ControllerBase
 
     protected IActionResult ToActionResult(Result result) =>
         result.IsSuccess ? NoContent() : ToErrorResult(result.Error);
+
+    /// <summary>Maps a paginated query result to the standard envelope with a pagination <c>meta</c> (00_MASTER_SPEC.md § 8.3).</summary>
+    protected IActionResult ToPagedActionResult<T>(Result<PagedResult<T>> result) =>
+        result.IsSuccess
+            ? Ok(ApiResponse<IReadOnlyList<T>>.Ok(result.Value.Items, PaginationMeta.From(result.Value)))
+            : ToErrorResult(result.Error);
 
     private IActionResult ToErrorResult(Error error)
     {

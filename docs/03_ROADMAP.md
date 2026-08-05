@@ -25,7 +25,7 @@ Tracks the phased delivery plan for Mathilens Tailoring ERP, from repository set
 
 ## Phase 2 — Core Operational Modules (MVP)
 
-- [ ] Customer Management
+- [ ] Customer Management — backend complete (Domain, Infrastructure/EF migration, Application CQRS, `CustomersController` REST endpoints, 35 tests); not yet done per 00_MASTER_SPEC.md § 15 Definition of Done: frontend UI (Next.js pages) not yet built, and no live PostgreSQL instance exists yet to verify the create/search/update/delete paths end-to-end (same blocker noted under Phase 1 Database foundation)
 - [ ] Measurement Management
 - [ ] Employee Management
 - [ ] Tailoring Orders

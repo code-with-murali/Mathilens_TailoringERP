@@ -1,0 +1,26 @@
+using MathilensERP.Application.Common.Mediator;
+using MathilensERP.Application.Customers;
+using MathilensERP.Domain.Customers;
+using MathilensERP.Shared.Results;
+
+namespace MathilensERP.Application.Customers.Commands.Create;
+
+public sealed class CreateCustomerCommandHandler : ICommandHandler<CreateCustomerCommand, Result<CustomerDto>>
+{
+    private readonly ICustomerRepository _customerRepository;
+
+    public CreateCustomerCommandHandler(ICustomerRepository customerRepository)
+    {
+        _customerRepository = customerRepository;
+    }
+
+    public async Task<Result<CustomerDto>> Handle(CreateCustomerCommand command, CancellationToken cancellationToken)
+    {
+        var customer = Customer.Create(command.FullName, command.PhoneNumber, command.Email, command.Address, command.Notes);
+
+        _customerRepository.Add(customer);
+        await _customerRepository.SaveChangesAsync(cancellationToken);
+
+        return customer.ToDto();
+    }
+}

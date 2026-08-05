@@ -1,5 +1,6 @@
 using System.Linq.Expressions;
 using MathilensERP.Domain.Common;
+using MathilensERP.Domain.Customers;
 using MathilensERP.Domain.Identity;
 using MathilensERP.Infrastructure.Identity;
 using Microsoft.AspNetCore.Identity;
@@ -22,6 +23,8 @@ public class ApplicationDbContext : IdentityDbContext<ApplicationUser, Applicati
     }
 
     public DbSet<RefreshToken> RefreshTokens => Set<RefreshToken>();
+
+    public DbSet<Customer> Customers => Set<Customer>();
 
     protected override void OnModelCreating(ModelBuilder builder)
     {

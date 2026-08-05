@@ -1,6 +1,8 @@
 using MathilensERP.Application.Common.Interfaces;
+using MathilensERP.Application.Customers;
 using MathilensERP.Infrastructure.Identity;
 using MathilensERP.Infrastructure.Persistence;
+using MathilensERP.Infrastructure.Persistence.Customers;
 using MathilensERP.Infrastructure.Persistence.Interceptors;
 using MathilensERP.Infrastructure.Services;
 using Microsoft.AspNetCore.Identity;
@@ -59,6 +61,7 @@ public static class DependencyInjection
             .ValidateOnStart();
 
         services.AddScoped<IIdentityService, IdentityService>();
+        services.AddScoped<ICustomerRepository, CustomerRepository>();
 
         return services;
     }
