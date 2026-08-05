@@ -4,6 +4,7 @@ import { useEffect, useState } from "react";
 import Link from "next/link";
 import { useParams, useRouter } from "next/navigation";
 import { CustomerForm } from "../CustomerForm";
+import { MeasurementsSection } from "./MeasurementsSection";
 import { useToast } from "@/components/ui/ToastProvider";
 import { getAccessToken } from "@/lib/auth";
 import { ApiError } from "@/lib/api-client";
@@ -59,18 +60,22 @@ export default function EditCustomerPage() {
       ) : !customer ? (
         <p className="text-sm text-foreground/70">Loading…</p>
       ) : (
-        <div className="max-w-xl rounded-lg border border-border bg-surface p-6">
-          <CustomerForm
-            initialValues={{
-              fullName: customer.fullName,
-              phoneNumber: customer.phoneNumber,
-              email: customer.email,
-              address: customer.address,
-              notes: customer.notes,
-            }}
-            submitLabel="Save changes"
-            onSubmit={handleUpdate}
-          />
+        <div className="flex max-w-xl flex-col gap-6">
+          <div className="rounded-lg border border-border bg-surface p-6">
+            <CustomerForm
+              initialValues={{
+                fullName: customer.fullName,
+                phoneNumber: customer.phoneNumber,
+                email: customer.email,
+                address: customer.address,
+                notes: customer.notes,
+              }}
+              submitLabel="Save changes"
+              onSubmit={handleUpdate}
+            />
+          </div>
+
+          <MeasurementsSection customerId={params.id} />
         </div>
       )}
     </div>
