@@ -21,7 +21,7 @@ Tracks the phased delivery plan for Mathilens Tailoring ERP, from repository set
 - [x] Database foundation (PostgreSQL + EF Core Code First, ASP.NET Core Identity, initial migration) — migration generated; application to a live database pending local PostgreSQL/Docker availability
 - [x] Authentication module (login, JWT issuance/refresh) — role *assignment* (baseline role seeding, admin role-management) deferred to Phase 2 once a live database is available to verify startup seeding against; role *claims* already flow through JWTs and `[Authorize(Roles = ...)]` is usable today
 - [x] Dashboard shell (Next.js frontend scaffold + authenticated shell layout) — login, JWT-backed auth guard, sign-out, dark/light theme toggle; CORS wired on the API for the frontend origin
-- [ ] CI/CD skeleton (GitHub Actions: build + test on every push/PR)
+- [x] CI/CD skeleton (GitHub Actions: build + test on every push/PR) — `.github/workflows/ci.yml`: .NET solution build/test + frontend lint/build, run in parallel
 
 ## Phase 2 — Core Operational Modules (MVP)
 
