@@ -47,6 +47,9 @@ export default function DashboardLayout({ children }: LayoutProps<"/dashboard">)
             <Link href="/dashboard" className="hover:text-foreground">
               Dashboard
             </Link>
+            <Link href="/dashboard/customers" className="hover:text-foreground">
+              Customers
+            </Link>
           </nav>
         </div>
         <div className="flex items-center gap-3">
