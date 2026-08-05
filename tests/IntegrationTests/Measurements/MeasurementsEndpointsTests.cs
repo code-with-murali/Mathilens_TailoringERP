@@ -50,6 +50,23 @@ public class MeasurementsEndpointsTests : IClassFixture<CustomWebApplicationFact
     }
 
     [Fact]
+    public async Task Create_WithValidStringGarmentTypeAndValues_PassesValidationAndReachesTheHandler()
+    {
+        // Proves GarmentType actually deserializes from its JSON string name ("Shirt"), not
+        // just that malformed requests get rejected — a request that's fully valid gets past
+        // both model binding and FluentValidation into CreateMeasurementCommandHandler, which
+        // then fails on the (expected, unreachable-in-this-environment) database with a 500,
+        // not a 400. Without a JsonStringEnumConverter registered, "Shirt" wouldn't bind to
+        // GarmentType at all and this would 400 instead, for the wrong reason.
+        AuthenticateClient();
+
+        var response = await _client.PostAsJsonAsync(
+            $"/api/v1/customers/{Guid.NewGuid()}/measurements", new { garmentType = "Shirt", values = new Dictionary<string, decimal> { ["Chest"] = 40 } });
+
+        Assert.Equal(HttpStatusCode.InternalServerError, response.StatusCode);
+    }
+
+    [Fact]
     public async Task GetById_WithoutBearerToken_ReturnsUnauthorized()
     {
         var response = await _client.GetAsync($"/api/v1/measurements/{Guid.NewGuid()}");

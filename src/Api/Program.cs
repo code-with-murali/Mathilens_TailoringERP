@@ -1,4 +1,5 @@
 using System.Text;
+using System.Text.Json.Serialization;
 using MathilensERP.Api.Common;
 using MathilensERP.Api.Contracts.Common;
 using MathilensERP.Application;
@@ -12,7 +13,15 @@ var builder = WebApplication.CreateBuilder(args);
 
 // Add services to the container.
 
-builder.Services.AddControllers();
+builder.Services.AddControllers()
+    .AddJsonOptions(options =>
+    {
+        // Every enum in this API's contracts (OrderStatus, InvoiceStatus, GarmentType, etc.)
+        // is otherwise serialized as its underlying integer by System.Text.Json's default —
+        // fragile for API consumers and undocumented in Swagger. Readable names, matching the
+        // C# member names exactly, over the wire in both directions.
+        options.JsonSerializerOptions.Converters.Add(new JsonStringEnumConverter());
+    });
 builder.Services.AddEndpointsApiExplorer();
 
 // 00_MASTER_SPEC.md § 8.7 — every error response, including framework model-binding
