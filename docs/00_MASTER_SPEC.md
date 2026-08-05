@@ -267,7 +267,7 @@ The stack is fixed for the life of this product unless this document is explicit
 | **Authentication** | ASP.NET Core Identity + JWT bearer tokens (access + refresh token pair) | Industry-standard, integrates cleanly with RBAC |
 | **Logging** | Serilog, structured logging, console + file (local), cloud sink (production) | Structured logs are queryable; dev-friendly locally, production-ready in the cloud |
 | **Storage** | Abstracted file storage port backed by a cloud object store (e.g., Azure Blob Storage) | Measurement photos, invoice PDFs; provider-agnostic behind an interface |
-| **Testing** | xUnit, FluentAssertions, NSubstitute (mocking) | Fast, expressive, avoids brittle over-mocked tests |
+| **Testing** | xUnit (with its built-in `Assert`), NSubstitute (mocking) | Fast, expressive, avoids brittle over-mocked tests. FluentAssertions was dropped during Phase 1 implementation: its license became commercial-only starting v8, which is an unacceptable risk to pin into a product built to be sold — xUnit's own `Assert` is free, sufficient, and already in use |
 | **CI/CD** | GitHub Actions | Already scaffolded in [.github/workflows](../.github/workflows) |
 | **Monitoring** | Structured Serilog logs + health check endpoints + APM (e.g., Application Insights) in production | Observability from day one |
 | **Deployment** | Docker images to Azure (primary) with Railway as a lower-cost staging/alternate target | See [13. Deployment](#13-deployment) |
