@@ -2,6 +2,7 @@ using System.Linq.Expressions;
 using MathilensERP.Domain.Common;
 using MathilensERP.Domain.Customers;
 using MathilensERP.Domain.Identity;
+using MathilensERP.Domain.Measurements;
 using MathilensERP.Infrastructure.Identity;
 using Microsoft.AspNetCore.Identity;
 using Microsoft.AspNetCore.Identity.EntityFrameworkCore;
@@ -25,6 +26,10 @@ public class ApplicationDbContext : IdentityDbContext<ApplicationUser, Applicati
     public DbSet<RefreshToken> RefreshTokens => Set<RefreshToken>();
 
     public DbSet<Customer> Customers => Set<Customer>();
+
+    public DbSet<Measurement> Measurements => Set<Measurement>();
+
+    public DbSet<MeasurementHistory> MeasurementHistory => Set<MeasurementHistory>();
 
     protected override void OnModelCreating(ModelBuilder builder)
     {
