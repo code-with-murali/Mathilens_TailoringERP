@@ -56,6 +56,9 @@ export default function DashboardLayout({ children }: LayoutProps<"/dashboard">)
             <Link href="/dashboard/orders" className="hover:text-foreground">
               Orders
             </Link>
+            <Link href="/dashboard/invoices" className="hover:text-foreground">
+              Invoices
+            </Link>
           </nav>
         </div>
         <div className="flex items-center gap-3">

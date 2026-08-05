@@ -2,7 +2,7 @@
 
 import { useCallback, useEffect, useState, type FormEvent } from "react";
 import Link from "next/link";
-import { useParams } from "next/navigation";
+import { useParams, useRouter } from "next/navigation";
 import { Button } from "@/components/ui/Button";
 import { SearchPicker } from "@/components/ui/SearchPicker";
 import { useToast } from "@/components/ui/ToastProvider";
@@ -10,6 +10,7 @@ import { getAccessToken } from "@/lib/auth";
 import { ApiError } from "@/lib/api-client";
 import { searchEmployees, type Employee } from "@/lib/api/employees";
 import { GARMENT_TYPES, type GarmentType } from "@/lib/api/measurements";
+import { createInvoice } from "@/lib/api/billing";
 import {
   getOrder,
   transitionOrderStatus,
@@ -35,10 +36,17 @@ const fieldClassName =
 
 export default function OrderDetailPage() {
   const params = useParams<{ id: string }>();
+  const router = useRouter();
   const { showToast } = useToast();
   const [order, setOrder] = useState<Order | null>(null);
   const [loadError, setLoadError] = useState<string | null>(null);
   const [isTransitioning, setIsTransitioning] = useState(false);
+
+  const [showCreateInvoice, setShowCreateInvoice] = useState(false);
+  const [invoiceTax, setInvoiceTax] = useState("0");
+  const [invoiceDiscount, setInvoiceDiscount] = useState("0");
+  const [invoiceError, setInvoiceError] = useState<string | null>(null);
+  const [isCreatingInvoice, setIsCreatingInvoice] = useState(false);
 
   const [showAddItem, setShowAddItem] = useState(false);
   const [newItemGarmentType, setNewItemGarmentType] = useState<GarmentType>(GARMENT_TYPES[0]);
@@ -91,6 +99,29 @@ export default function OrderDetailPage() {
       await load();
     } catch (error) {
       showToast(error instanceof ApiError ? error.message : "Unable to assign employee.", "error");
+    }
+  }
+
+  async function handleCreateInvoice(event: FormEvent<HTMLFormElement>) {
+    event.preventDefault();
+    setInvoiceError(null);
+
+    const tax = Number(invoiceTax);
+    const discount = Number(invoiceDiscount);
+    if (!Number.isFinite(tax) || tax < 0 || !Number.isFinite(discount) || discount < 0) {
+      setInvoiceError("Tax and discount must be zero or greater.");
+      return;
+    }
+
+    setIsCreatingInvoice(true);
+    try {
+      const invoice = await createInvoice(params.id, tax, discount, getAccessToken());
+      showToast("Invoice created.");
+      router.push(`/dashboard/invoices/${invoice.id}`);
+    } catch (error) {
+      setInvoiceError(error instanceof ApiError ? error.message : "Unable to create an invoice for this order.");
+    } finally {
+      setIsCreatingInvoice(false);
     }
   }
 
@@ -228,6 +259,52 @@ export default function OrderDetailPage() {
           getLabel={(e) => e.fullName}
           placeholder="Search employees to assign…"
         />
+      </div>
+
+      <div className="rounded-lg border border-border bg-surface p-6">
+        <div className="mb-3 flex items-center justify-between">
+          <h2 className="text-lg font-semibold">Invoice</h2>
+          {!showCreateInvoice && (
+            <Button type="button" variant="secondary" onClick={() => setShowCreateInvoice(true)}>
+              Create Invoice
+            </Button>
+          )}
+        </div>
+        {!showCreateInvoice && <p className="text-sm text-foreground/70">No invoice created from this page yet.</p>}
+        {showCreateInvoice && (
+          <form onSubmit={handleCreateInvoice} className="flex flex-col gap-3">
+            <div className="grid grid-cols-2 gap-3">
+              <div className="flex flex-col gap-1">
+                <label className="text-sm">Tax amount</label>
+                <input type="number" min="0" step="0.01" value={invoiceTax} onChange={(e) => setInvoiceTax(e.target.value)} className={fieldClassName} />
+              </div>
+              <div className="flex flex-col gap-1">
+                <label className="text-sm">Discount amount</label>
+                <input
+                  type="number"
+                  min="0"
+                  step="0.01"
+                  value={invoiceDiscount}
+                  onChange={(e) => setInvoiceDiscount(e.target.value)}
+                  className={fieldClassName}
+                />
+              </div>
+            </div>
+            {invoiceError && (
+              <p role="alert" className="text-sm text-red-600">
+                {invoiceError}
+              </p>
+            )}
+            <div className="flex justify-end gap-2">
+              <button type="button" onClick={() => setShowCreateInvoice(false)} className="text-sm text-foreground/70 hover:text-foreground">
+                Cancel
+              </button>
+              <Button type="submit" disabled={isCreatingInvoice}>
+                {isCreatingInvoice ? "Creating…" : "Create invoice"}
+              </Button>
+            </div>
+          </form>
+        )}
       </div>
 
       <div className="rounded-lg border border-border bg-surface p-6">

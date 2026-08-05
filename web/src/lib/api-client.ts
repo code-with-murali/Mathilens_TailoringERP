@@ -120,3 +120,17 @@ export async function apiDelete(path: string, token?: string | null): Promise<vo
 
   await throwIfError(response);
 }
+
+/** For POST endpoints (typically actions, not resource creation) that return 204 No Content on success — never attempts to parse a body. */
+export async function apiPostNoContent(path: string, payload: unknown, token?: string | null): Promise<void> {
+  const response = await fetch(`${API_BASE_URL}${path}`, {
+    method: "POST",
+    body: JSON.stringify(payload),
+    headers: {
+      "Content-Type": "application/json",
+      ...authHeaders(token),
+    },
+  });
+
+  await throwIfError(response);
+}
