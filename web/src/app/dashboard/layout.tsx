@@ -62,6 +62,9 @@ export default function DashboardLayout({ children }: LayoutProps<"/dashboard">)
             <Link href="/dashboard/whatsapp" className="hover:text-foreground">
               WhatsApp
             </Link>
+            <Link href="/dashboard/settings" className="hover:text-foreground">
+              Settings
+            </Link>
           </nav>
         </div>
         <div className="flex items-center gap-3">
