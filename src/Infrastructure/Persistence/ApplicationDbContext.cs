@@ -4,6 +4,7 @@ using MathilensERP.Domain.Customers;
 using MathilensERP.Domain.Employees;
 using MathilensERP.Domain.Identity;
 using MathilensERP.Domain.Measurements;
+using MathilensERP.Domain.Orders;
 using MathilensERP.Infrastructure.Identity;
 using Microsoft.AspNetCore.Identity;
 using Microsoft.AspNetCore.Identity.EntityFrameworkCore;
@@ -33,6 +34,12 @@ public class ApplicationDbContext : IdentityDbContext<ApplicationUser, Applicati
     public DbSet<MeasurementHistory> MeasurementHistory => Set<MeasurementHistory>();
 
     public DbSet<Employee> Employees => Set<Employee>();
+
+    public DbSet<Order> Orders => Set<Order>();
+
+    public DbSet<OrderItem> OrderItems => Set<OrderItem>();
+
+    public DbSet<FabricDetails> FabricDetails => Set<FabricDetails>();
 
     protected override void OnModelCreating(ModelBuilder builder)
     {

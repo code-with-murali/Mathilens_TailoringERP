@@ -2,12 +2,14 @@ using MathilensERP.Application.Common.Interfaces;
 using MathilensERP.Application.Customers;
 using MathilensERP.Application.Employees;
 using MathilensERP.Application.Measurements;
+using MathilensERP.Application.Orders;
 using MathilensERP.Infrastructure.Identity;
 using MathilensERP.Infrastructure.Persistence;
 using MathilensERP.Infrastructure.Persistence.Customers;
 using MathilensERP.Infrastructure.Persistence.Employees;
 using MathilensERP.Infrastructure.Persistence.Interceptors;
 using MathilensERP.Infrastructure.Persistence.Measurements;
+using MathilensERP.Infrastructure.Persistence.Orders;
 using MathilensERP.Infrastructure.Services;
 using Microsoft.AspNetCore.Identity;
 using Microsoft.EntityFrameworkCore;
@@ -68,6 +70,7 @@ public static class DependencyInjection
         services.AddScoped<ICustomerRepository, CustomerRepository>();
         services.AddScoped<IMeasurementRepository, MeasurementRepository>();
         services.AddScoped<IEmployeeRepository, EmployeeRepository>();
+        services.AddScoped<IOrderRepository, OrderRepository>();
 
         return services;
     }
