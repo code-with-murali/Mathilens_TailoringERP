@@ -1,5 +1,6 @@
 using System.Linq.Expressions;
 using MathilensERP.Domain.Common;
+using MathilensERP.Domain.Billing;
 using MathilensERP.Domain.Customers;
 using MathilensERP.Domain.Employees;
 using MathilensERP.Domain.Identity;
@@ -40,6 +41,10 @@ public class ApplicationDbContext : IdentityDbContext<ApplicationUser, Applicati
     public DbSet<OrderItem> OrderItems => Set<OrderItem>();
 
     public DbSet<FabricDetails> FabricDetails => Set<FabricDetails>();
+
+    public DbSet<Invoice> Invoices => Set<Invoice>();
+
+    public DbSet<Payment> Payments => Set<Payment>();
 
     protected override void OnModelCreating(ModelBuilder builder)
     {
