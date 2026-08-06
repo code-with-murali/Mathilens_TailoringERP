@@ -4,6 +4,8 @@
  * (NEXT_PUBLIC_API_BASE_URL), never hardcoded per environment.
  */
 
+import { clearTokens, getRefreshToken, storeTokens, type AuthTokens } from "@/lib/auth";
+
 export type ApiFieldError = {
   field: string;
   message: string;
@@ -58,79 +60,162 @@ async function throwIfError(response: Response): Promise<void> {
 
   const body = await response.json().catch(() => null);
   const errorBody = body as ApiErrorBody | null;
+  const fallbackMessage =
+    response.status === 401 ? "Your session has expired. Please sign in again." : "An unexpected error occurred.";
   throw new ApiError(
     response.status,
     errorBody?.error?.code ?? "UNKNOWN_ERROR",
-    errorBody?.error?.message ?? "An unexpected error occurred.",
+    errorBody?.error?.message ?? fallbackMessage,
     errorBody?.error?.details ?? null,
   );
 }
 
-async function requestEnvelope<T>(path: string, init?: RequestInit): Promise<ApiSuccessResponse<T>> {
-  const response = await fetch(`${API_BASE_URL}${path}`, {
-    ...init,
-    headers: {
-      "Content-Type": "application/json",
-      ...init?.headers,
+// Refresh tokens are single-use with rotation and replay detection (01_ARCHITECTURE.md § 17)
+// — if two requests 401 at the same moment and both redeem the same refresh token, the second
+// looks like a replay and the backend revokes every active token for the user. This in-flight
+// promise dedupes concurrent refresh attempts into a single redemption.
+let refreshPromise: Promise<string | null> | null = null;
+
+async function redeemRefreshToken(): Promise<string | null> {
+  const refreshToken = getRefreshToken();
+  if (!refreshToken) {
+    return null;
+  }
+
+  try {
+    const response = await fetch(`${API_BASE_URL}/api/v1/auth/refresh`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ refreshToken }),
+    });
+    if (!response.ok) {
+      return null;
+    }
+    const envelope = (await response.json()) as ApiSuccessResponse<AuthTokens>;
+    storeTokens(envelope.data);
+    return envelope.data.accessToken;
+  } catch {
+    return null;
+  }
+}
+
+function refreshAccessTokenOnce(): Promise<string | null> {
+  if (!refreshPromise) {
+    refreshPromise = redeemRefreshToken().finally(() => {
+      refreshPromise = null;
+    });
+  }
+  return refreshPromise;
+}
+
+/**
+ * Every authenticated request routes through here: on a 401 from an expired access token, it
+ * transparently redeems the refresh token and retries the request once. Requests made without a
+ * token (e.g. login itself) are never retried — a 401 there means invalid credentials, not an
+ * expired session. If the refresh token is missing/invalid too, the session is over: tokens are
+ * cleared and the app is sent back to /login rather than surfacing a confusing generic error.
+ */
+async function fetchWithAuthRetry(path: string, init: RequestInit, token?: string | null): Promise<Response> {
+  const response = await fetch(`${API_BASE_URL}${path}`, init);
+  if (response.status !== 401 || !token) {
+    return response;
+  }
+
+  const newAccessToken = await refreshAccessTokenOnce();
+  if (!newAccessToken) {
+    clearTokens();
+    if (typeof window !== "undefined") {
+      // A full reload, not router.push: this module runs outside React (no useRouter access),
+      // and a hard reset of all component state is exactly what an expired session calls for.
+      // eslint-disable-next-line @next/next/no-location-assign-relative-destination
+      window.location.href = "/login";
+    }
+    return response;
+  }
+
+  const retryHeaders = new Headers(init.headers);
+  retryHeaders.set("Authorization", `Bearer ${newAccessToken}`);
+  return fetch(`${API_BASE_URL}${path}`, { ...init, headers: retryHeaders });
+}
+
+async function requestEnvelope<T>(path: string, init?: RequestInit, token?: string | null): Promise<ApiSuccessResponse<T>> {
+  const response = await fetchWithAuthRetry(
+    path,
+    {
+      ...init,
+      headers: {
+        "Content-Type": "application/json",
+        ...init?.headers,
+      },
     },
-  });
+    token,
+  );
 
   await throwIfError(response);
 
   return (await response.json()) as ApiSuccessResponse<T>;
 }
 
-async function request<T>(path: string, init?: RequestInit): Promise<T> {
-  const envelope = await requestEnvelope<T>(path, init);
+async function request<T>(path: string, init: RequestInit | undefined, token?: string | null): Promise<T> {
+  const envelope = await requestEnvelope<T>(path, init, token);
   return envelope.data;
 }
 
 export function apiGet<T>(path: string, token?: string | null): Promise<T> {
-  return request<T>(path, { headers: authHeaders(token) });
+  return request<T>(path, { headers: authHeaders(token) }, token);
 }
 
 /** For paginated collection endpoints (00_MASTER_SPEC.md § 8.3) — surfaces `meta` alongside the items. */
 export async function apiGetPaged<T>(path: string, token?: string | null): Promise<{ items: T[]; meta: PaginationMeta }> {
-  const envelope = await requestEnvelope<T[]>(path, { headers: authHeaders(token) });
+  const envelope = await requestEnvelope<T[]>(path, { headers: authHeaders(token) }, token);
   return { items: envelope.data, meta: envelope.meta as PaginationMeta };
 }
 
 export function apiPost<T>(path: string, payload: unknown, token?: string | null): Promise<T> {
-  return request<T>(path, {
-    method: "POST",
-    body: JSON.stringify(payload),
-    headers: token ? { Authorization: `Bearer ${token}` } : undefined,
-  });
+  return request<T>(
+    path,
+    {
+      method: "POST",
+      body: JSON.stringify(payload),
+      headers: token ? { Authorization: `Bearer ${token}` } : undefined,
+    },
+    token,
+  );
 }
 
 export function apiPut<T>(path: string, payload: unknown, token?: string | null): Promise<T> {
-  return request<T>(path, {
-    method: "PUT",
-    body: JSON.stringify(payload),
-    headers: authHeaders(token),
-  });
+  return request<T>(
+    path,
+    {
+      method: "PUT",
+      body: JSON.stringify(payload),
+      headers: authHeaders(token),
+    },
+    token,
+  );
 }
 
 /** For endpoints that return 204 No Content on success — never attempts to parse a body. */
 export async function apiDelete(path: string, token?: string | null): Promise<void> {
-  const response = await fetch(`${API_BASE_URL}${path}`, {
-    method: "DELETE",
-    headers: authHeaders(token),
-  });
+  const response = await fetchWithAuthRetry(path, { method: "DELETE", headers: authHeaders(token) }, token);
 
   await throwIfError(response);
 }
 
 /** For POST endpoints (typically actions, not resource creation) that return 204 No Content on success — never attempts to parse a body. */
 export async function apiPostNoContent(path: string, payload: unknown, token?: string | null): Promise<void> {
-  const response = await fetch(`${API_BASE_URL}${path}`, {
-    method: "POST",
-    body: JSON.stringify(payload),
-    headers: {
-      "Content-Type": "application/json",
-      ...authHeaders(token),
+  const response = await fetchWithAuthRetry(
+    path,
+    {
+      method: "POST",
+      body: JSON.stringify(payload),
+      headers: {
+        "Content-Type": "application/json",
+        ...authHeaders(token),
+      },
     },
-  });
+    token,
+  );
 
   await throwIfError(response);
 }

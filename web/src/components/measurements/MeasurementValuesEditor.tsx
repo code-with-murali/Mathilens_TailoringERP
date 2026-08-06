@@ -1,81 +1,101 @@
 "use client";
 
-import { useState } from "react";
+import { useEffect, useRef, useState, type KeyboardEvent } from "react";
+import type { GarmentType } from "@/lib/api/measurements";
 
 export type ValueRowInput = { name: string; value: string };
 
 type Row = ValueRowInput & { id: number };
 
-let nextRowId = 0;
+/** Fixed measurement-point template per garment type, matching the shop's standard measurement
+ * sheet — no free-form add/remove. Only Shirt and Trousers have a defined template today; other
+ * garment types fall back to a "not configured yet" message rather than inventing fields. */
+const GARMENT_MEASUREMENT_FIELDS: Partial<Record<GarmentType, readonly string[]>> = {
+  Shirt: ["Neck", "Shoulder width", "Chest", "Waist", "Hip", "Sleeve length", "Bicep", "Wrist", "Shirt length"],
+  Trousers: [
+    "Waist",
+    "Hip/Seat",
+    "Thigh",
+    "Knee",
+    "Calf",
+    "Inseam (inside leg)",
+    "Outseam (waist to ankle)",
+    "Rise (front & back)",
+    "Bottom opening (ankle width)",
+  ],
+};
 
-function toRows(values: Record<string, number>): Row[] {
-  const entries = Object.entries(values);
-  if (entries.length === 0) {
-    return [{ id: nextRowId++, name: "", value: "" }];
-  }
-  return entries.map(([name, value]) => ({ id: nextRowId++, name, value: String(value) }));
+function toRows(fields: readonly string[], values: Record<string, number>): Row[] {
+  return fields.map((name, id) => ({ id, name, value: values[name] !== undefined ? String(values[name]) : "" }));
 }
 
 type MeasurementValuesEditorProps = {
+  garmentType: GarmentType;
   initialValues?: Record<string, number>;
   onChange: (rows: ValueRowInput[]) => void;
 };
 
-/** Free-form name/value point editor — measurement points are a flexible set, not fixed fields (see the backend's Measurement domain entity). */
-export function MeasurementValuesEditor({ initialValues = {}, onChange }: MeasurementValuesEditorProps) {
-  const [rows, setRows] = useState<Row[]>(() => toRows(initialValues));
+/** Renders the fixed measurement points for a garment type. Callers should remount this (e.g. a
+ * `key` on the parent form keyed to whatever's being edited) when switching targets — internal
+ * state is only initialized once, not kept in sync with later prop changes. */
+export function MeasurementValuesEditor({ garmentType, initialValues = {}, onChange }: MeasurementValuesEditorProps) {
+  const fields = GARMENT_MEASUREMENT_FIELDS[garmentType] ?? [];
+  const [rows, setRows] = useState<Row[]>(() => toRows(fields, initialValues));
+  const inputRefs = useRef<Array<HTMLInputElement | null>>([]);
 
-  function updateRows(next: Row[]) {
+  useEffect(() => {
+    // Reports the pre-filled rows to the parent immediately — otherwise reviewing existing
+    // values and saving without touching a field would look like nothing had been entered.
+    onChange(rows.map(({ name, value }) => ({ name, value })));
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
+
+  function updateValue(id: number, value: string) {
+    const next = rows.map((row) => (row.id === id ? { ...row, value } : row));
     setRows(next);
     onChange(next.map(({ name, value }) => ({ name, value })));
   }
 
-  function updateRow(id: number, field: "name" | "value", newValue: string) {
-    updateRows(rows.map((row) => (row.id === id ? { ...row, [field]: newValue } : row)));
+  function handleKeyDown(e: KeyboardEvent<HTMLInputElement>, index: number) {
+    if (e.key !== "Enter") return;
+    const next = inputRefs.current[index + 1];
+    if (next) {
+      // Not the last field — move to the next measurement field instead of submitting, so
+      // staff can keep both hands on the keyboard like Tab.
+      e.preventDefault();
+      next.focus();
+      return;
+    }
+    // Last field: let the browser's native Enter-submits-form behavior through, which saves
+    // via the form's onSubmit — same as clicking the Save button.
   }
 
-  function addRow() {
-    updateRows([...rows, { id: nextRowId++, name: "", value: "" }]);
-  }
-
-  function removeRow(id: number) {
-    updateRows(rows.filter((row) => row.id !== id));
+  if (fields.length === 0) {
+    return <p className="text-sm text-foreground/70">No measurement template configured for {garmentType} yet.</p>;
   }
 
   return (
     <div className="flex flex-col gap-2">
       <span className="text-sm font-medium">Measurement points (cm)</span>
-      {rows.map((row) => (
-        <div key={row.id} className="flex items-center gap-2">
+      {rows.map((row, index) => (
+        <div key={row.id} className="flex items-center gap-3">
+          <label className="w-48 shrink-0 text-sm text-foreground/80">{row.name}</label>
           <input
-            aria-label="Measurement point name"
-            placeholder="e.g. Chest"
-            value={row.name}
-            onChange={(e) => updateRow(row.id, "name", e.target.value)}
-            className="flex-1 rounded-md border border-border bg-background px-3 py-2 text-sm outline-none focus:ring-2 focus:ring-foreground/20"
-          />
-          <input
-            aria-label="Measurement value"
+            ref={(el) => {
+              inputRefs.current[index] = el;
+            }}
+            aria-label={`${row.name} measurement value`}
             type="number"
             step="0.1"
+            min="0"
             placeholder="cm"
             value={row.value}
-            onChange={(e) => updateRow(row.id, "value", e.target.value)}
+            onChange={(e) => updateValue(row.id, e.target.value)}
+            onKeyDown={(e) => handleKeyDown(e, index)}
             className="w-28 rounded-md border border-border bg-background px-3 py-2 text-sm outline-none focus:ring-2 focus:ring-foreground/20"
           />
-          <button
-            type="button"
-            onClick={() => removeRow(row.id)}
-            className="text-sm text-red-600 hover:text-red-700"
-            aria-label="Remove measurement point"
-          >
-            Remove
-          </button>
         </div>
       ))}
-      <button type="button" onClick={addRow} className="self-start text-sm text-foreground/70 hover:text-foreground">
-        + Add point
-      </button>
     </div>
   );
 }

@@ -40,9 +40,11 @@ export default function DashboardLayout({ children }: LayoutProps<"/dashboard">)
 
   return (
     <div className="flex min-h-full flex-1 flex-col">
-      <header className="flex items-center justify-between border-b border-border px-6 py-4">
+      <header className="flex items-center justify-between border-b border-border px-6 py-4 print:hidden">
         <div className="flex items-center gap-6">
-          <span className="font-semibold">Mathilens Tailoring ERP</span>
+          <Link href="/dashboard" className="font-semibold hover:text-foreground/80">
+            Mathilens Tailoring ERP
+          </Link>
           <nav className="flex items-center gap-4 text-sm text-foreground/70">
             <Link href="/dashboard" className="hover:text-foreground">
               Dashboard

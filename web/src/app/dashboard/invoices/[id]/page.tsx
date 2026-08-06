@@ -9,6 +9,8 @@ import { useToast } from "@/components/ui/ToastProvider";
 import { getAccessToken } from "@/lib/auth";
 import { ApiError } from "@/lib/api-client";
 import { getInvoice, recordPayment, voidInvoice, PAYMENT_METHODS, type Invoice, type PaymentMethod } from "@/lib/api/billing";
+import { getOrder, type Order } from "@/lib/api/orders";
+import { getCustomer, type Customer } from "@/lib/api/customers";
 
 const fieldClassName =
   "rounded-md border border-border bg-background px-3 py-2 text-sm outline-none focus:ring-2 focus:ring-foreground/20";
@@ -17,6 +19,8 @@ export default function InvoiceDetailPage() {
   const params = useParams<{ id: string }>();
   const { showToast } = useToast();
   const [invoice, setInvoice] = useState<Invoice | null>(null);
+  const [order, setOrder] = useState<Order | null>(null);
+  const [customer, setCustomer] = useState<Customer | null>(null);
   const [loadError, setLoadError] = useState<string | null>(null);
 
   const [paymentAmount, setPaymentAmount] = useState("");
@@ -31,6 +35,14 @@ export default function InvoiceDetailPage() {
     try {
       const data = await getInvoice(params.id, getAccessToken());
       setInvoice(data);
+      // Neither the customer's name/phone nor the order's due date live on the invoice itself
+      // (Invoice only stores CustomerId/OrderId) — fetched separately so this page can show them.
+      const [orderData, customerData] = await Promise.all([
+        getOrder(data.orderId, getAccessToken()),
+        getCustomer(data.customerId, getAccessToken()),
+      ]);
+      setOrder(orderData);
+      setCustomer(customerData);
     } catch (error) {
       setLoadError(error instanceof ApiError ? error.message : "Unable to load this invoice.");
     }
@@ -97,15 +109,40 @@ export default function InvoiceDetailPage() {
 
   return (
     <div className="flex flex-col gap-6">
-      <div className="flex items-center justify-between">
-        <h1 className="text-2xl font-semibold">Invoice</h1>
-        <Link href="/dashboard/invoices" className="text-sm text-foreground/70 hover:text-foreground">
-          Back to invoices
-        </Link>
+      {/* print:block instead of a permanent header — the app-chrome title above says "Invoice"
+          fine on screen, but a printed page needs its own letterhead since the dashboard nav
+          (which carries the shop name) is hidden for print. */}
+      <div className="hidden print:block">
+        <h1 className="text-2xl font-semibold">Mathilens Tailoring ERP</h1>
+        <p className="text-sm text-foreground/70">Invoice #{invoice.id.slice(0, 8).toUpperCase()} — printed {new Date().toLocaleDateString()}</p>
       </div>
 
-      <div className="rounded-lg border border-border bg-surface p-6">
+      <div className="flex items-center justify-between print:hidden">
+        <h1 className="text-2xl font-semibold">Invoice</h1>
+        <div className="flex items-center gap-4">
+          <button type="button" onClick={() => window.print()} className="text-sm text-foreground/70 hover:text-foreground">
+            Print
+          </button>
+          <Link href="/dashboard/invoices" className="text-sm text-foreground/70 hover:text-foreground">
+            Back to invoices
+          </Link>
+        </div>
+      </div>
+
+      <div className="rounded-lg border border-border bg-surface p-6 print:border-0 print:p-0">
         <dl className="grid grid-cols-2 gap-4 text-sm sm:grid-cols-3">
+          <div>
+            <dt className="text-foreground/70">Customer</dt>
+            <dd className="font-medium">{customer ? customer.fullName : "—"}</dd>
+          </div>
+          <div>
+            <dt className="text-foreground/70">Phone number</dt>
+            <dd className="font-medium">{customer ? customer.phoneNumber : "—"}</dd>
+          </div>
+          <div>
+            <dt className="text-foreground/70">Due date</dt>
+            <dd className="font-medium">{order ? new Date(order.dueAtUtc).toLocaleDateString() : "—"}</dd>
+          </div>
           <div>
             <dt className="text-foreground/70">Status</dt>
             <dd className="font-medium">{invoice.status}</dd>
@@ -127,13 +164,17 @@ export default function InvoiceDetailPage() {
             <dd className="font-medium">{invoice.totalAmount.toFixed(2)}</dd>
           </div>
           <div>
-            <dt className="text-foreground/70">Remaining balance</dt>
+            <dt className="text-foreground/70">Advance / Paid</dt>
+            <dd className="font-medium">{invoice.amountPaid.toFixed(2)}</dd>
+          </div>
+          <div>
+            <dt className="text-foreground/70">Balance</dt>
             <dd className="font-medium">{invoice.remainingBalance.toFixed(2)}</dd>
           </div>
         </dl>
 
         {canVoid && (
-          <div className="mt-4">
+          <div className="mt-4 print:hidden">
             <Button type="button" variant="danger" onClick={() => setConfirmingVoid(true)}>
               Void Invoice
             </Button>
@@ -141,7 +182,7 @@ export default function InvoiceDetailPage() {
         )}
       </div>
 
-      <div className="rounded-lg border border-border bg-surface p-6">
+      <div className="rounded-lg border border-border bg-surface p-6 print:border-0 print:p-0">
         <h2 className="mb-3 text-lg font-semibold">Payments</h2>
         {invoice.payments.length === 0 ? (
           <p className="text-sm text-foreground/70">No payments recorded yet.</p>
@@ -158,7 +199,7 @@ export default function InvoiceDetailPage() {
         )}
 
         {canRecordPayment && (
-          <form onSubmit={handleRecordPayment} className="mt-4 flex flex-col gap-3 rounded-md border border-border bg-background p-4">
+          <form onSubmit={handleRecordPayment} className="mt-4 flex flex-col gap-3 rounded-md border border-border bg-background p-4 print:hidden">
             <span className="text-sm font-medium">Record a payment</span>
             <div className="grid grid-cols-2 gap-3">
               <input

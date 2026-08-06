@@ -14,10 +14,25 @@ type SearchPickerProps<T> = {
   getId: (item: T) => string;
   getLabel: (item: T) => string;
   placeholder?: string;
+  /** When provided, a "create new" action appears once a search returns no results — for pickers that also need to cover records that don't exist yet (e.g. a walk-in customer). */
+  onCreateNew?: (query: string) => void;
+  createNewLabel?: (query: string) => string;
 };
 
 /** A debounced, server-side search dropdown for picking a related record (00_MASTER_SPEC.md § 9.7 Search). */
-export function SearchPicker<T>({ id, label, selectedLabel, onSelect, onClear, search, getId, getLabel, placeholder }: SearchPickerProps<T>) {
+export function SearchPicker<T>({
+  id,
+  label,
+  selectedLabel,
+  onSelect,
+  onClear,
+  search,
+  getId,
+  getLabel,
+  placeholder,
+  onCreateNew,
+  createNewLabel,
+}: SearchPickerProps<T>) {
   const [query, setQuery] = useState("");
   const debouncedQuery = useDebouncedValue(query, 300);
   const [results, setResults] = useState<T[]>([]);
@@ -102,6 +117,21 @@ export function SearchPicker<T>({ id, label, selectedLabel, onSelect, onClear, s
             </li>
           ))}
         </ul>
+      )}
+      {isOpen && debouncedQuery && results.length === 0 && onCreateNew && (
+        <div className="absolute top-full z-10 mt-1 w-full rounded-md border border-border bg-background shadow-lg">
+          <button
+            type="button"
+            onClick={() => {
+              onCreateNew(debouncedQuery);
+              setQuery("");
+              setIsOpen(false);
+            }}
+            className="block w-full px-3 py-2 text-left text-sm hover:bg-surface"
+          >
+            {createNewLabel ? createNewLabel(debouncedQuery) : `+ Add "${debouncedQuery}" as new`}
+          </button>
+        </div>
       )}
     </div>
   );

@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { GARMENT_TYPES, type GarmentType } from "@/lib/api/measurements";
 import { FABRIC_SOURCES, type FabricSource } from "@/lib/api/orders";
 
@@ -18,10 +18,10 @@ export type ItemRow = {
 
 let nextItemRowId = 0;
 
-function emptyRow(): ItemRow {
+function emptyRow(garmentType: GarmentType = GARMENT_TYPES[0]): ItemRow {
   return {
     id: nextItemRowId++,
-    garmentType: GARMENT_TYPES[0],
+    garmentType,
     quantity: "1",
     unitPrice: "",
     includeFabric: false,
@@ -37,11 +37,22 @@ const fieldClassName =
 
 type OrderItemsEditorProps = {
   onChange: (rows: ItemRow[]) => void;
+  activeItemId?: number | null;
+  onItemClick?: (row: ItemRow) => void;
 };
 
 /** Dynamic garment-line editor for the create-order form — each item optionally carries its own fabric details. */
-export function OrderItemsEditor({ onChange }: OrderItemsEditorProps) {
-  const [rows, setRows] = useState<ItemRow[]>(() => [emptyRow()]);
+export function OrderItemsEditor({ onChange, activeItemId, onItemClick }: OrderItemsEditorProps) {
+  const [rows, setRows] = useState<ItemRow[]>(() => [emptyRow("Shirt"), emptyRow("Trousers")]);
+
+  useEffect(() => {
+    // The default rows only live in this component's own state until the parent is told about
+    // them — without this, clicking an item before editing any field finds nothing in the
+    // parent's copy, since onChange is otherwise only called from update() below. Deliberately
+    // mount-only: update() below owns every subsequent change, so onChange/rows aren't deps here.
+    onChange(rows);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
 
   function update(next: ItemRow[]) {
     setRows(next);
@@ -64,17 +75,30 @@ export function OrderItemsEditor({ onChange }: OrderItemsEditorProps) {
     <div className="flex flex-col gap-4">
       <span className="text-sm font-medium">Garment items</span>
       {rows.map((row, index) => (
-        <div key={row.id} className="flex flex-col gap-3 rounded-md border border-border p-4">
+        <div
+          key={row.id}
+          onClick={() => onItemClick?.(row)}
+          className={`flex flex-col gap-3 rounded-md border p-4 ${
+            onItemClick ? "cursor-pointer hover:border-foreground/40" : ""
+          } ${activeItemId === row.id ? "border-foreground ring-1 ring-foreground" : "border-border"}`}
+        >
           <div className="flex items-center justify-between">
             <span className="text-sm font-medium">Item {index + 1}</span>
             {rows.length > 1 && (
-              <button type="button" onClick={() => removeRow(row.id)} className="text-sm text-red-600 hover:text-red-700">
+              <button
+                type="button"
+                onClick={(e) => {
+                  e.stopPropagation();
+                  removeRow(row.id);
+                }}
+                className="text-sm text-red-600 hover:text-red-700"
+              >
                 Remove
               </button>
             )}
           </div>
 
-          <div className="grid grid-cols-3 gap-3">
+          <div className="grid max-w-sm grid-cols-3 gap-3" onClick={(e) => e.stopPropagation()}>
             <div className="flex flex-col gap-1">
               <label className="text-sm">Garment</label>
               <select
@@ -112,13 +136,13 @@ export function OrderItemsEditor({ onChange }: OrderItemsEditorProps) {
             </div>
           </div>
 
-          <label className="flex items-center gap-2 text-sm">
+          <label className="flex items-center gap-2 text-sm" onClick={(e) => e.stopPropagation()}>
             <input type="checkbox" checked={row.includeFabric} onChange={(e) => updateRow(row.id, { includeFabric: e.target.checked })} />
             Add fabric details
           </label>
 
           {row.includeFabric && (
-            <div className="grid grid-cols-2 gap-3 rounded-md bg-surface p-3">
+            <div className="grid grid-cols-2 gap-3 rounded-md bg-surface p-3" onClick={(e) => e.stopPropagation()}>
               <div className="flex flex-col gap-1">
                 <label className="text-sm">Fabric type</label>
                 <input value={row.fabricType} onChange={(e) => updateRow(row.id, { fabricType: e.target.value })} className={fieldClassName} />

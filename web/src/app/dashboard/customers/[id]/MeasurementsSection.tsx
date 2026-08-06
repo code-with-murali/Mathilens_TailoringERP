@@ -104,6 +104,7 @@ export function MeasurementsSection({ customerId }: { customerId: string }) {
       {formState && (
         <div className="rounded-md border border-border bg-background p-4">
           <MeasurementForm
+            key={formState.mode === "edit" ? formState.measurement.id : "create"}
             garmentType={formState.mode === "edit" ? formState.measurement.garmentType : undefined}
             initialValues={formState.mode === "edit" ? formState.measurement.values : undefined}
             submitLabel={formState.mode === "create" ? "Add measurement" : "Save changes"}

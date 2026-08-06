@@ -1,4 +1,4 @@
-import { apiDelete, apiGetPaged, apiPut } from "@/lib/api-client";
+import { apiDelete, apiGet, apiGetPaged, apiPut } from "@/lib/api-client";
 
 export type Setting = {
   id: string;
@@ -8,9 +8,18 @@ export type Setting = {
   lastModifiedAtUtc: string | null;
 };
 
+/** Shop owners configure this via the Settings page — its value is the number of days to add
+ * to today's date when pre-filling a new order's due date (00_MASTER_SPEC.md § 9 — different
+ * shops commit to different turnaround times, so this isn't hardcoded). */
+export const DEFAULT_ORDER_DUE_DATE_DAYS_KEY = "Orders.DefaultDueDateDurationDays";
+
 export function listSettings(page: number, pageSize: number, token: string | null) {
   const params = new URLSearchParams({ page: String(page), pageSize: String(pageSize) });
   return apiGetPaged<Setting>(`/api/v1/settings?${params}`, token);
+}
+
+export function getSetting(key: string, token: string | null) {
+  return apiGet<Setting>(`/api/v1/settings/${encodeURIComponent(key)}`, token);
 }
 
 export function upsertSetting(key: string, value: string, token: string | null) {

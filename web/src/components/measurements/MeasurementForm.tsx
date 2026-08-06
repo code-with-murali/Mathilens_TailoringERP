@@ -26,16 +26,17 @@ export function MeasurementForm({ garmentType: fixedGarmentType, initialValues, 
 
     const values: Record<string, number> = {};
     for (const row of rows) {
-      const name = row.name.trim();
-      if (!name) {
+      if (row.value.trim() === "") {
+        // Fixed fields are individually optional — skip the ones not measured yet, rather than
+        // forcing every point to be filled in before anything can be saved.
         continue;
       }
       const numericValue = Number(row.value);
       if (!Number.isFinite(numericValue) || numericValue <= 0) {
-        setFormError(`"${name}" needs a value greater than zero.`);
+        setFormError(`"${row.name}" needs a value greater than zero.`);
         return;
       }
-      values[name] = numericValue;
+      values[row.name] = numericValue;
     }
 
     if (Object.keys(values).length === 0) {
@@ -74,7 +75,7 @@ export function MeasurementForm({ garmentType: fixedGarmentType, initialValues, 
         </select>
       </div>
 
-      <MeasurementValuesEditor initialValues={initialValues} onChange={setRows} />
+      <MeasurementValuesEditor key={garmentType} garmentType={garmentType} initialValues={initialValues} onChange={setRows} />
 
       {formError && (
         <p role="alert" className="text-sm text-red-600">

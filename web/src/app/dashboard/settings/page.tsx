@@ -8,7 +8,14 @@ import { ConfirmDialog } from "@/components/ui/ConfirmDialog";
 import { useToast } from "@/components/ui/ToastProvider";
 import { getAccessToken } from "@/lib/auth";
 import { ApiError, type PaginationMeta } from "@/lib/api-client";
-import { listSettings, upsertSetting, deleteSetting, type Setting } from "@/lib/api/settings";
+import {
+  listSettings,
+  upsertSetting,
+  deleteSetting,
+  getSetting,
+  DEFAULT_ORDER_DUE_DATE_DAYS_KEY,
+  type Setting,
+} from "@/lib/api/settings";
 
 const PAGE_SIZE = 20;
 
@@ -29,12 +36,17 @@ export default function SettingsPage() {
   const [pendingDelete, setPendingDelete] = useState<Setting | null>(null);
   const [isDeleting, setIsDeleting] = useState(false);
 
+  const [orderDurationDays, setOrderDurationDays] = useState("");
+  const [isLoadingOrderDuration, setIsLoadingOrderDuration] = useState(true);
+  const [isSavingOrderDuration, setIsSavingOrderDuration] = useState(false);
+  const [orderDurationError, setOrderDurationError] = useState<string | null>(null);
+
   const load = useCallback(async () => {
     setIsLoading(true);
     setLoadError(null);
     try {
       const { items, meta } = await listSettings(page, PAGE_SIZE, getAccessToken());
-      setSettings(items);
+      setSettings(items.filter((s) => s.key !== DEFAULT_ORDER_DUE_DATE_DAYS_KEY));
       setMeta(meta);
     } catch (error) {
       setLoadError(error instanceof ApiError ? error.message : "Unable to load settings.");
@@ -43,12 +55,51 @@ export default function SettingsPage() {
     }
   }, [page]);
 
+  const loadOrderDuration = useCallback(async () => {
+    setIsLoadingOrderDuration(true);
+    try {
+      const setting = await getSetting(DEFAULT_ORDER_DUE_DATE_DAYS_KEY, getAccessToken());
+      setOrderDurationDays(setting.value);
+    } catch {
+      // Not configured yet — leave the field blank, same as a fresh install.
+      setOrderDurationDays("");
+    } finally {
+      setIsLoadingOrderDuration(false);
+    }
+  }, []);
+
   useEffect(() => {
     // See CustomersPage for why this fetch-on-dependency-change pattern is intentionally not
     // restructured around the set-state-in-effect lint rule.
     // eslint-disable-next-line react-hooks/set-state-in-effect
     load();
   }, [load]);
+
+  useEffect(() => {
+    // eslint-disable-next-line react-hooks/set-state-in-effect
+    loadOrderDuration();
+  }, [loadOrderDuration]);
+
+  async function handleSaveOrderDuration(event: FormEvent<HTMLFormElement>) {
+    event.preventDefault();
+    setOrderDurationError(null);
+
+    const days = Number(orderDurationDays);
+    if (!Number.isInteger(days) || days <= 0) {
+      setOrderDurationError("Enter a whole number of days greater than zero.");
+      return;
+    }
+
+    setIsSavingOrderDuration(true);
+    try {
+      await upsertSetting(DEFAULT_ORDER_DUE_DATE_DAYS_KEY, String(days), getAccessToken());
+      showToast("Order duration saved.");
+    } catch (error) {
+      setOrderDurationError(error instanceof ApiError ? error.message : "Unable to save this setting.");
+    } finally {
+      setIsSavingOrderDuration(false);
+    }
+  }
 
   function openCreateForm() {
     setFormState({ mode: "create" });
@@ -114,6 +165,36 @@ export default function SettingsPage() {
           </Button>
         )}
       </div>
+
+      <form onSubmit={handleSaveOrderDuration} className="flex max-w-xl flex-col gap-4 rounded-lg border border-border bg-surface p-6">
+        <div>
+          <h2 className="text-lg font-semibold">Order Duration</h2>
+          <p className="text-sm text-foreground/70">
+            When staff create a new order, the due date is pre-filled this many days from today.
+          </p>
+        </div>
+        <Input
+          id="orderDurationDays"
+          label="Number of days"
+          type="number"
+          min="1"
+          step="1"
+          value={orderDurationDays}
+          onChange={(e) => setOrderDurationDays(e.target.value)}
+          disabled={isLoadingOrderDuration}
+          placeholder="e.g. 5"
+        />
+        {orderDurationError && (
+          <p role="alert" className="text-sm text-red-600">
+            {orderDurationError}
+          </p>
+        )}
+        <div className="flex justify-end">
+          <Button type="submit" disabled={isLoadingOrderDuration || isSavingOrderDuration}>
+            {isSavingOrderDuration ? "Saving…" : "Save"}
+          </Button>
+        </div>
+      </form>
 
       {formState && (
         <form onSubmit={handleSubmit} className="flex max-w-xl flex-col gap-4 rounded-lg border border-border bg-surface p-6">

@@ -32,3 +32,19 @@ body {
   color: var(--foreground);
   font-family: Arial, Helvetica, sans-serif;
 }
+
+/* Printed pages (invoices, etc.) should read as plain paper regardless of the active theme —
+   dark mode's near-black background would otherwise print as a solid ink block. */
+@media print {
+  :root,
+  .dark {
+    --background: #ffffff;
+    --foreground: #171717;
+    --surface: #f4f4f5;
+    --border: #d4d4d8;
+  }
+
+  @page {
+    margin: 1.5cm;
+  }
+}
