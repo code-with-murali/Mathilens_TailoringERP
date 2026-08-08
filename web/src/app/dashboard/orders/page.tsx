@@ -4,6 +4,7 @@ import { useCallback, useEffect, useState } from "react";
 import Link from "next/link";
 import { Button } from "@/components/ui/Button";
 import { Pagination } from "@/components/ui/Pagination";
+import { StatusBadge, ORDER_STATUS_BADGE } from "@/components/ui/StatusBadge";
 import { getAccessToken } from "@/lib/auth";
 import { ApiError, type PaginationMeta } from "@/lib/api-client";
 import { searchOrders, ORDER_STATUSES, type Order, type OrderStatus } from "@/lib/api/orders";
@@ -61,7 +62,7 @@ export default function OrdersPage() {
           id="statusFilter"
           value={status}
           onChange={(e) => handleStatusChange(e.target.value)}
-          className="max-w-xs rounded-md border border-border bg-background px-3 py-2 text-sm outline-none focus:ring-2 focus:ring-foreground/20"
+          className="max-w-xs rounded-md border border-border bg-surface px-3 py-2 text-sm outline-none transition-colors focus:border-primary focus:ring-2 focus:ring-primary/25"
         >
           <option value="">All statuses</option>
           {ORDER_STATUSES.map((s) => (
@@ -75,7 +76,7 @@ export default function OrdersPage() {
       {isLoading ? (
         <p className="text-sm text-foreground/70">Loading…</p>
       ) : loadError ? (
-        <p role="alert" className="text-sm text-red-600">
+        <p role="alert" className="text-sm text-danger">
           {loadError}
         </p>
       ) : orders.length === 0 ? (
@@ -96,7 +97,9 @@ export default function OrdersPage() {
             <tbody>
               {orders.map((order) => (
                 <tr key={order.id} className="border-b border-border last:border-0">
-                  <td className="px-4 py-3">{order.status}</td>
+                  <td className="px-4 py-3">
+                    <StatusBadge {...ORDER_STATUS_BADGE[order.status]} />
+                  </td>
                   <td className="px-4 py-3">{new Date(order.dueAtUtc).toLocaleDateString()}</td>
                   <td className="px-4 py-3">{order.items.length}</td>
                   <td className="px-4 py-3 text-right">

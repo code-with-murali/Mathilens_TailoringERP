@@ -76,7 +76,7 @@ export default function NewWhatsAppMessagePage() {
             id="messageType"
             value={messageType}
             onChange={(e) => setMessageType(e.target.value as WhatsAppMessageType)}
-            className="rounded-md border border-border bg-background px-3 py-2 text-sm outline-none focus:ring-2 focus:ring-foreground/20"
+            className="rounded-md border border-border bg-surface px-3 py-2 text-sm outline-none transition-colors focus:border-primary focus:ring-2 focus:ring-primary/25"
           >
             {WHATSAPP_MESSAGE_TYPES.map((type) => (
               <option key={type} value={type}>
@@ -89,7 +89,7 @@ export default function NewWhatsAppMessagePage() {
         <Textarea id="content" label="Message" rows={4} value={content} onChange={(e) => setContent(e.target.value)} />
 
         {formError && (
-          <p role="alert" className="text-sm text-red-600">
+          <p role="alert" className="text-sm text-danger">
             {formError}
           </p>
         )}

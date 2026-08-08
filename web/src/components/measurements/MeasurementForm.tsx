@@ -74,7 +74,7 @@ export function MeasurementForm({ garmentType: fixedGarmentType, initialValues, 
             id="garmentType"
             value={garmentType}
             onChange={(e) => setGarmentType(e.target.value as GarmentType)}
-            className="rounded-md border border-border bg-background px-3 py-2 text-sm outline-none focus:ring-2 focus:ring-foreground/20"
+            className="rounded-md border border-border bg-surface px-3 py-2 text-sm outline-none transition-colors focus:border-primary focus:ring-2 focus:ring-primary/25"
           >
             {GARMENT_TYPES.map((type) => (
               <option key={type} value={type}>
@@ -93,7 +93,7 @@ export function MeasurementForm({ garmentType: fixedGarmentType, initialValues, 
       />
 
       {formError && (
-        <p role="alert" className="text-sm text-red-600">
+        <p role="alert" className="text-sm text-danger">
           {formError}
         </p>
       )}

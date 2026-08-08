@@ -61,7 +61,7 @@ export default function WhatsAppMessagesPage() {
           id="statusFilter"
           value={status}
           onChange={(e) => handleStatusChange(e.target.value)}
-          className="max-w-xs rounded-md border border-border bg-background px-3 py-2 text-sm outline-none focus:ring-2 focus:ring-foreground/20"
+          className="max-w-xs rounded-md border border-border bg-surface px-3 py-2 text-sm outline-none transition-colors focus:border-primary focus:ring-2 focus:ring-primary/25"
         >
           <option value="">All statuses</option>
           {WHATSAPP_MESSAGE_STATUSES.map((s) => (
@@ -75,7 +75,7 @@ export default function WhatsAppMessagesPage() {
       {isLoading ? (
         <p className="text-sm text-foreground/70">Loading…</p>
       ) : loadError ? (
-        <p role="alert" className="text-sm text-red-600">
+        <p role="alert" className="text-sm text-danger">
           {loadError}
         </p>
       ) : messages.length === 0 ? (

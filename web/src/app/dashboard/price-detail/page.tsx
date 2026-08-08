@@ -149,7 +149,7 @@ export default function PriceDetailPage() {
             <Input id="sellingPrice" label="Selling price" type="number" min="0" step="0.01" value={formSellingPrice} onChange={(e) => setFormSellingPrice(e.target.value)} />
           </div>
           {formError && (
-            <p role="alert" className="text-sm text-red-600">
+            <p role="alert" className="text-sm text-danger">
               {formError}
             </p>
           )}
@@ -167,7 +167,7 @@ export default function PriceDetailPage() {
       {isLoading ? (
         <p className="text-sm text-foreground/70">Loading…</p>
       ) : loadError ? (
-        <p role="alert" className="text-sm text-red-600">
+        <p role="alert" className="text-sm text-danger">
           {loadError}
         </p>
       ) : clothPrices.length === 0 ? (
@@ -198,7 +198,7 @@ export default function PriceDetailPage() {
                       <button type="button" onClick={() => openEditForm(clothPrice)} className="text-foreground/70 hover:text-foreground">
                         Edit
                       </button>
-                      <button type="button" onClick={() => setPendingDelete(clothPrice)} className="text-red-600 hover:text-red-700">
+                      <button type="button" onClick={() => setPendingDelete(clothPrice)} className="text-danger hover:text-danger-hover">
                         Delete
                       </button>
                     </div>

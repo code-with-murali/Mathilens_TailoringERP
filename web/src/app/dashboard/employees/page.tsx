@@ -90,7 +90,7 @@ export default function EmployeesPage() {
       {isLoading ? (
         <p className="text-sm text-foreground/70">Loading…</p>
       ) : loadError ? (
-        <p role="alert" className="text-sm text-red-600">
+        <p role="alert" className="text-sm text-danger">
           {loadError}
         </p>
       ) : employees.length === 0 ? (
@@ -122,7 +122,7 @@ export default function EmployeesPage() {
                       <button
                         type="button"
                         onClick={() => setPendingDelete(employee)}
-                        className="text-red-600 hover:text-red-700"
+                        className="text-danger hover:text-danger-hover"
                       >
                         Delete
                       </button>

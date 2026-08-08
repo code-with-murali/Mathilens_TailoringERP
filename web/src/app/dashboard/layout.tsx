@@ -4,6 +4,7 @@ import { useEffect, useState } from "react";
 import { useRouter, usePathname } from "next/navigation";
 import Link from "next/link";
 import { isAuthenticated, clearTokens } from "@/lib/auth";
+import { ThemeToggle } from "@/components/theme-toggle";
 
 const NAV_ITEMS = [
   { href: "/dashboard", label: "Dashboard", icon: DashboardIcon },
@@ -50,16 +51,23 @@ export default function DashboardLayout({ children }: LayoutProps<"/dashboard">)
     return null;
   }
 
+  const activeLabel = NAV_ITEMS.find(({ href }) =>
+    href === "/dashboard" ? pathname === href : pathname?.startsWith(href),
+  )?.label ?? "Dashboard";
+
   return (
     <div className="flex min-h-full flex-1">
-      <aside className="flex w-36 shrink-0 flex-col border-r border-border print:hidden">
+      <aside className="flex w-60 shrink-0 flex-col border-r border-border bg-surface print:hidden">
         <Link
           href="/dashboard"
-          className="flex items-center justify-center gap-2 whitespace-nowrap border-b border-border px-3 py-4 text-sm font-semibold hover:text-foreground/80"
+          className="flex items-center gap-2.5 whitespace-nowrap border-b border-border px-5 py-4 text-sm font-semibold"
         >
+          <span className="flex h-7 w-7 shrink-0 items-center justify-center rounded-md bg-primary text-xs font-bold text-primary-foreground">
+            M
+          </span>
           Mathilens ERP
         </Link>
-        <nav className="flex flex-1 flex-col gap-1 px-3 py-4 text-sm">
+        <nav className="flex flex-1 flex-col gap-0.5 px-3 py-4 text-sm">
           {NAV_ITEMS.map(({ href, label, icon: Icon }) => {
             const isActive =
               href === "/dashboard" ? pathname === href : pathname?.startsWith(href);
@@ -69,8 +77,8 @@ export default function DashboardLayout({ children }: LayoutProps<"/dashboard">)
                 href={href}
                 className={`flex items-center gap-3 rounded-md px-3 py-2 transition-colors ${
                   isActive
-                    ? "bg-surface font-medium text-foreground"
-                    : "text-foreground/70 hover:bg-surface hover:text-foreground"
+                    ? "bg-primary/10 font-medium text-primary"
+                    : "text-foreground/65 hover:bg-surface-hover hover:text-foreground"
                 }`}
               >
                 <Icon className="h-4 w-4 shrink-0" />
@@ -83,7 +91,7 @@ export default function DashboardLayout({ children }: LayoutProps<"/dashboard">)
           <button
             type="button"
             onClick={handleLogout}
-            className="flex w-full items-center gap-3 rounded-md px-3 py-2 text-sm text-foreground/70 hover:bg-surface hover:text-foreground"
+            className="flex w-full items-center gap-3 rounded-md px-3 py-2 text-sm text-foreground/65 transition-colors hover:bg-surface-hover hover:text-foreground"
           >
             <LogoutIcon className="h-4 w-4 shrink-0" />
             Sign out
@@ -91,7 +99,11 @@ export default function DashboardLayout({ children }: LayoutProps<"/dashboard">)
         </div>
       </aside>
       <div className="flex min-h-full flex-1 flex-col">
-        <main className="flex-1 px-6 py-4">{children}</main>
+        <header className="sticky top-0 z-10 flex h-14 shrink-0 items-center justify-between border-b border-border bg-surface/80 px-6 backdrop-blur-sm print:hidden">
+          <span className="text-sm font-medium text-foreground/70">{activeLabel}</span>
+          <ThemeToggle />
+        </header>
+        <main className="flex-1 px-6 py-6">{children}</main>
       </div>
     </div>
   );

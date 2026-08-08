@@ -14,10 +14,10 @@ export function Input({ label, error, id, className = "", ...props }: InputProps
       <input
         id={id}
         aria-invalid={Boolean(error)}
-        className={`rounded-md border border-border bg-background px-3 py-2 text-sm outline-none focus:ring-2 focus:ring-foreground/20 ${className}`}
+        className={`rounded-md border border-border bg-surface px-3 py-2 text-sm outline-none transition-colors focus:border-primary focus:ring-2 focus:ring-primary/25 aria-[invalid=true]:border-danger ${className}`}
         {...props}
       />
-      {error && <p className="text-sm text-red-600">{error}</p>}
+      {error && <p className="text-sm text-danger">{error}</p>}
     </div>
   );
 }
@@ -36,10 +36,10 @@ export function Textarea({ label, error, id, className = "", ...props }: Textare
       <textarea
         id={id}
         aria-invalid={Boolean(error)}
-        className={`rounded-md border border-border bg-background px-3 py-2 text-sm outline-none focus:ring-2 focus:ring-foreground/20 ${className}`}
+        className={`rounded-md border border-border bg-surface px-3 py-2 text-sm outline-none transition-colors focus:border-primary focus:ring-2 focus:ring-primary/25 aria-[invalid=true]:border-danger ${className}`}
         {...props}
       />
-      {error && <p className="text-sm text-red-600">{error}</p>}
+      {error && <p className="text-sm text-danger">{error}</p>}
     </div>
   );
 }

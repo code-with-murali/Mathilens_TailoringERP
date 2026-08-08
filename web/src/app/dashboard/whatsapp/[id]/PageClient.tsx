@@ -43,7 +43,7 @@ export default function WhatsAppMessageDetailPage() {
       </div>
 
       {loadError ? (
-        <p role="alert" className="text-sm text-red-600">
+        <p role="alert" className="text-sm text-danger">
           {loadError}
         </p>
       ) : !message ? (
@@ -66,7 +66,7 @@ export default function WhatsAppMessageDetailPage() {
             {message.failureReason && (
               <div className="col-span-2">
                 <dt className="text-foreground/70">Failure reason</dt>
-                <dd className="font-medium text-red-600">{message.failureReason}</dd>
+                <dd className="font-medium text-danger">{message.failureReason}</dd>
               </div>
             )}
             <div className="col-span-2">

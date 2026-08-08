@@ -22,7 +22,7 @@ import { listMeasurementsForCustomer, createMeasurement, updateMeasurementValues
 import { getSetting, DEFAULT_ORDER_DUE_DATE_DAYS_KEY } from "@/lib/api/settings";
 import { createInvoice, recordPayment, PAYMENT_METHODS, type PaymentMethod, type Invoice } from "@/lib/api/billing";
 
-const fieldClassName = "rounded-md border border-border bg-background px-3 py-1 text-sm outline-none focus:ring-2 focus:ring-foreground/20";
+const fieldClassName = "rounded-md border border-border bg-surface px-3 py-1 text-sm outline-none transition-colors focus:border-primary focus:ring-2 focus:ring-primary/25";
 
 function digitsOnly(value: string): string {
   return value.replace(/\D/g, "");
@@ -539,10 +539,10 @@ export default function NewOrderPage() {
                   className={fieldClassName}
                 />
                 {isMobileDropdownOpen && debouncedMobileNumber && mobileMatches.length > 0 && (
-                  <ul className="absolute top-full z-10 mt-1 max-h-48 w-full overflow-y-auto rounded-md border border-border bg-background shadow-lg">
+                  <ul className="absolute top-full z-10 mt-1 max-h-48 w-full overflow-y-auto rounded-md border border-border bg-surface shadow-lg">
                     {mobileMatches.map((c) => (
                       <li key={c.id}>
-                        <button type="button" onClick={() => selectCustomer(c)} className="block w-full px-3 py-2 text-left text-sm hover:bg-surface">
+                        <button type="button" onClick={() => selectCustomer(c)} className="block w-full px-3 py-2 text-left text-sm hover:bg-surface-hover">
                           {c.fullName} ({c.phoneNumber})
                         </button>
                       </li>
@@ -550,11 +550,11 @@ export default function NewOrderPage() {
                   </ul>
                 )}
                 {isMobileDropdownOpen && debouncedMobileNumber && mobileMatches.length === 0 && digitsOnly(debouncedMobileNumber).length >= 7 && (
-                  <div className="absolute top-full z-10 mt-1 w-full rounded-md border border-border bg-background shadow-lg">
+                  <div className="absolute top-full z-10 mt-1 w-full rounded-md border border-border bg-surface shadow-lg">
                     <button
                       type="button"
                       onClick={() => startAddingNewCustomer(debouncedMobileNumber, "phone")}
-                      className="block w-full px-3 py-2 text-left text-sm hover:bg-surface"
+                      className="block w-full px-3 py-2 text-left text-sm hover:bg-surface-hover"
                     >
                       {`+ Add new customer with mobile ${debouncedMobileNumber}`}
                     </button>
@@ -596,7 +596,7 @@ export default function NewOrderPage() {
             {/* Always present (blank when no item is active) so Due date/Assigned employee and
                 Order summary below stay pinned to the bottom, matching column 1's height, instead
                 of jumping up to fill the gap. */}
-            <div ref={measurementBlockRef} className="flex flex-1 flex-col gap-3 rounded-lg border-2 border-black bg-surface p-3">
+            <div ref={measurementBlockRef} className="flex flex-1 flex-col gap-3 rounded-lg border-2 border-foreground bg-surface p-3">
               {activeMeasurementItem && (
                 <>
                   <div className="flex items-center justify-between gap-2 border-b-2 border-black pb-3">
@@ -635,7 +635,7 @@ export default function NewOrderPage() {
                               onKeyDown={(e) => {
                                 if (e.key === "Enter") e.preventDefault();
                               }}
-                              className="w-24 rounded-md border-2 border-black bg-background px-3 py-1 text-sm outline-none focus:ring-2 focus:ring-foreground/20 disabled:cursor-not-allowed disabled:opacity-50"
+                              className="w-24 rounded-md border-2 border-foreground bg-surface px-3 py-1 text-sm outline-none transition-colors focus:border-primary focus:ring-2 focus:ring-primary/25 disabled:cursor-not-allowed disabled:opacity-50"
                             />
                           </div>
                         ))}
@@ -656,7 +656,7 @@ export default function NewOrderPage() {
                               onKeyDown={(e) => {
                                 if (e.key === "Enter") e.preventDefault();
                               }}
-                              className="w-24 rounded-md border-2 border-black bg-background px-3 py-1 text-sm outline-none focus:ring-2 focus:ring-foreground/20 disabled:cursor-not-allowed disabled:opacity-50"
+                              className="w-24 rounded-md border-2 border-foreground bg-surface px-3 py-1 text-sm outline-none transition-colors focus:border-primary focus:ring-2 focus:ring-primary/25 disabled:cursor-not-allowed disabled:opacity-50"
                             />
                           </div>
                         ))}
@@ -665,7 +665,7 @@ export default function NewOrderPage() {
                   )}
 
                   {measurementFormError && (
-                    <p role="alert" className="text-sm text-red-600">
+                    <p role="alert" className="text-sm text-danger">
                       {measurementFormError}
                     </p>
                   )}
@@ -693,7 +693,7 @@ export default function NewOrderPage() {
                   <Input id="newCustomerPhone" label="Phone number" value={newCustomerPhone} onChange={(e) => setNewCustomerPhone(e.target.value)} error={newCustomerFieldErrors.phonenumber} />
                   <Input id="newCustomerEmail" label="Email (optional)" type="email" value={newCustomerEmail} onChange={(e) => setNewCustomerEmail(e.target.value)} error={newCustomerFieldErrors.email} />
                   {newCustomerError && (
-                    <p role="alert" className="text-sm text-red-600">
+                    <p role="alert" className="text-sm text-danger">
                       {newCustomerError}
                     </p>
                   )}
@@ -847,7 +847,7 @@ export default function NewOrderPage() {
             {/* Row 3: order creation and (once created) invoice generation, as two explicit steps. */}
             <div className="flex w-full flex-col gap-3 rounded-lg border border-border bg-surface p-3">
               {(formError || invoiceError) && (
-                <p role="alert" className="text-sm text-red-600">
+                <p role="alert" className="text-sm text-danger">
                   {formError ?? invoiceError}
                 </p>
               )}

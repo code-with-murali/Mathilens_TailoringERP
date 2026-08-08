@@ -5,6 +5,7 @@ import Link from "next/link";
 import { useParams, useRouter } from "next/navigation";
 import { Button } from "@/components/ui/Button";
 import { SearchPicker } from "@/components/ui/SearchPicker";
+import { StatusBadge, ORDER_STATUS_BADGE } from "@/components/ui/StatusBadge";
 import { useToast } from "@/components/ui/ToastProvider";
 import { getAccessToken } from "@/lib/auth";
 import { ApiError } from "@/lib/api-client";
@@ -32,7 +33,7 @@ const NEXT_STATUSES: Record<OrderStatus, OrderStatus[]> = {
 };
 
 const fieldClassName =
-  "rounded-md border border-border bg-background px-3 py-2 text-sm outline-none focus:ring-2 focus:ring-foreground/20";
+  "rounded-md border border-border bg-surface px-3 py-2 text-sm outline-none transition-colors focus:border-primary focus:ring-2 focus:ring-primary/25";
 
 export default function OrderDetailPage() {
   const params = useParams<{ id: string }>();
@@ -196,7 +197,7 @@ export default function OrderDetailPage() {
 
   if (loadError) {
     return (
-      <p role="alert" className="text-sm text-red-600">
+      <p role="alert" className="text-sm text-danger">
         {loadError}
       </p>
     );
@@ -222,7 +223,9 @@ export default function OrderDetailPage() {
         <dl className="grid grid-cols-2 gap-4 text-sm">
           <div>
             <dt className="text-foreground/70">Status</dt>
-            <dd className="font-medium">{order.status}</dd>
+            <dd className="mt-0.5">
+              <StatusBadge {...ORDER_STATUS_BADGE[order.status]} />
+            </dd>
           </div>
           <div>
             <dt className="text-foreground/70">Due date</dt>
@@ -291,7 +294,7 @@ export default function OrderDetailPage() {
               </div>
             </div>
             {invoiceError && (
-              <p role="alert" className="text-sm text-red-600">
+              <p role="alert" className="text-sm text-danger">
                 {invoiceError}
               </p>
             )}
@@ -363,7 +366,7 @@ export default function OrderDetailPage() {
                     className={fieldClassName}
                   />
                   {fabricError && (
-                    <p role="alert" className="text-sm text-red-600">
+                    <p role="alert" className="text-sm text-danger">
                       {fabricError}
                     </p>
                   )}
@@ -382,7 +385,7 @@ export default function OrderDetailPage() {
         </ul>
 
         {showAddItem && (
-          <form onSubmit={handleAddItem} className="mt-4 flex flex-col gap-3 rounded-md border border-border bg-background p-4">
+          <form onSubmit={handleAddItem} className="mt-4 flex flex-col gap-3 rounded-md border border-border bg-surface p-4">
             <div className="grid grid-cols-3 gap-3">
               <select value={newItemGarmentType} onChange={(e) => setNewItemGarmentType(e.target.value as GarmentType)} className={fieldClassName}>
                 {GARMENT_TYPES.map((type) => (
@@ -410,7 +413,7 @@ export default function OrderDetailPage() {
               />
             </div>
             {addItemError && (
-              <p role="alert" className="text-sm text-red-600">
+              <p role="alert" className="text-sm text-danger">
                 {addItemError}
               </p>
             )}

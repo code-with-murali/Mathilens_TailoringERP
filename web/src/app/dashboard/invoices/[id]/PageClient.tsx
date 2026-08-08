@@ -5,6 +5,7 @@ import Link from "next/link";
 import { useParams } from "next/navigation";
 import { Button } from "@/components/ui/Button";
 import { ConfirmDialog } from "@/components/ui/ConfirmDialog";
+import { StatusBadge, INVOICE_STATUS_BADGE } from "@/components/ui/StatusBadge";
 import { useToast } from "@/components/ui/ToastProvider";
 import { getAccessToken } from "@/lib/auth";
 import { ApiError } from "@/lib/api-client";
@@ -13,7 +14,7 @@ import { getOrder, type Order } from "@/lib/api/orders";
 import { getCustomer, type Customer } from "@/lib/api/customers";
 
 const fieldClassName =
-  "rounded-md border border-border bg-background px-3 py-2 text-sm outline-none focus:ring-2 focus:ring-foreground/20";
+  "rounded-md border border-border bg-surface px-3 py-2 text-sm outline-none transition-colors focus:border-primary focus:ring-2 focus:ring-primary/25";
 
 export default function InvoiceDetailPage() {
   const params = useParams<{ id: string }>();
@@ -94,7 +95,7 @@ export default function InvoiceDetailPage() {
 
   if (loadError) {
     return (
-      <p role="alert" className="text-sm text-red-600">
+      <p role="alert" className="text-sm text-danger">
         {loadError}
       </p>
     );
@@ -145,7 +146,9 @@ export default function InvoiceDetailPage() {
           </div>
           <div>
             <dt className="text-foreground/70">Status</dt>
-            <dd className="font-medium">{invoice.status}</dd>
+            <dd className="mt-0.5">
+              <StatusBadge {...INVOICE_STATUS_BADGE[invoice.status]} />
+            </dd>
           </div>
           <div>
             <dt className="text-foreground/70">Subtotal</dt>
@@ -199,7 +202,7 @@ export default function InvoiceDetailPage() {
         )}
 
         {canRecordPayment && (
-          <form onSubmit={handleRecordPayment} className="mt-4 flex flex-col gap-3 rounded-md border border-border bg-background p-4 print:hidden">
+          <form onSubmit={handleRecordPayment} className="mt-4 flex flex-col gap-3 rounded-md border border-border bg-surface p-4 print:hidden">
             <span className="text-sm font-medium">Record a payment</span>
             <div className="grid grid-cols-2 gap-3">
               <input
@@ -220,7 +223,7 @@ export default function InvoiceDetailPage() {
               </select>
             </div>
             {paymentError && (
-              <p role="alert" className="text-sm text-red-600">
+              <p role="alert" className="text-sm text-danger">
                 {paymentError}
               </p>
             )}

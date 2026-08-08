@@ -32,10 +32,10 @@ export function ToastProvider({ children }: { children: ReactNode }) {
           <div
             key={toast.id}
             role="status"
-            className={`pointer-events-auto rounded-md border px-4 py-2 text-sm shadow-lg ${
+            className={`pointer-events-auto rounded-md border px-4 py-2 text-sm shadow-lg backdrop-blur-sm ${
               toast.variant === "success"
-                ? "border-border bg-surface text-foreground"
-                : "border-red-300 bg-red-50 text-red-700 dark:border-red-900 dark:bg-red-950 dark:text-red-300"
+                ? "border-success/25 bg-success/10 text-success"
+                : "border-danger/25 bg-danger/10 text-danger"
             }`}
           >
             {toast.message}

@@ -53,7 +53,7 @@ export default function EditEmployeePage() {
       </div>
 
       {loadError ? (
-        <p role="alert" className="text-sm text-red-600">
+        <p role="alert" className="text-sm text-danger">
           {loadError}
         </p>
       ) : !employee ? (

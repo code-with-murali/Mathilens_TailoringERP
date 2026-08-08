@@ -194,7 +194,7 @@ export default function SettingsPage() {
           placeholder="e.g. 5"
         />
         {orderDurationError && (
-          <p role="alert" className="text-sm text-red-600">
+          <p role="alert" className="text-sm text-danger">
             {orderDurationError}
           </p>
         )}
@@ -216,7 +216,7 @@ export default function SettingsPage() {
           />
           <Textarea id="settingValue" label="Value" rows={3} value={formValue} onChange={(e) => setFormValue(e.target.value)} />
           {formError && (
-            <p role="alert" className="text-sm text-red-600">
+            <p role="alert" className="text-sm text-danger">
               {formError}
             </p>
           )}
@@ -234,7 +234,7 @@ export default function SettingsPage() {
       {isLoading ? (
         <p className="text-sm text-foreground/70">Loading…</p>
       ) : loadError ? (
-        <p role="alert" className="text-sm text-red-600">
+        <p role="alert" className="text-sm text-danger">
           {loadError}
         </p>
       ) : settings.length === 0 ? (
@@ -261,7 +261,7 @@ export default function SettingsPage() {
                       <button type="button" onClick={() => openEditForm(setting)} className="text-foreground/70 hover:text-foreground">
                         Edit
                       </button>
-                      <button type="button" onClick={() => setPendingDelete(setting)} className="text-red-600 hover:text-red-700">
+                      <button type="button" onClick={() => setPendingDelete(setting)} className="text-danger hover:text-danger-hover">
                         Delete
                       </button>
                     </div>

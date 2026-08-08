@@ -39,7 +39,7 @@ function emptyRow(garmentType: GarmentType = GARMENT_TYPES[0]): ItemRow {
 }
 
 const fieldClassName =
-  "w-full rounded-md border border-border bg-background px-3 py-1 text-sm outline-none focus:ring-2 focus:ring-foreground/20";
+  "w-full rounded-md border border-border bg-surface px-3 py-1 text-sm outline-none transition-colors focus:border-primary focus:ring-2 focus:ring-primary/25";
 
 // Live preview only — tolerant of blank/partial input so Total price updates as the shop owner
 // types, same reasoning as the order-level total on the New Order page.
@@ -123,13 +123,13 @@ function ClothCodeField({ value, onChange, onSelectMatch, disabled = false }: Cl
         className={`${fieldClassName} disabled:cursor-not-allowed disabled:opacity-50`}
       />
       {!disabled && isOpen && matches.length > 0 && (
-        <ul className="absolute top-full z-10 mt-1 max-h-40 w-full min-w-[10rem] overflow-y-auto rounded-md border border-border bg-background shadow-lg">
+        <ul className="absolute top-full z-10 mt-1 max-h-40 w-full min-w-[10rem] overflow-y-auto rounded-md border border-border bg-surface shadow-lg">
           {matches.map((match) => (
             <li key={match.id}>
               <button
                 type="button"
                 onClick={() => selectMatch(match)}
-                className="block w-full px-3 py-1.5 text-left text-sm hover:bg-surface"
+                className="block w-full px-3 py-1.5 text-left text-sm hover:bg-surface-hover"
               >
                 {match.clothCode} — {match.clothName} <span className="text-foreground/60">({match.sellingPrice.toFixed(2)})</span>
               </button>
@@ -199,7 +199,7 @@ export function OrderItemsEditor({ onChange, activeItemId, onItemClick, disabled
                   e.stopPropagation();
                   removeRow(row.id);
                 }}
-                className="text-sm text-red-600 hover:text-red-700"
+                className="text-sm text-danger hover:text-danger-hover"
               >
                 Remove
               </button>

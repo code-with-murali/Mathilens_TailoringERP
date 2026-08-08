@@ -55,7 +55,7 @@ export function InvoicePrintModal({ invoice, order, customer, onClose, autoPrint
       role="dialog"
       aria-modal="true"
     >
-      <div className="flex max-h-[90vh] w-full max-w-lg flex-col gap-4 overflow-y-auto rounded-lg border border-border bg-background p-6 print:max-h-none print:w-auto print:max-w-none print:overflow-visible print:rounded-none print:border-0 print:p-0">
+      <div className="flex max-h-[90vh] w-full max-w-lg flex-col gap-4 overflow-y-auto rounded-lg border border-border bg-surface p-6 print:max-h-none print:w-auto print:max-w-none print:overflow-visible print:rounded-none print:border-0 print:p-0">
         <div className="flex items-center justify-between print:hidden">
           <h2 className="text-lg font-semibold">Invoice</h2>
           <div className="flex items-center gap-4">

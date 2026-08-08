@@ -3,6 +3,7 @@
 import { useCallback, useEffect, useState } from "react";
 import Link from "next/link";
 import { Pagination } from "@/components/ui/Pagination";
+import { StatusBadge, INVOICE_STATUS_BADGE } from "@/components/ui/StatusBadge";
 import { getAccessToken } from "@/lib/auth";
 import { ApiError, type PaginationMeta } from "@/lib/api-client";
 import { searchInvoices, INVOICE_STATUSES, type Invoice, type InvoiceStatus } from "@/lib/api/billing";
@@ -55,7 +56,7 @@ export default function InvoicesPage() {
           id="statusFilter"
           value={status}
           onChange={(e) => handleStatusChange(e.target.value)}
-          className="max-w-xs rounded-md border border-border bg-background px-3 py-2 text-sm outline-none focus:ring-2 focus:ring-foreground/20"
+          className="max-w-xs rounded-md border border-border bg-surface px-3 py-2 text-sm outline-none transition-colors focus:border-primary focus:ring-2 focus:ring-primary/25"
         >
           <option value="">All statuses</option>
           {INVOICE_STATUSES.map((s) => (
@@ -69,7 +70,7 @@ export default function InvoicesPage() {
       {isLoading ? (
         <p className="text-sm text-foreground/70">Loading…</p>
       ) : loadError ? (
-        <p role="alert" className="text-sm text-red-600">
+        <p role="alert" className="text-sm text-danger">
           {loadError}
         </p>
       ) : invoices.length === 0 ? (
@@ -91,7 +92,9 @@ export default function InvoicesPage() {
             <tbody>
               {invoices.map((invoice) => (
                 <tr key={invoice.id} className="border-b border-border last:border-0">
-                  <td className="px-4 py-3">{invoice.status}</td>
+                  <td className="px-4 py-3">
+                    <StatusBadge {...INVOICE_STATUS_BADGE[invoice.status]} />
+                  </td>
                   <td className="px-4 py-3">{invoice.totalAmount.toFixed(2)}</td>
                   <td className="px-4 py-3">{invoice.amountPaid.toFixed(2)}</td>
                   <td className="px-4 py-3">{invoice.remainingBalance.toFixed(2)}</td>

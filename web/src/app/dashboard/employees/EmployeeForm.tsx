@@ -85,7 +85,7 @@ export function EmployeeForm({ initialValues = emptyValues, submitLabel, onSubmi
       />
 
       {formError && (
-        <p role="alert" className="text-sm text-red-600">
+        <p role="alert" className="text-sm text-danger">
           {formError}
         </p>
       )}

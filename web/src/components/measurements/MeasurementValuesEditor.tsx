@@ -98,7 +98,7 @@ export function MeasurementValuesEditor({ garmentType, initialValues = {}, onCha
             value={row.value}
             onChange={(e) => updateValue(row.id, e.target.value)}
             onKeyDown={(e) => handleKeyDown(e, index)}
-            className="w-28 rounded-md border border-border bg-background px-3 py-2 text-sm outline-none focus:ring-2 focus:ring-foreground/20"
+            className="w-28 rounded-md border border-border bg-surface px-3 py-2 text-sm outline-none transition-colors focus:border-primary focus:ring-2 focus:ring-primary/25"
           />
         </div>
       ))}

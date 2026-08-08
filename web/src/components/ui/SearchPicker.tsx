@@ -71,7 +71,7 @@ export function SearchPicker<T>({
     return (
       <div className="flex flex-col gap-1">
         {label && <span className="text-sm font-medium">{label}</span>}
-        <div className="flex items-center justify-between rounded-md border border-border bg-background px-3 py-2 text-sm">
+        <div className="flex items-center justify-between rounded-md border border-border bg-surface px-3 py-2 text-sm">
           <span>{selectedLabel}</span>
           {onClear && !disabled && (
             <button type="button" onClick={onClear} className="text-foreground/70 hover:text-foreground">
@@ -100,10 +100,10 @@ export function SearchPicker<T>({
         }}
         onFocus={() => setIsOpen(true)}
         placeholder={placeholder}
-        className="rounded-md border border-border bg-background px-3 py-2 text-sm outline-none focus:ring-2 focus:ring-foreground/20 disabled:cursor-not-allowed disabled:opacity-50"
+        className="rounded-md border border-border bg-surface px-3 py-2 text-sm outline-none transition-colors focus:border-primary focus:ring-2 focus:ring-primary/25 disabled:cursor-not-allowed disabled:opacity-50"
       />
       {isOpen && debouncedQuery && results.length > 0 && (
-        <ul className="absolute top-full z-10 mt-1 max-h-48 w-full overflow-y-auto rounded-md border border-border bg-background shadow-lg">
+        <ul className="absolute top-full z-10 mt-1 max-h-48 w-full overflow-y-auto rounded-md border border-border bg-surface shadow-lg">
           {results.map((item) => (
             <li key={getId(item)}>
               <button
@@ -114,7 +114,7 @@ export function SearchPicker<T>({
                   setResults([]);
                   setIsOpen(false);
                 }}
-                className="block w-full px-3 py-2 text-left text-sm hover:bg-surface"
+                className="block w-full px-3 py-2 text-left text-sm hover:bg-surface-hover"
               >
                 {getLabel(item)}
               </button>
@@ -123,7 +123,7 @@ export function SearchPicker<T>({
         </ul>
       )}
       {isOpen && debouncedQuery && results.length === 0 && onCreateNew && (
-        <div className="absolute top-full z-10 mt-1 w-full rounded-md border border-border bg-background shadow-lg">
+        <div className="absolute top-full z-10 mt-1 w-full rounded-md border border-border bg-surface shadow-lg">
           <button
             type="button"
             onClick={() => {
@@ -131,7 +131,7 @@ export function SearchPicker<T>({
               setQuery("");
               setIsOpen(false);
             }}
-            className="block w-full px-3 py-2 text-left text-sm hover:bg-surface"
+            className="block w-full px-3 py-2 text-left text-sm hover:bg-surface-hover"
           >
             {createNewLabel ? createNewLabel(debouncedQuery) : `+ Add "${debouncedQuery}" as new`}
           </button>

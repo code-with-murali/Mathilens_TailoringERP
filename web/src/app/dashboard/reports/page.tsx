@@ -15,7 +15,7 @@ import {
 
 const PAGE_SIZE = 20;
 const fieldClassName =
-  "rounded-md border border-border bg-background px-3 py-2 text-sm outline-none focus:ring-2 focus:ring-foreground/20";
+  "rounded-md border border-border bg-surface px-3 py-2 text-sm outline-none transition-colors focus:border-primary focus:ring-2 focus:ring-primary/25";
 
 function isoDateDaysAgo(days: number): string {
   const date = new Date();
@@ -114,7 +114,7 @@ export default function ReportsPage() {
       {isLoadingSummaries ? (
         <p className="text-sm text-foreground/70">Loading…</p>
       ) : summariesError ? (
-        <p role="alert" className="text-sm text-red-600">
+        <p role="alert" className="text-sm text-danger">
           {summariesError}
         </p>
       ) : (
@@ -162,7 +162,7 @@ export default function ReportsPage() {
         {isLoadingInvoices ? (
           <p className="text-sm text-foreground/70">Loading…</p>
         ) : invoicesError ? (
-          <p role="alert" className="text-sm text-red-600">
+          <p role="alert" className="text-sm text-danger">
             {invoicesError}
           </p>
         ) : outstandingInvoices.length === 0 ? (
