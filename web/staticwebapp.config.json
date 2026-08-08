@@ -8,7 +8,6 @@
     { "route": "/dashboard/employees/*", "rewrite": "/dashboard/employees/_.html" },
     { "route": "/dashboard/orders/*", "rewrite": "/dashboard/orders/_.html" },
     { "route": "/dashboard/invoices/*", "rewrite": "/dashboard/invoices/_.html" },
-    { "route": "/dashboard/whatsapp/*", "rewrite": "/dashboard/whatsapp/_.html" },
-    { "route": "/dashboard/measurements/*/history", "rewrite": "/dashboard/measurements/_/history.html" }
+    { "route": "/dashboard/whatsapp/*", "rewrite": "/dashboard/whatsapp/_.html" }
   ]
 }
