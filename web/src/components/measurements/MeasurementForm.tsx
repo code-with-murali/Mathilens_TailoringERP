@@ -19,6 +19,15 @@ export function MeasurementForm({ garmentType: fixedGarmentType, initialValues, 
   const [rows, setRows] = useState<ValueRowInput[]>([]);
   const [formError, setFormError] = useState<string | null>(null);
   const [isSubmitting, setIsSubmitting] = useState(false);
+  // Bumped by the Clear button to force MeasurementValuesEditor to remount blank — after the
+  // first clear, initialValues is dropped too, so clearing again still yields blank fields
+  // instead of reverting back to whatever was originally loaded.
+  const [clearCount, setClearCount] = useState(0);
+
+  function handleClear() {
+    setFormError(null);
+    setClearCount((count) => count + 1);
+  }
 
   async function handleSubmit(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
@@ -56,26 +65,32 @@ export function MeasurementForm({ garmentType: fixedGarmentType, initialValues, 
 
   return (
     <form onSubmit={handleSubmit} className="flex flex-col gap-4">
-      <div className="flex flex-col gap-1">
-        <label htmlFor="garmentType" className="text-sm font-medium">
-          Garment type
-        </label>
-        <select
-          id="garmentType"
-          value={garmentType}
-          disabled={Boolean(fixedGarmentType)}
-          onChange={(e) => setGarmentType(e.target.value as GarmentType)}
-          className="rounded-md border border-border bg-background px-3 py-2 text-sm outline-none focus:ring-2 focus:ring-foreground/20 disabled:opacity-60"
-        >
-          {GARMENT_TYPES.map((type) => (
-            <option key={type} value={type}>
-              {type}
-            </option>
-          ))}
-        </select>
-      </div>
+      {!fixedGarmentType && (
+        <div className="flex flex-col gap-1">
+          <label htmlFor="garmentType" className="text-sm font-medium">
+            Garment type
+          </label>
+          <select
+            id="garmentType"
+            value={garmentType}
+            onChange={(e) => setGarmentType(e.target.value as GarmentType)}
+            className="rounded-md border border-border bg-background px-3 py-2 text-sm outline-none focus:ring-2 focus:ring-foreground/20"
+          >
+            {GARMENT_TYPES.map((type) => (
+              <option key={type} value={type}>
+                {type}
+              </option>
+            ))}
+          </select>
+        </div>
+      )}
 
-      <MeasurementValuesEditor key={garmentType} garmentType={garmentType} initialValues={initialValues} onChange={setRows} />
+      <MeasurementValuesEditor
+        key={`${garmentType}-${clearCount}`}
+        garmentType={garmentType}
+        initialValues={clearCount === 0 ? initialValues : undefined}
+        onChange={setRows}
+      />
 
       {formError && (
         <p role="alert" className="text-sm text-red-600">
@@ -83,7 +98,10 @@ export function MeasurementForm({ garmentType: fixedGarmentType, initialValues, 
         </p>
       )}
 
-      <div className="flex justify-end">
+      <div className="flex justify-end gap-3">
+        <Button type="button" variant="secondary" onClick={handleClear} disabled={isSubmitting}>
+          Clear
+        </Button>
         <Button type="submit" disabled={isSubmitting}>
           {isSubmitting ? "Saving…" : submitLabel}
         </Button>

@@ -6,6 +6,7 @@ import { Input, Textarea } from "@/components/ui/Input";
 import { Pagination } from "@/components/ui/Pagination";
 import { ConfirmDialog } from "@/components/ui/ConfirmDialog";
 import { useToast } from "@/components/ui/ToastProvider";
+import { ThemeToggle } from "@/components/theme-toggle";
 import { getAccessToken } from "@/lib/auth";
 import { ApiError, type PaginationMeta } from "@/lib/api-client";
 import {
@@ -164,6 +165,14 @@ export default function SettingsPage() {
             New Setting
           </Button>
         )}
+      </div>
+
+      <div className="flex max-w-xl items-center justify-between gap-4 rounded-lg border border-border bg-surface p-6">
+        <div>
+          <h2 className="text-lg font-semibold">Appearance</h2>
+          <p className="text-sm text-foreground/70">Switch between light and dark mode.</p>
+        </div>
+        <ThemeToggle />
       </div>
 
       <form onSubmit={handleSaveOrderDuration} className="flex max-w-xl flex-col gap-4 rounded-lg border border-border bg-surface p-6">

@@ -29,6 +29,13 @@ function toRows(fields: readonly string[], values: Record<string, number>): Row[
   return fields.map((name, id) => ({ id, name, value: values[name] !== undefined ? String(values[name]) : "" }));
 }
 
+/** The fixed measurement-point names for a garment type, in their standard order — exposed so
+ * callers that need to lay the points out themselves (rather than rendering this component's
+ * own single-list layout) don't have to duplicate the template. */
+export function getMeasurementFields(garmentType: GarmentType): readonly string[] {
+  return GARMENT_MEASUREMENT_FIELDS[garmentType] ?? [];
+}
+
 type MeasurementValuesEditorProps = {
   garmentType: GarmentType;
   initialValues?: Record<string, number>;
@@ -76,7 +83,6 @@ export function MeasurementValuesEditor({ garmentType, initialValues = {}, onCha
 
   return (
     <div className="flex flex-col gap-2">
-      <span className="text-sm font-medium">Measurement points (cm)</span>
       {rows.map((row, index) => (
         <div key={row.id} className="flex items-center gap-3">
           <label className="w-48 shrink-0 text-sm text-foreground/80">{row.name}</label>

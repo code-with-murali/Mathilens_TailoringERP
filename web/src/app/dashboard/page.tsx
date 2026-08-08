@@ -1,5 +1,6 @@
 import Link from "next/link";
 import { Button } from "@/components/ui/Button";
+import { OrderStatusCounts } from "@/components/dashboard/OrderStatusCounts";
 
 export default function DashboardPage() {
   return (
@@ -10,9 +11,12 @@ export default function DashboardPage() {
           <Button type="button">New Order</Button>
         </Link>
       </div>
+
+      <OrderStatusCounts />
+
       <p className="text-foreground/70">
-        Welcome back. Operational widgets (orders in progress, revenue, pending deliveries)
-        arrive as their modules are built — see docs/03_ROADMAP.md.
+        More operational widgets (revenue, pending deliveries) arrive as their modules are built — see
+        docs/03_ROADMAP.md.
       </p>
     </div>
   );
