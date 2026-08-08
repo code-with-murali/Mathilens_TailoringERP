@@ -402,33 +402,6 @@ export default function NewOrderPage() {
         </form>
 
         <div className="flex w-full max-w-sm flex-col gap-6">
-          <div className="flex flex-col gap-4 rounded-lg border border-border bg-surface p-6">
-            <span className="text-sm font-medium">Order summary</span>
-            <div className="flex items-center justify-between text-sm">
-              <span className="text-foreground/70">Total</span>
-              <span className="font-medium">{orderTotal.toFixed(2)}</span>
-            </div>
-            <div className="flex flex-col gap-1">
-              <label htmlFor="advanceAmount" className="text-sm font-medium">
-                Advance received (optional)
-              </label>
-              <div className="grid grid-cols-2 gap-3">
-                <input id="advanceAmount" type="number" min="0" step="0.01" value={advanceAmount} onChange={(e) => setAdvanceAmount(e.target.value)} placeholder="0.00" className={fieldClassName} />
-                <select value={advanceMethod} onChange={(e) => setAdvanceMethod(e.target.value as PaymentMethod)} className={fieldClassName}>
-                  {PAYMENT_METHODS.map((method) => (
-                    <option key={method} value={method}>
-                      {method}
-                    </option>
-                  ))}
-                </select>
-              </div>
-            </div>
-            <div className="flex items-center justify-between border-t border-border pt-3 text-sm">
-              <span className="text-foreground/70">Balance</span>
-              <span className="font-medium">{orderBalance.toFixed(2)}</span>
-            </div>
-          </div>
-
           {isAddingNewCustomer && (
             <div className="flex flex-col gap-4 rounded-lg border border-border bg-surface p-6">
               <span className="text-sm font-medium">New customer</span>
@@ -482,6 +455,33 @@ export default function NewOrderPage() {
               )}
             </div>
           )}
+
+          <div className="flex flex-col gap-4 rounded-lg border border-border bg-surface p-6">
+            <span className="text-sm font-medium">Order summary</span>
+            <div className="flex items-center justify-between text-sm">
+              <span className="text-foreground/70">Total</span>
+              <span className="font-medium">{orderTotal.toFixed(2)}</span>
+            </div>
+            <div className="flex flex-col gap-1">
+              <label htmlFor="advanceAmount" className="text-sm font-medium">
+                Advance received (optional)
+              </label>
+              <div className="grid grid-cols-2 gap-3">
+                <input id="advanceAmount" type="number" min="0" step="0.01" value={advanceAmount} onChange={(e) => setAdvanceAmount(e.target.value)} placeholder="0.00" className={fieldClassName} />
+                <select value={advanceMethod} onChange={(e) => setAdvanceMethod(e.target.value as PaymentMethod)} className={fieldClassName}>
+                  {PAYMENT_METHODS.map((method) => (
+                    <option key={method} value={method}>
+                      {method}
+                    </option>
+                  ))}
+                </select>
+              </div>
+            </div>
+            <div className="flex items-center justify-between border-t border-border pt-3 text-sm">
+              <span className="text-foreground/70">Balance</span>
+              <span className="font-medium">{orderBalance.toFixed(2)}</span>
+            </div>
+          </div>
         </div>
       </div>
     </div>
