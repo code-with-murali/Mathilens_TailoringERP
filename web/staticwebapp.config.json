@@ -1,0 +1,14 @@
+{
+  "navigationFallback": {
+    "rewrite": "/index.html",
+    "exclude": ["/_next/*", "/*.{css,js,ico,png,jpg,jpeg,gif,svg,webp,woff,woff2,json,txt}"]
+  },
+  "routes": [
+    { "route": "/dashboard/customers/*", "rewrite": "/dashboard/customers/_.html" },
+    { "route": "/dashboard/employees/*", "rewrite": "/dashboard/employees/_.html" },
+    { "route": "/dashboard/orders/*", "rewrite": "/dashboard/orders/_.html" },
+    { "route": "/dashboard/invoices/*", "rewrite": "/dashboard/invoices/_.html" },
+    { "route": "/dashboard/whatsapp/*", "rewrite": "/dashboard/whatsapp/_.html" },
+    { "route": "/dashboard/measurements/*/history", "rewrite": "/dashboard/measurements/_/history.html" }
+  ]
+}
