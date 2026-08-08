@@ -1,0 +1,19 @@
+using MathilensERP.Domain.Pricing;
+using MathilensERP.Shared.Pagination;
+
+namespace MathilensERP.Application.Pricing;
+
+/// <summary>Repository port for the <see cref="ClothPrice"/> aggregate (01_ARCHITECTURE.md § 25.1 Repository Pattern).</summary>
+public interface IClothPriceRepository
+{
+    Task<ClothPrice?> GetByIdAsync(Guid id, CancellationToken cancellationToken);
+
+    /// <summary>Case-insensitive exact match, used to keep <see cref="ClothPrice.ClothCode"/> unique on create/update.</summary>
+    Task<ClothPrice?> GetByClothCodeAsync(string clothCode, CancellationToken cancellationToken);
+
+    Task<PagedResult<ClothPrice>> SearchAsync(string? searchTerm, int page, int pageSize, CancellationToken cancellationToken);
+
+    void Add(ClothPrice clothPrice);
+
+    Task SaveChangesAsync(CancellationToken cancellationToken);
+}
