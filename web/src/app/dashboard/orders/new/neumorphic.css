@@ -1,0 +1,212 @@
+/*
+ * Scoped "Soft Neumorphic Studio" skin for the New Order page only (order/04-soft-neumorphic.html).
+ *
+ * Technique: this app's shared components (Button, Input, SearchPicker, ConfirmDialog,
+ * OrderStatusCounts) and this page's own markup already route every color through the design
+ * tokens declared in globals.css (--background/--surface/--border/--primary/etc.), consumed via
+ * Tailwind utilities like bg-surface/border-border/bg-primary. Redefining those same custom
+ * properties inside .orderNewNeu cascades to every descendant for free — no component needs to
+ * know a second theme exists. The embossed shadow/no-border look isn't tokenized (Tailwind has no
+ * "soft-UI" utility), so it's added here as plain, un-layered CSS, which — per the CSS Cascade
+ * Layers spec — beats Tailwind's own utilities (declared inside @layer utilities) regardless of
+ * specificity, without needing !important for most rules.
+ */
+
+.orderNewNeu {
+  --background: #eceef1;
+  --foreground: #33363f;
+  --surface: #eceef1;
+  --surface-hover: #e3e6ea;
+  --border: transparent;
+  --primary: #1fa896;
+  --primary-hover: #188f80;
+  --primary-foreground: #ffffff;
+  --success: #1fa896;
+  --success-hover: #188f80;
+  --warning: #c98a2e;
+  --warning-hover: #a8721f;
+  --danger: #d1615a;
+  --danger-hover: #b64f49;
+  --info: #3b82c4;
+  --info-hover: #2f6ba0;
+
+  --neu-shadow-out: 8px 8px 16px #d1d4da, -8px -8px 16px #ffffff;
+  --neu-shadow-out-lg: 10px 10px 24px #d1d4da, -10px -10px 24px #ffffff;
+  --neu-shadow-in: inset 5px 5px 10px #d1d4da, inset -5px -5px 10px #ffffff;
+
+  /* Per-section accents (00_MASTER_SPEC.md-style tokenization, just scoped to this page): each
+     logical part of the form gets its own hue so the page reads as more than one shade of teal,
+     while every card keeps the same neutral embossed shadow — only labels, focus rings, and
+     primary buttons within a section pick up its color. */
+  --accent-customer: #7c6fe0;
+  --accent-customer-hover: #6a5cd1;
+  --accent-items: #1fa896;
+  --accent-items-hover: #188f80;
+  --accent-measure: #c98a2e;
+  --accent-measure-hover: #a8721f;
+  --accent-summary: #c2528f;
+  --accent-summary-hover: #a83f77;
+  --accent-schedule: #3b82c4;
+  --accent-schedule-hover: #2f6ba0;
+
+  background: var(--background);
+  color: var(--foreground);
+  margin: -1.5rem;
+  padding: 1.5rem;
+  border-radius: 20px;
+}
+
+.dark .orderNewNeu {
+  --background: #1c1e24;
+  --foreground: #e6e7ec;
+  --surface: #1c1e24;
+  --surface-hover: #23262d;
+  --primary: #2dd4bf;
+  --primary-hover: #5eead4;
+  --primary-foreground: #06231f;
+  --success: #2dd4bf;
+  --success-hover: #5eead4;
+  --warning: #e3a857;
+  --warning-hover: #f0bd78;
+  --danger: #ef8983;
+  --danger-hover: #f4a8a3;
+  --info: #6fa8dc;
+  --info-hover: #8fbde3;
+
+  --neu-shadow-out: 8px 8px 16px #131418, -8px -8px 16px #262a32;
+  --neu-shadow-out-lg: 10px 10px 24px #131418, -10px -10px 24px #262a32;
+  --neu-shadow-in: inset 5px 5px 10px #131418, inset -5px -5px 10px #262a32;
+
+  --accent-customer: #a89bff;
+  --accent-customer-hover: #bfb4ff;
+  --accent-items: #2dd4bf;
+  --accent-items-hover: #5eead4;
+  --accent-measure: #e3a857;
+  --accent-measure-hover: #f0bd78;
+  --accent-summary: #e18ab8;
+  --accent-summary-hover: #ec9fc7;
+  --accent-schedule: #6fa8dc;
+  --accent-schedule-hover: #8fbde3;
+}
+
+/* Baseline: every bordered element gets a soft, low-contrast line instead of a hard token border
+   (covers thin dividers — table rows, etc. — that shouldn't be full embossed panels). */
+.orderNewNeu .border-border {
+  border-color: color-mix(in srgb, var(--foreground) 12%, transparent);
+}
+
+/* Card-like "bordered surface block" containers (the codebase's own convention: rounded + border
+   + bg-surface together) become raised embossed panels — this single rule covers this page's own
+   section cards AND SearchPicker's selected-value box/dropdown, ConfirmDialog's panel, and
+   OrderStatusCounts' tiles, since they all follow that same convention. */
+.orderNewNeu :is(div, ul)[class*="border-border"][class*="bg-surface"],
+.orderNewNeu div[class*="border-2"][class*="border-foreground"] {
+  border-color: transparent !important;
+  border-radius: 16px;
+  box-shadow: var(--neu-shadow-out-lg);
+}
+
+/* Any other bordered (but not full-card) div — e.g. an OrderItemsEditor row — gets a soft outline
+   and rounder corners without full embossing, so nested rows don't stack shadow-on-shadow. */
+.orderNewNeu div[class*="rounded-md"][class*="border"] {
+  border-radius: 14px;
+}
+
+/* Dropdown/menu panels (mobile number, cloth code, customer/employee search results). */
+.orderNewNeu [class*="shadow-lg"] {
+  border-color: transparent !important;
+  box-shadow: var(--neu-shadow-out-lg);
+}
+
+/* Inputs, selects, textareas, and the read-only Total price field read as recessed wells. */
+.orderNewNeu input:not([type="checkbox"]),
+.orderNewNeu select,
+.orderNewNeu textarea {
+  background: var(--background);
+  border-color: transparent;
+  box-shadow: var(--neu-shadow-in);
+  border-radius: 12px;
+}
+
+.orderNewNeu input[type="checkbox"] {
+  accent-color: var(--primary);
+}
+
+/* Real <Button> instances (guaranteed to carry "rounded-md" from the shared component's base
+   class) become raised soft-UI buttons; plain text-link buttons (Close, Change, Cancel) are left
+   alone since they never carry that class. */
+.orderNewNeu button[class*="rounded-md"] {
+  border: none;
+  box-shadow: var(--neu-shadow-out);
+}
+.orderNewNeu button[class*="rounded-md"]:active {
+  box-shadow: var(--neu-shadow-in);
+}
+
+/* Selected/active state (order items row, Order summary cell when previewing) reads as pressed-in
+   rather than a colored outline ring. */
+.orderNewNeu [class*="ring-foreground"] {
+  box-shadow: var(--neu-shadow-in) !important;
+}
+
+/* --- Per-section accents ---------------------------------------------------------------- */
+
+.neuSection-customer,
+.neuSection-items,
+.neuSection-measure,
+.neuSection-summary,
+.neuSection-schedule {
+  --section-accent: var(--foreground);
+  --section-accent-hover: var(--foreground);
+}
+.neuSection-customer { --section-accent: var(--accent-customer); --section-accent-hover: var(--accent-customer-hover); }
+.neuSection-items { --section-accent: var(--accent-items); --section-accent-hover: var(--accent-items-hover); }
+.neuSection-measure { --section-accent: var(--accent-measure); --section-accent-hover: var(--accent-measure-hover); }
+.neuSection-summary { --section-accent: var(--accent-summary); --section-accent-hover: var(--accent-summary-hover); }
+.neuSection-schedule { --section-accent: var(--accent-schedule); --section-accent-hover: var(--accent-schedule-hover); }
+
+/* Field labels and headings pick up the section's hue. Headings use an explicit .neu-heading
+   marker (rather than matching on font-medium generally) so numeric values that happen to share
+   that weight — Total, Balance, item totals — aren't tinted too. */
+.orderNewNeu [class*="neuSection-"] label,
+.orderNewNeu [class*="neuSection-"] .neu-heading {
+  color: var(--section-accent);
+}
+
+/* Focused fields glow with the section's color instead of the generic teal ring. */
+.orderNewNeu [class*="neuSection-"] input:not([type="checkbox"]):focus,
+.orderNewNeu [class*="neuSection-"] select:focus,
+.orderNewNeu [class*="neuSection-"] textarea:focus {
+  box-shadow: var(--neu-shadow-in), 0 0 0 2px var(--section-accent);
+}
+
+/* Primary (filled) buttons inside a themed section borrow its accent instead of the default. */
+.orderNewNeu [class*="neuSection-"] button[class*="bg-primary"] {
+  background: var(--section-accent);
+}
+.orderNewNeu [class*="neuSection-"] button[class*="bg-primary"]:hover {
+  background: var(--section-accent-hover);
+}
+
+/* Plain text-link buttons (Change, "+ Add new customer…", search-result rows) in the customer
+   zone read in violet too — Remove/Cancel elsewhere keep their own semantic (danger/neutral)
+   color since those live outside this rule's sections. */
+.neuSection-customer button:not([class*="rounded-md"]) {
+  color: var(--accent-customer);
+}
+.neuSection-customer button:not([class*="rounded-md"]):hover {
+  color: var(--accent-customer-hover);
+}
+
+.neuSection-items .neu-add-item {
+  color: var(--accent-items);
+}
+.neuSection-items .neu-add-item:hover {
+  color: var(--accent-items-hover);
+}
+
+/* Cloth-code suggestion list: garment/code text picks up the items accent; the trailing price
+   span keeps its own muted color since it sets color explicitly. */
+.neuSection-items ul button {
+  color: var(--accent-items);
+}

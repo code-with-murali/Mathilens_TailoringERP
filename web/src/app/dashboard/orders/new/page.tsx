@@ -21,6 +21,7 @@ import { createOrder, type CreateOrderItemInput, type Order } from "@/lib/api/or
 import { listMeasurementsForCustomer, createMeasurement, updateMeasurementValues, type Measurement } from "@/lib/api/measurements";
 import { getSetting, DEFAULT_ORDER_DUE_DATE_DAYS_KEY } from "@/lib/api/settings";
 import { createInvoice, recordPayment, PAYMENT_METHODS, type PaymentMethod, type Invoice } from "@/lib/api/billing";
+import "./neumorphic.css";
 
 const fieldClassName = "rounded-md border border-border bg-surface px-3 py-1 text-sm outline-none transition-colors focus:border-primary focus:ring-2 focus:ring-primary/25";
 
@@ -507,7 +508,7 @@ export default function NewOrderPage() {
 
   return (
     <>
-    <div className="flex flex-col gap-3 print:hidden">
+    <div className="orderNewNeu flex flex-col gap-3 print:hidden">
       <div className="flex items-center justify-between">
         <h1 className="text-2xl font-semibold">{createdOrder ? `Order - #${createdOrder.id.slice(0, 8).toUpperCase()}` : "New Order"}</h1>
         <Link href="/dashboard/orders" className="text-sm text-foreground/70 hover:text-foreground">
@@ -519,6 +520,7 @@ export default function NewOrderPage() {
         <div className="flex flex-col items-start gap-3 lg:flex-row lg:items-stretch">
           {/* Column 1: who the order is for, and what's being made. */}
           <div className="flex w-full flex-1 flex-col gap-2 rounded-lg border border-border bg-surface p-3 lg:flex-[2]">
+          <div className="neuSection-customer flex flex-col gap-2">
             {/* Once a customer is selected, the Customer field below is the single source of truth
                 for who the order is for — Mobile Number's only job was helping to find them, so it
                 hides rather than repeating the same name/phone a second time right next to it. */}
@@ -577,8 +579,9 @@ export default function NewOrderPage() {
               createNewLabel={(query) => `+ Add "${query}" as a new customer`}
               disabled={isOrderCreated}
             />
+          </div>
 
-            <div ref={itemsAreaRef}>
+            <div ref={itemsAreaRef} className="neuSection-items">
               <OrderItemsEditor
                 key={formKey}
                 onChange={setItemRows}
@@ -598,9 +601,9 @@ export default function NewOrderPage() {
                 of jumping up to fill the gap. */}
             <div ref={measurementBlockRef} className="flex flex-1 flex-col gap-3 rounded-lg border-2 border-foreground bg-surface p-3">
               {activeMeasurementItem && (
-                <>
-                  <div className="flex items-center justify-between gap-2 border-b-2 border-black pb-3">
-                    <span className="min-w-0 flex-1 truncate text-sm font-medium">
+                <div className="neuSection-measure flex flex-col gap-3">
+                  <div className="flex items-center justify-between gap-2 border-b-2 border-foreground/15 pb-3">
+                    <span className="neu-heading min-w-0 flex-1 truncate text-sm font-medium">
                       Measurement Detail - Item {activeMeasurementItemIndex + 1} - {activeMeasurementItem.garmentType}
                     </span>
                     <button
@@ -671,7 +674,7 @@ export default function NewOrderPage() {
                   )}
 
                   {customer && !isLoadingMeasurements && measurementFields.length > 0 && (
-                    <div className="flex justify-center gap-3 border-y-2 border-black py-3">
+                    <div className="flex justify-center gap-3 border-y-2 border-foreground/15 py-3">
                       <Button type="button" variant="secondary" onClick={handleClearMeasurement} disabled={isSavingMeasurement || isOrderCreated}>
                         Clear
                       </Button>
@@ -680,15 +683,15 @@ export default function NewOrderPage() {
                       </Button>
                     </div>
                   )}
-                </>
+                </div>
               )}
               {/* "+ Add new customer" (from the Mobile Number or Customer field) opens the New
                   customer form here, in the same top block, instead of inline in column 1 —
                   mutually exclusive with the measurement panel above since starting either one
                   clears the other's active state. */}
               {!activeMeasurementItem && isAddingNewCustomer && (
-                <div className="flex flex-col gap-2">
-                  <span className="text-sm font-medium">New customer</span>
+                <div className="neuSection-customer flex flex-col gap-2">
+                  <span className="neu-heading text-sm font-medium">New customer</span>
                   <Input id="newCustomerName" label="Full name" value={newCustomerName} onChange={(e) => setNewCustomerName(e.target.value)} error={newCustomerFieldErrors.fullname} />
                   <Input id="newCustomerPhone" label="Phone number" value={newCustomerPhone} onChange={(e) => setNewCustomerPhone(e.target.value)} error={newCustomerFieldErrors.phonenumber} />
                   <Input id="newCustomerEmail" label="Email (optional)" type="email" value={newCustomerEmail} onChange={(e) => setNewCustomerEmail(e.target.value)} error={newCustomerFieldErrors.email} />
@@ -711,9 +714,9 @@ export default function NewOrderPage() {
                   just closing whatever was open — a read-only recap of items/total/advance/balance
                   before committing to Create order. */}
               {!activeMeasurementItem && !isAddingNewCustomer && isViewingSummary && (
-                <div className="flex flex-1 flex-col gap-3">
-                  <div className="flex items-center justify-between border-b-2 border-black pb-3">
-                    <span className="text-sm font-medium">Order Summary Preview</span>
+                <div className="neuSection-summary flex flex-1 flex-col gap-3">
+                  <div className="flex items-center justify-between border-b-2 border-foreground/15 pb-3">
+                    <span className="neu-heading text-sm font-medium">Order Summary Preview</span>
                     <button type="button" onClick={() => setIsViewingSummary(false)} className="text-sm text-foreground/70 hover:text-foreground">
                       Close
                     </button>
@@ -740,7 +743,7 @@ export default function NewOrderPage() {
                       ))}
                     </tbody>
                   </table>
-                  <div className="flex flex-col gap-1 border-t-2 border-black pt-2 text-sm">
+                  <div className="flex flex-col gap-1 border-t-2 border-foreground/15 pt-2 text-sm">
                     <div className="flex items-center justify-between">
                       <span className="text-foreground/70">Total</span>
                       <span className="font-medium">{orderTotal.toFixed(2)}</span>
@@ -768,11 +771,11 @@ export default function NewOrderPage() {
               <div
                 ref={orderSummaryRef}
                 onClick={handleOpenSummary}
-                className={`flex w-full flex-1 cursor-pointer flex-col gap-2 rounded-lg border p-3 ${
+                className={`neuSection-summary flex w-full flex-1 cursor-pointer flex-col gap-2 rounded-lg border p-3 ${
                   isViewingSummary ? "border-foreground bg-surface ring-1 ring-foreground" : "border-border bg-surface"
                 }`}
               >
-                <span className="text-sm font-medium">Order summary</span>
+                <span className="neu-heading text-sm font-medium">Order summary</span>
                 <div className="flex items-center justify-between text-sm">
                   <span className="text-foreground/70">Total</span>
                   <span className="font-medium">{orderTotal.toFixed(2)}</span>
@@ -814,7 +817,7 @@ export default function NewOrderPage() {
               </div>
 
               {/* Column 3: scheduling. */}
-              <div className="flex w-full flex-1 flex-col gap-3 rounded-lg border border-border bg-surface p-3">
+              <div className="neuSection-schedule flex w-full flex-1 flex-col gap-3 rounded-lg border border-border bg-surface p-3">
                 <div className="flex flex-col gap-1">
                   <label htmlFor="dueAtUtc" className="text-sm font-medium">
                     Due date
