@@ -1,0 +1,169 @@
+/*
+ * Scoped "Luxury Dark Glass" skin for the New Order page only (order/03-luxury-dark-glass.html).
+ *
+ * Same technique as the app's other page skins: this app's shared components (Button, Input,
+ * SearchPicker, ConfirmDialog, OrderStatusCounts) and this page's own markup already route every
+ * color through the design tokens declared in globals.css (--background/--surface/--border/
+ * --primary/etc.), consumed via Tailwind utilities like bg-surface/border-border/bg-primary.
+ * Redefining those same custom properties inside .orderNewSkin cascades to every descendant for
+ * free — no component needs to know a second theme exists. The glass panel look (translucent +
+ * backdrop-blur, no hard border) isn't tokenized, so it's added here as plain, un-layered CSS,
+ * which — per the CSS Cascade Layers spec — beats Tailwind's own utilities (declared inside
+ * @layer utilities) regardless of specificity, without needing !important for most rules.
+ *
+ * This design has no light-mode counterpart in the mockup, so it renders dark unconditionally,
+ * independent of the app's own light/dark toggle (only this page's content area is affected —
+ * the sidebar/header chrome stays in the app's normal theme).
+ *
+ * `.orderSection-*` wrapper classes and `.order-heading`/`.order-add-item` markers are shared,
+ * style-agnostic scaffolding added directly to page.tsx/OrderItemsEditor.tsx — swapping to a
+ * different mockup only means swapping this file, not touching those components again.
+ */
+
+.orderNewSkin {
+  --background: #0a0a12;
+  --foreground: #f4f2ea;
+  --surface: rgba(255, 255, 255, 0.055);
+  --surface-hover: rgba(255, 255, 255, 0.09);
+  --border: rgba(255, 255, 255, 0.14);
+  --primary: #e8c77a;
+  --primary-hover: #c9a24c;
+  --primary-foreground: #241a05;
+  --success: #34d19a;
+  --success-hover: #2bb583;
+  --warning: #ffb454;
+  --warning-hover: #ffa733;
+  --danger: #ff6b6b;
+  --danger-hover: #ff8f8f;
+  --info: #8fb4ff;
+  --info-hover: #aac4ff;
+
+  background:
+    radial-gradient(1100px 600px at 12% -10%, rgba(232, 199, 122, 0.16), transparent 60%),
+    radial-gradient(900px 500px at 100% 10%, rgba(52, 209, 154, 0.14), transparent 55%),
+    radial-gradient(1200px 700px at 50% 120%, rgba(120, 90, 255, 0.14), transparent 60%),
+    linear-gradient(180deg, #0a0a12, #0e0e18 40%, #0a0a12);
+  color: var(--foreground);
+  margin: -1.5rem;
+  padding: 1.5rem;
+  border-radius: 20px;
+}
+
+/* Baseline: every bordered element gets the mockup's hairline instead of a hard token border. */
+.orderNewSkin .border-border {
+  border-color: var(--border);
+}
+
+/* Card-like "bordered surface block" containers (this codebase's own convention: rounded + border
+   + bg-surface together) become glass panels — one rule covers this page's own section cards AND
+   SearchPicker's selected-value box/dropdown, ConfirmDialog's panel, and OrderStatusCounts' tiles,
+   since they all follow that same convention. */
+.orderNewSkin :is(div, ul)[class*="border-border"][class*="bg-surface"],
+.orderNewSkin div[class*="border-2"][class*="border-foreground"] {
+  border: 1px solid var(--border) !important;
+  border-radius: 18px;
+  background: var(--surface);
+  backdrop-filter: blur(20px) saturate(140%);
+  -webkit-backdrop-filter: blur(20px) saturate(140%);
+  box-shadow: 0 20px 50px -30px rgba(0, 0, 0, 0.7), inset 0 1px 0 rgba(255, 255, 255, 0.06);
+}
+
+/* Any other bordered (but not full-card) div — e.g. an OrderItemsEditor row — gets a soft hairline
+   and rounder corners without the full glass treatment, so nested rows don't blur-on-blur. */
+.orderNewSkin div[class*="rounded-md"][class*="border"] {
+  border-radius: 14px;
+}
+
+/* Dropdown/menu panels (mobile number, cloth code, customer/employee search results). */
+.orderNewSkin [class*="shadow-lg"] {
+  border: 1px solid var(--border) !important;
+  background: #14121f;
+  backdrop-filter: blur(20px) saturate(140%);
+  -webkit-backdrop-filter: blur(20px) saturate(140%);
+  box-shadow: 0 20px 50px -30px rgba(0, 0, 0, 0.7);
+}
+.orderNewSkin [class*="shadow-lg"] button:hover {
+  background: var(--surface-hover);
+}
+
+/* Inputs, selects, textareas, and the read-only Total price field read as recessed glass wells. */
+.orderNewSkin input:not([type="checkbox"]),
+.orderNewSkin select,
+.orderNewSkin textarea {
+  background: rgba(255, 255, 255, 0.04);
+  border: 1px solid var(--border);
+  border-radius: 10px;
+  box-shadow: none;
+}
+.orderNewSkin input:not([type="checkbox"]):focus,
+.orderNewSkin select:focus,
+.orderNewSkin textarea:focus {
+  border-color: var(--primary);
+  box-shadow: 0 0 0 2px rgba(232, 199, 122, 0.25);
+}
+
+.orderNewSkin input[type="checkbox"] {
+  accent-color: var(--primary);
+}
+
+/* Real <Button> instances (guaranteed to carry "rounded-md" from the shared component's base
+   class) drop their flat fill for the mockup's gilded gradient (primary) or frosted-glass
+   (secondary/danger) treatment; plain text-link buttons (Close, Change, Cancel) are left alone
+   since they never carry that class. */
+.orderNewSkin button[class*="rounded-md"] {
+  border: none;
+}
+.orderNewSkin button[class*="bg-primary"] {
+  background: linear-gradient(135deg, var(--primary), #b3893f);
+  color: var(--primary-foreground);
+  box-shadow: 0 10px 24px -10px rgba(232, 199, 122, 0.6);
+}
+.orderNewSkin button[class*="bg-primary"]:hover {
+  filter: brightness(1.07);
+}
+.orderNewSkin button[class*="bg-surface"] {
+  background: var(--surface);
+  border: 1px solid var(--border) !important;
+  backdrop-filter: blur(14px);
+}
+.orderNewSkin button[class*="bg-surface"]:hover {
+  background: var(--surface-hover);
+}
+
+/* Selected/active state (order items row, Order summary cell when previewing) reads as a gold
+   glow instead of a plain ring. */
+.orderNewSkin [class*="ring-foreground"] {
+  border-color: var(--primary) !important;
+  box-shadow: 0 0 0 2px rgba(232, 199, 122, 0.35), 0 20px 50px -30px rgba(0, 0, 0, 0.7) !important;
+}
+
+/* The page's own "New Order" headline picks up the mockup's white → lilac → gold gradient text. */
+.orderNewSkin h1 {
+  background: linear-gradient(90deg, #fff, #cfc8ff 60%, var(--primary));
+  -webkit-background-clip: text;
+  background-clip: text;
+  color: transparent;
+}
+
+/* Section/field headings render in the muted ink the mockup uses for card titles and labels,
+   with the gold accent reserved for the primary CTA, focus rings, and measurement values below —
+   this design uses one accent, not a per-section palette. */
+.orderNewSkin [class*="orderSection-"] label {
+  color: var(--foreground);
+  opacity: 0.75;
+}
+.orderNewSkin [class*="orderSection-"] .order-heading {
+  color: var(--foreground);
+  font-weight: 700;
+}
+.orderNewSkin .orderSection-measure input:not([type="checkbox"]) {
+  color: var(--primary);
+  font-weight: 700;
+  text-align: center;
+}
+.orderNewSkin .order-add-item {
+  color: var(--primary);
+}
+.orderNewSkin .order-add-item:hover {
+  color: var(--primary-hover);
+}

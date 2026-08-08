@@ -181,7 +181,7 @@ export function OrderItemsEditor({ onChange, activeItemId, onItemClick, disabled
 
   return (
     <div className="flex flex-col gap-2">
-      <span className="neu-heading text-sm font-medium">Garment items</span>
+      <span className="order-heading text-sm font-medium">Garment items</span>
       {rows.map((row, index) => (
         <div
           key={row.id}
@@ -324,7 +324,7 @@ export function OrderItemsEditor({ onChange, activeItemId, onItemClick, disabled
         </div>
       ))}
       {!disabled && (
-        <button type="button" onClick={addRow} className="neu-add-item self-start text-sm font-medium text-foreground/70 hover:text-foreground">
+        <button type="button" onClick={addRow} className="order-add-item self-start text-sm font-medium text-foreground/70 hover:text-foreground">
           + Add item
         </button>
       )}
