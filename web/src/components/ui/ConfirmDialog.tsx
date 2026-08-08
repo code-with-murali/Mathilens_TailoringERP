@@ -7,17 +7,23 @@ type ConfirmDialogProps = {
   title: string;
   description: string;
   confirmLabel?: string;
+  /** Text shown on the confirm button while isConfirming — defaults to matching confirmLabel's "-ing" destructive phrasing. */
+  confirmingLabel?: string;
+  /** "danger" (default) suits destructive actions like delete; non-destructive confirmations (e.g. generating an invoice) should pass "primary". */
+  confirmVariant?: "danger" | "primary";
   isConfirming?: boolean;
   onConfirm: () => void;
   onCancel: () => void;
 };
 
-/** Blocking confirmation for destructive actions (00_MASTER_SPEC.md § 9.5/9.11). */
+/** Blocking confirmation for actions worth double-checking before they happen (00_MASTER_SPEC.md § 9.5/9.11) — destructive ones by default, but reusable for any consequential action via confirmVariant. */
 export function ConfirmDialog({
   open,
   title,
   description,
   confirmLabel = "Delete",
+  confirmingLabel = "Deleting…",
+  confirmVariant = "danger",
   isConfirming = false,
   onConfirm,
   onCancel,
@@ -35,8 +41,8 @@ export function ConfirmDialog({
           <Button type="button" variant="secondary" onClick={onCancel} disabled={isConfirming}>
             Cancel
           </Button>
-          <Button type="button" variant="danger" onClick={onConfirm} disabled={isConfirming}>
-            {isConfirming ? "Deleting…" : confirmLabel}
+          <Button type="button" variant={confirmVariant} onClick={onConfirm} disabled={isConfirming}>
+            {isConfirming ? confirmingLabel : confirmLabel}
           </Button>
         </div>
       </div>

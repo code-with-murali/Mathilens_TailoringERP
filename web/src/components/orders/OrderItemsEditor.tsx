@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { GARMENT_TYPES, type GarmentType } from "@/lib/api/measurements";
 import { FABRIC_SOURCES, type FabricSource } from "@/lib/api/orders";
 import { searchClothPrices, type ClothPrice } from "@/lib/api/clothPrices";
@@ -39,28 +39,37 @@ function emptyRow(garmentType: GarmentType = GARMENT_TYPES[0]): ItemRow {
 }
 
 const fieldClassName =
-  "rounded-md border border-border bg-background px-3 py-1 text-sm outline-none focus:ring-2 focus:ring-foreground/20";
+  "w-full rounded-md border border-border bg-background px-3 py-1 text-sm outline-none focus:ring-2 focus:ring-foreground/20";
+
+// Live preview only — tolerant of blank/partial input so Total price updates as the shop owner
+// types, same reasoning as the order-level total on the New Order page.
+function rowTotal(row: ItemRow): number {
+  const quantity = Number(row.quantity);
+  const unitPrice = Number(row.unitPrice);
+  return (Number.isFinite(quantity) ? quantity : 0) * (Number.isFinite(unitPrice) ? unitPrice : 0);
+}
 
 type ClothCodeFieldProps = {
   value: string;
   onChange: (value: string) => void;
   onSelectMatch: (match: ClothPrice) => void;
+  disabled?: boolean;
 };
 
-/** Free-text cloth code input with suggestions from the Price Detail catalog — picking a
- * suggestion fills in its code and its Selling price (never Cost price, which is for the
- * shop's own margin tracking, not a customer-facing order). */
-function ClothCodeField({ value, onChange, onSelectMatch }: ClothCodeFieldProps) {
+/** Dropdown cloth code picker with search — sourced from the Price Detail catalog. Opening it
+ * (focus/click) lists the catalog even with an empty query; typing filters it live. Picking an
+ * entry fills in its code and its Selling price (never Cost price, which is for the shop's own
+ * margin tracking, not a customer-facing order). Free text is still allowed for codes not yet in
+ * the catalog. */
+function ClothCodeField({ value, onChange, onSelectMatch, disabled = false }: ClothCodeFieldProps) {
   const debouncedValue = useDebouncedValue(value, 300);
   const [matches, setMatches] = useState<ClothPrice[]>([]);
+  const [isOpen, setIsOpen] = useState(false);
+  const fieldRef = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
-    if (!debouncedValue) {
-      return;
-    }
-
     let cancelled = false;
-    searchClothPrices(debouncedValue, 1, 5, getAccessToken())
+    searchClothPrices(debouncedValue, 1, 8, getAccessToken())
       .then(({ items }) => {
         if (!cancelled) {
           setMatches(items);
@@ -77,16 +86,43 @@ function ClothCodeField({ value, onChange, onSelectMatch }: ClothCodeFieldProps)
     };
   }, [debouncedValue]);
 
+  useEffect(() => {
+    if (!isOpen) {
+      return;
+    }
+
+    // Same outside-click-closes pattern used by the Mobile Number dropdown on the New Order page.
+    function handleOutsideClick(event: MouseEvent) {
+      const target = event.target as Node;
+      if (fieldRef.current?.contains(target)) {
+        return;
+      }
+      setIsOpen(false);
+    }
+
+    document.addEventListener("mousedown", handleOutsideClick);
+    return () => document.removeEventListener("mousedown", handleOutsideClick);
+  }, [isOpen]);
+
   function selectMatch(match: ClothPrice) {
     onSelectMatch(match);
-    setMatches([]);
+    setIsOpen(false);
   }
 
   return (
-    <div className="relative flex flex-col gap-1">
+    <div ref={fieldRef} className="relative flex flex-col gap-1">
       <label className="text-sm">Cloth code</label>
-      <input value={value} onChange={(e) => onChange(e.target.value)} className={fieldClassName} />
-      {debouncedValue && matches.length > 0 && (
+      <input
+        value={value}
+        disabled={disabled}
+        onChange={(e) => {
+          onChange(e.target.value);
+          setIsOpen(true);
+        }}
+        onFocus={() => setIsOpen(true)}
+        className={`${fieldClassName} disabled:cursor-not-allowed disabled:opacity-50`}
+      />
+      {!disabled && isOpen && matches.length > 0 && (
         <ul className="absolute top-full z-10 mt-1 max-h-40 w-full min-w-[10rem] overflow-y-auto rounded-md border border-border bg-background shadow-lg">
           {matches.map((match) => (
             <li key={match.id}>
@@ -109,10 +145,12 @@ type OrderItemsEditorProps = {
   onChange: (rows: ItemRow[]) => void;
   activeItemId?: number | null;
   onItemClick?: (row: ItemRow) => void;
+  /** Freezes every field and the Add item/Remove buttons — used once an order has been created from this form. */
+  disabled?: boolean;
 };
 
 /** Dynamic garment-line editor for the create-order form — each item optionally carries its own fabric details. */
-export function OrderItemsEditor({ onChange, activeItemId, onItemClick }: OrderItemsEditorProps) {
+export function OrderItemsEditor({ onChange, activeItemId, onItemClick, disabled = false }: OrderItemsEditorProps) {
   const [rows, setRows] = useState<ItemRow[]>(() => [emptyRow("Shirt"), emptyRow("Trousers"), emptyRow()]);
 
   useEffect(() => {
@@ -154,7 +192,7 @@ export function OrderItemsEditor({ onChange, activeItemId, onItemClick }: OrderI
         >
           <div className="flex items-center justify-between">
             <span className="text-sm font-medium">Item {index + 1}</span>
-            {rows.length > 1 && (
+            {rows.length > 1 && !disabled && (
               <button
                 type="button"
                 onClick={(e) => {
@@ -168,13 +206,18 @@ export function OrderItemsEditor({ onChange, activeItemId, onItemClick }: OrderI
             )}
           </div>
 
-          <div className="grid max-w-md grid-cols-4 gap-2" onClick={(e) => e.stopPropagation()}>
+          {/* No stopPropagation here — a click anywhere in the fields (including a blank input)
+              should still bubble up and open the measurement panel for this item, same as
+              clicking the card itself. Only Remove needs to opt out, since removing shouldn't
+              also select the (about to disappear) row. */}
+          <div className="grid max-w-2xl grid-cols-5 gap-2">
             <div className="flex flex-col gap-1">
               <label className="text-sm">Garment</label>
               <select
                 value={row.garmentType}
+                disabled={disabled}
                 onChange={(e) => updateRow(row.id, { garmentType: e.target.value as GarmentType })}
-                className={fieldClassName}
+                className={`${fieldClassName} disabled:cursor-not-allowed disabled:opacity-50`}
               >
                 {GARMENT_TYPES.map((type) => (
                   <option key={type} value={type}>
@@ -189,14 +232,16 @@ export function OrderItemsEditor({ onChange, activeItemId, onItemClick }: OrderI
                 type="number"
                 min="1"
                 value={row.quantity}
+                disabled={disabled}
                 onChange={(e) => updateRow(row.id, { quantity: e.target.value })}
-                className={fieldClassName}
+                className={`${fieldClassName} disabled:cursor-not-allowed disabled:opacity-50`}
               />
             </div>
             <ClothCodeField
               value={row.clothCode}
               onChange={(clothCode) => updateRow(row.id, { clothCode })}
               onSelectMatch={(match) => updateRow(row.id, { clothCode: match.clothCode, unitPrice: String(match.sellingPrice) })}
+              disabled={disabled}
             />
             <div className="flex flex-col gap-1">
               <label className="text-sm">Unit price</label>
@@ -205,14 +250,25 @@ export function OrderItemsEditor({ onChange, activeItemId, onItemClick }: OrderI
                 min="0"
                 step="0.01"
                 value={row.unitPrice}
+                disabled={disabled}
                 onChange={(e) => updateRow(row.id, { unitPrice: e.target.value })}
-                className={fieldClassName}
+                className={`${fieldClassName} disabled:cursor-not-allowed disabled:opacity-50`}
+              />
+            </div>
+            <div className="flex flex-col gap-1">
+              <label className="text-sm">Total price</label>
+              <input
+                type="text"
+                readOnly
+                tabIndex={-1}
+                value={rowTotal(row).toFixed(2)}
+                className={`${fieldClassName} cursor-default bg-surface`}
               />
             </div>
           </div>
 
           <label className="flex items-center gap-2 text-sm" onClick={(e) => e.stopPropagation()}>
-            <input type="checkbox" checked={row.includeFabric} onChange={(e) => updateRow(row.id, { includeFabric: e.target.checked })} />
+            <input type="checkbox" checked={row.includeFabric} disabled={disabled} onChange={(e) => updateRow(row.id, { includeFabric: e.target.checked })} />
             Add fabric details
           </label>
 
@@ -220,14 +276,20 @@ export function OrderItemsEditor({ onChange, activeItemId, onItemClick }: OrderI
             <div className="grid grid-cols-2 gap-2 rounded-md bg-surface p-2" onClick={(e) => e.stopPropagation()}>
               <div className="flex flex-col gap-1">
                 <label className="text-sm">Fabric type</label>
-                <input value={row.fabricType} onChange={(e) => updateRow(row.id, { fabricType: e.target.value })} className={fieldClassName} />
+                <input
+                  value={row.fabricType}
+                  disabled={disabled}
+                  onChange={(e) => updateRow(row.id, { fabricType: e.target.value })}
+                  className={`${fieldClassName} disabled:cursor-not-allowed disabled:opacity-50`}
+                />
               </div>
               <div className="flex flex-col gap-1">
                 <label className="text-sm">Source</label>
                 <select
                   value={row.fabricSource}
+                  disabled={disabled}
                   onChange={(e) => updateRow(row.id, { fabricSource: e.target.value as FabricSource })}
-                  className={fieldClassName}
+                  className={`${fieldClassName} disabled:cursor-not-allowed disabled:opacity-50`}
                 >
                   {FABRIC_SOURCES.map((source) => (
                     <option key={source} value={source}>
@@ -238,7 +300,12 @@ export function OrderItemsEditor({ onChange, activeItemId, onItemClick }: OrderI
               </div>
               <div className="flex flex-col gap-1">
                 <label className="text-sm">Color</label>
-                <input value={row.fabricColor} onChange={(e) => updateRow(row.id, { fabricColor: e.target.value })} className={fieldClassName} />
+                <input
+                  value={row.fabricColor}
+                  disabled={disabled}
+                  onChange={(e) => updateRow(row.id, { fabricColor: e.target.value })}
+                  className={`${fieldClassName} disabled:cursor-not-allowed disabled:opacity-50`}
+                />
               </div>
               <div className="flex flex-col gap-1">
                 <label className="text-sm">Quantity (m)</label>
@@ -247,17 +314,20 @@ export function OrderItemsEditor({ onChange, activeItemId, onItemClick }: OrderI
                   min="0"
                   step="0.1"
                   value={row.fabricQuantity}
+                  disabled={disabled}
                   onChange={(e) => updateRow(row.id, { fabricQuantity: e.target.value })}
-                  className={fieldClassName}
+                  className={`${fieldClassName} disabled:cursor-not-allowed disabled:opacity-50`}
                 />
               </div>
             </div>
           )}
         </div>
       ))}
-      <button type="button" onClick={addRow} className="self-start text-sm text-foreground/70 hover:text-foreground">
-        + Add item
-      </button>
+      {!disabled && (
+        <button type="button" onClick={addRow} className="self-start text-sm text-foreground/70 hover:text-foreground">
+          + Add item
+        </button>
+      )}
     </div>
   );
 }

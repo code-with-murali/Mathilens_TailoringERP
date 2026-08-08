@@ -13,6 +13,12 @@ export type Setting = {
  * shops commit to different turnaround times, so this isn't hardcoded). */
 export const DEFAULT_ORDER_DUE_DATE_DAYS_KEY = "Orders.DefaultDueDateDurationDays";
 
+/** Letterhead details for the printable invoice — configured via the Settings page's generic
+ * key/value store (same mechanism as the due-date default above) rather than hardcoded, since
+ * each shop has its own name and contact number. */
+export const SHOP_NAME_KEY = "Shop.Name";
+export const SHOP_CONTACT_NUMBER_KEY = "Shop.ContactNumber";
+
 export function listSettings(page: number, pageSize: number, token: string | null) {
   const params = new URLSearchParams({ page: String(page), pageSize: String(pageSize) });
   return apiGetPaged<Setting>(`/api/v1/settings?${params}`, token);

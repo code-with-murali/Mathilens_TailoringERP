@@ -6,7 +6,9 @@ import { useRouter } from "next/navigation";
 import { Button } from "@/components/ui/Button";
 import { Input } from "@/components/ui/Input";
 import { SearchPicker } from "@/components/ui/SearchPicker";
+import { ConfirmDialog } from "@/components/ui/ConfirmDialog";
 import { OrderItemsEditor, type ItemRow } from "@/components/orders/OrderItemsEditor";
+import { InvoicePrintModal } from "@/components/orders/InvoicePrintModal";
 import { getMeasurementFields } from "@/components/measurements/MeasurementValuesEditor";
 import { OrderStatusCounts } from "@/components/dashboard/OrderStatusCounts";
 import { useToast } from "@/components/ui/ToastProvider";
@@ -18,7 +20,7 @@ import { searchEmployees, type Employee } from "@/lib/api/employees";
 import { createOrder, type CreateOrderItemInput, type Order } from "@/lib/api/orders";
 import { listMeasurementsForCustomer, createMeasurement, updateMeasurementValues, type Measurement } from "@/lib/api/measurements";
 import { getSetting, DEFAULT_ORDER_DUE_DATE_DAYS_KEY } from "@/lib/api/settings";
-import { createInvoice, recordPayment, PAYMENT_METHODS, type PaymentMethod } from "@/lib/api/billing";
+import { createInvoice, recordPayment, PAYMENT_METHODS, type PaymentMethod, type Invoice } from "@/lib/api/billing";
 
 const fieldClassName = "rounded-md border border-border bg-background px-3 py-1 text-sm outline-none focus:ring-2 focus:ring-foreground/20";
 
@@ -33,6 +35,7 @@ export default function NewOrderPage() {
   const [mobileNumber, setMobileNumber] = useState("");
   const debouncedMobileNumber = useDebouncedValue(mobileNumber, 300);
   const [mobileMatches, setMobileMatches] = useState<Customer[]>([]);
+  const [isMobileDropdownOpen, setIsMobileDropdownOpen] = useState(false);
   const [isAddingNewCustomer, setIsAddingNewCustomer] = useState(false);
   const [newCustomerName, setNewCustomerName] = useState("");
   const [newCustomerPhone, setNewCustomerPhone] = useState("");
@@ -56,6 +59,14 @@ export default function NewOrderPage() {
   const [measurementValues, setMeasurementValues] = useState<Record<string, string>>({});
   const [measurementFormError, setMeasurementFormError] = useState<string | null>(null);
   const [isSavingMeasurement, setIsSavingMeasurement] = useState(false);
+  const [isViewingSummary, setIsViewingSummary] = useState(false);
+  const [formKey, setFormKey] = useState(0);
+  const [showInvoiceConfirm, setShowInvoiceConfirm] = useState(false);
+  const [createdInvoice, setCreatedInvoice] = useState<Invoice | null>(null);
+  const [showInvoiceModal, setShowInvoiceModal] = useState(false);
+  const [autoPrintInvoice, setAutoPrintInvoice] = useState(false);
+
+  const isOrderCreated = createdOrder !== null;
 
   const activeMeasurementItemIndex = itemRows.findIndex((row) => row.id === activeMeasurementItemId);
   const activeMeasurementItem = activeMeasurementItemIndex === -1 ? null : itemRows[activeMeasurementItemIndex];
@@ -69,26 +80,49 @@ export default function NewOrderPage() {
 
   const itemsAreaRef = useRef<HTMLDivElement>(null);
   const measurementBlockRef = useRef<HTMLDivElement>(null);
+  const mobileFieldRef = useRef<HTMLDivElement>(null);
+  const orderSummaryRef = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
-    if (!activeMeasurementItem) {
+    if (!activeMeasurementItem && !isViewingSummary) {
       return;
     }
 
-    // Clicking an item card opens this panel; clicking anywhere else (Customer field, Due
-    // date, blank space, etc.) should close it again, same as the "Close" button — but a click
-    // inside the panel itself (editing a measurement value) must not count as "elsewhere".
+    // Clicking an item card opens the measurement panel, clicking Order summary opens the invoice
+    // preview — clicking anywhere else (Customer field, Due date, blank space, etc.) should close
+    // whichever one is open, same as their own Close button — but a click inside the panel/Order
+    // summary cell itself must not count as "elsewhere".
     function handleOutsideClick(event: MouseEvent) {
       const target = event.target as Node;
-      if (itemsAreaRef.current?.contains(target) || measurementBlockRef.current?.contains(target)) {
+      if (itemsAreaRef.current?.contains(target) || measurementBlockRef.current?.contains(target) || orderSummaryRef.current?.contains(target)) {
         return;
       }
       setActiveMeasurementItemId(null);
+      setIsViewingSummary(false);
     }
 
     document.addEventListener("mousedown", handleOutsideClick);
     return () => document.removeEventListener("mousedown", handleOutsideClick);
-  }, [activeMeasurementItem]);
+  }, [activeMeasurementItem, isViewingSummary]);
+
+  useEffect(() => {
+    if (!isMobileDropdownOpen) {
+      return;
+    }
+
+    // Same outside-click-closes pattern as the measurement panel above — a click on the dropdown
+    // itself (picking a match) must not count as "elsewhere".
+    function handleOutsideClick(event: MouseEvent) {
+      const target = event.target as Node;
+      if (mobileFieldRef.current?.contains(target)) {
+        return;
+      }
+      setIsMobileDropdownOpen(false);
+    }
+
+    document.addEventListener("mousedown", handleOutsideClick);
+    return () => document.removeEventListener("mousedown", handleOutsideClick);
+  }, [isMobileDropdownOpen]);
 
   useEffect(() => {
     if (!activeMeasurementItem) {
@@ -112,11 +146,12 @@ export default function NewOrderPage() {
 
   // Live preview only — tolerant of blank/partial rows so the total updates as the shop owner
   // types, unlike handleSubmit's strict per-item validation which runs at actual submit time.
-  const orderTotal = itemRows.reduce((sum, row) => {
+  function itemRowTotal(row: ItemRow): number {
     const quantity = Number(row.quantity);
     const unitPrice = Number(row.unitPrice);
-    return sum + (Number.isFinite(quantity) ? quantity : 0) * (Number.isFinite(unitPrice) ? unitPrice : 0);
-  }, 0);
+    return (Number.isFinite(quantity) ? quantity : 0) * (Number.isFinite(unitPrice) ? unitPrice : 0);
+  }
+  const orderTotal = itemRows.reduce((sum, row) => sum + itemRowTotal(row), 0);
   const advanceValue = advanceAmount.trim() === "" ? 0 : Number(advanceAmount);
   const orderBalance = orderTotal - (Number.isFinite(advanceValue) ? advanceValue : 0);
 
@@ -124,6 +159,7 @@ export default function NewOrderPage() {
     setCustomer(selected);
     setMobileNumber("");
     setMobileMatches([]);
+    setIsMobileDropdownOpen(false);
     setIsAddingNewCustomer(false);
   }
 
@@ -131,6 +167,7 @@ export default function NewOrderPage() {
     setCustomer(null);
     setMobileNumber("");
     setMobileMatches([]);
+    setIsMobileDropdownOpen(false);
     setActiveMeasurementItemId(null);
   }
 
@@ -141,11 +178,20 @@ export default function NewOrderPage() {
     setNewCustomerError(null);
     setNewCustomerFieldErrors({});
     setIsAddingNewCustomer(true);
+    setIsMobileDropdownOpen(false);
     setActiveMeasurementItemId(null);
+    setIsViewingSummary(false);
   }
 
   function handleItemClick(row: ItemRow) {
     setActiveMeasurementItemId(row.id);
+    setIsAddingNewCustomer(false);
+    setIsViewingSummary(false);
+  }
+
+  function handleOpenSummary() {
+    setIsViewingSummary(true);
+    setActiveMeasurementItemId(null);
     setIsAddingNewCustomer(false);
   }
 
@@ -253,7 +299,7 @@ export default function NewOrderPage() {
     loadCustomerMeasurements();
   }, [loadCustomerMeasurements]);
 
-  useEffect(() => {
+  const applyDefaultDueDate = useCallback(() => {
     // Pre-fills Due date from the shop's configured turnaround (Settings page) — different
     // shops commit to different lead times, so this isn't hardcoded. Silently does nothing if
     // the setting was never configured; the functional update leaves a value the user already
@@ -273,6 +319,45 @@ export default function NewOrderPage() {
         // No default configured — Due date stays blank, same as before this feature existed.
       });
   }, []);
+
+  useEffect(() => {
+    applyDefaultDueDate();
+  }, [applyDefaultDueDate]);
+
+  function handleStartNewOrder() {
+    // Resets every field back to a blank form — the Add item/quantity/etc. rows live inside
+    // OrderItemsEditor's own state, so bumping formKey remounts it instead of trying to reach in.
+    setCustomer(null);
+    setMobileNumber("");
+    setMobileMatches([]);
+    setIsMobileDropdownOpen(false);
+    setIsAddingNewCustomer(false);
+    setNewCustomerName("");
+    setNewCustomerPhone("");
+    setNewCustomerEmail("");
+    setNewCustomerError(null);
+    setNewCustomerFieldErrors({});
+    setEmployee(null);
+    setDueAtUtc("");
+    setItemRows([]);
+    setFormError(null);
+    setIsSubmitting(false);
+    setCreatedOrder(null);
+    setInvoiceError(null);
+    setIsGeneratingInvoice(false);
+    setCreatedInvoice(null);
+    setShowInvoiceModal(false);
+    setAutoPrintInvoice(false);
+    setActiveMeasurementItemId(null);
+    setCustomerMeasurements([]);
+    setAdvanceAmount("");
+    setAdvanceMethod(PAYMENT_METHODS[0]);
+    setMeasurementValues({});
+    setMeasurementFormError(null);
+    setIsViewingSummary(false);
+    setFormKey((key) => key + 1);
+    applyDefaultDueDate();
+  }
 
   async function handleCreateNewCustomer() {
     setNewCustomerError(null);
@@ -326,6 +411,13 @@ export default function NewOrderPage() {
 
     const items: CreateOrderItemInput[] = [];
     for (const row of itemRows) {
+      // The form starts with a few blank placeholder rows so staff don't have to click "+ Add
+      // item" for a typical order — untouched ones (no cloth code, no unit price typed in) are
+      // silently skipped rather than blocking submission with a validation error.
+      if (row.clothCode.trim() === "" && row.unitPrice.trim() === "") {
+        continue;
+      }
+
       const quantity = Number(row.quantity);
       const unitPrice = Number(row.unitPrice);
       if (!Number.isFinite(quantity) || quantity <= 0 || !Number.isFinite(unitPrice) || unitPrice <= 0) {
@@ -397,11 +489,13 @@ export default function NewOrderPage() {
       // Tax/discount default to 0 since this form has no fields for them; staff can still adjust
       // an invoice's status via payments afterward.
       const invoice = await createInvoice(createdOrder.id, 0, 0, getAccessToken());
-      if (advanceValue > 0) {
-        await recordPayment(invoice.id, advanceValue, advanceMethod, getAccessToken());
-      }
+      // recordPayment returns the invoice with amountPaid/remainingBalance updated — that's the
+      // copy the printable invoice needs, not the pre-payment one from createInvoice.
+      const finalInvoice = advanceValue > 0 ? await recordPayment(invoice.id, advanceValue, advanceMethod, getAccessToken()) : invoice;
       showToast("Invoice generated.");
-      router.push(`/dashboard/invoices/${invoice.id}`);
+      // Stay on this page instead of navigating away — Generate invoice turns into View Invoice,
+      // which opens the printable modal, so staff decide when to leave.
+      setCreatedInvoice(finalInvoice);
     } catch (error) {
       // The order itself already exists — don't strand it. Staff can retry Generate Invoice here,
       // or fall back to the order page's own manual "Create Invoice" action.
@@ -412,9 +506,10 @@ export default function NewOrderPage() {
   }
 
   return (
-    <div className="flex flex-col gap-3">
+    <>
+    <div className="flex flex-col gap-3 print:hidden">
       <div className="flex items-center justify-between">
-        <h1 className="text-2xl font-semibold">New Order</h1>
+        <h1 className="text-2xl font-semibold">{createdOrder ? `Order - #${createdOrder.id.slice(0, 8).toUpperCase()}` : "New Order"}</h1>
         <Link href="/dashboard/orders" className="text-sm text-foreground/70 hover:text-foreground">
           Back to orders
         </Link>
@@ -428,32 +523,42 @@ export default function NewOrderPage() {
                 for who the order is for — Mobile Number's only job was helping to find them, so it
                 hides rather than repeating the same name/phone a second time right next to it. */}
             {!customer && (
-              <div className="relative flex flex-col gap-1">
+              <div ref={mobileFieldRef} className="relative flex flex-col gap-1">
                 <label htmlFor="mobileNumber" className="text-sm font-medium">
                   Mobile Number
                 </label>
                 <input
                   id="mobileNumber"
                   value={mobileNumber}
-                  onChange={(e) => setMobileNumber(e.target.value)}
+                  onChange={(e) => {
+                    setMobileNumber(e.target.value);
+                    setIsMobileDropdownOpen(true);
+                  }}
+                  onFocus={() => setIsMobileDropdownOpen(true)}
                   placeholder="Search by mobile number…"
                   className={fieldClassName}
                 />
-                {debouncedMobileNumber && mobileMatches.length > 0 && (
-                  <ul className="max-h-48 overflow-y-auto rounded-md border border-border bg-background shadow-sm">
+                {isMobileDropdownOpen && debouncedMobileNumber && mobileMatches.length > 0 && (
+                  <ul className="absolute top-full z-10 mt-1 max-h-48 w-full overflow-y-auto rounded-md border border-border bg-background shadow-lg">
                     {mobileMatches.map((c) => (
                       <li key={c.id}>
-                        <button type="button" onClick={() => selectCustomer(c)} className="block w-full px-3 py-1.5 text-left text-sm hover:bg-surface">
+                        <button type="button" onClick={() => selectCustomer(c)} className="block w-full px-3 py-2 text-left text-sm hover:bg-surface">
                           {c.fullName} ({c.phoneNumber})
                         </button>
                       </li>
                     ))}
                   </ul>
                 )}
-                {debouncedMobileNumber && mobileMatches.length === 0 && digitsOnly(debouncedMobileNumber).length >= 7 && (
-                  <button type="button" onClick={() => startAddingNewCustomer(debouncedMobileNumber, "phone")} className="self-start text-sm text-foreground/70 hover:text-foreground">
-                    {`+ Add new customer with mobile ${debouncedMobileNumber}`}
-                  </button>
+                {isMobileDropdownOpen && debouncedMobileNumber && mobileMatches.length === 0 && digitsOnly(debouncedMobileNumber).length >= 7 && (
+                  <div className="absolute top-full z-10 mt-1 w-full rounded-md border border-border bg-background shadow-lg">
+                    <button
+                      type="button"
+                      onClick={() => startAddingNewCustomer(debouncedMobileNumber, "phone")}
+                      className="block w-full px-3 py-2 text-left text-sm hover:bg-surface"
+                    >
+                      {`+ Add new customer with mobile ${debouncedMobileNumber}`}
+                    </button>
+                  </div>
                 )}
               </div>
             )}
@@ -470,32 +575,17 @@ export default function NewOrderPage() {
               placeholder="Search customers…"
               onCreateNew={(query) => startAddingNewCustomer(query, "name")}
               createNewLabel={(query) => `+ Add "${query}" as a new customer`}
+              disabled={isOrderCreated}
             />
 
-            {isAddingNewCustomer && (
-              <div className="flex flex-col gap-2 rounded-lg border border-border bg-background p-3">
-                <span className="text-sm font-medium">New customer</span>
-                <Input id="newCustomerName" label="Full name" value={newCustomerName} onChange={(e) => setNewCustomerName(e.target.value)} error={newCustomerFieldErrors.fullname} />
-                <Input id="newCustomerPhone" label="Phone number" value={newCustomerPhone} onChange={(e) => setNewCustomerPhone(e.target.value)} error={newCustomerFieldErrors.phonenumber} />
-                <Input id="newCustomerEmail" label="Email (optional)" type="email" value={newCustomerEmail} onChange={(e) => setNewCustomerEmail(e.target.value)} error={newCustomerFieldErrors.email} />
-                {newCustomerError && (
-                  <p role="alert" className="text-sm text-red-600">
-                    {newCustomerError}
-                  </p>
-                )}
-                <div className="flex justify-end gap-3">
-                  <button type="button" onClick={() => setIsAddingNewCustomer(false)} className="text-sm text-foreground/70 hover:text-foreground">
-                    Cancel
-                  </button>
-                  <Button type="button" variant="secondary" disabled={isCreatingCustomer} onClick={handleCreateNewCustomer}>
-                    {isCreatingCustomer ? "Adding…" : "Add customer"}
-                  </Button>
-                </div>
-              </div>
-            )}
-
             <div ref={itemsAreaRef}>
-              <OrderItemsEditor onChange={setItemRows} activeItemId={activeMeasurementItemId} onItemClick={handleItemClick} />
+              <OrderItemsEditor
+                key={formKey}
+                onChange={setItemRows}
+                activeItemId={activeMeasurementItemId}
+                onItemClick={handleItemClick}
+                disabled={isOrderCreated}
+              />
             </div>
           </div>
 
@@ -509,11 +599,15 @@ export default function NewOrderPage() {
             <div ref={measurementBlockRef} className="flex flex-1 flex-col gap-3 rounded-lg border-2 border-black bg-surface p-3">
               {activeMeasurementItem && (
                 <>
-                  <div className="flex items-center justify-between border-b-2 border-black pb-3">
-                    <span className="text-sm font-medium">
+                  <div className="flex items-center justify-between gap-2 border-b-2 border-black pb-3">
+                    <span className="min-w-0 flex-1 truncate text-sm font-medium">
                       Measurement Detail - Item {activeMeasurementItemIndex + 1} - {activeMeasurementItem.garmentType}
                     </span>
-                    <button type="button" onClick={() => setActiveMeasurementItemId(null)} className="text-sm text-foreground/70 hover:text-foreground">
+                    <button
+                      type="button"
+                      onClick={() => setActiveMeasurementItemId(null)}
+                      className="shrink-0 text-sm text-foreground/70 hover:text-foreground"
+                    >
                       Close
                     </button>
                   </div>
@@ -536,11 +630,12 @@ export default function NewOrderPage() {
                               min="0"
                               placeholder="cm"
                               value={measurementValues[field] ?? ""}
+                              disabled={isOrderCreated}
                               onChange={(e) => setMeasurementValues((prev) => ({ ...prev, [field]: e.target.value }))}
                               onKeyDown={(e) => {
                                 if (e.key === "Enter") e.preventDefault();
                               }}
-                              className="w-24 rounded-md border-2 border-black bg-background px-3 py-1 text-sm outline-none focus:ring-2 focus:ring-foreground/20"
+                              className="w-24 rounded-md border-2 border-black bg-background px-3 py-1 text-sm outline-none focus:ring-2 focus:ring-foreground/20 disabled:cursor-not-allowed disabled:opacity-50"
                             />
                           </div>
                         ))}
@@ -556,11 +651,12 @@ export default function NewOrderPage() {
                               min="0"
                               placeholder="cm"
                               value={measurementValues[field] ?? ""}
+                              disabled={isOrderCreated}
                               onChange={(e) => setMeasurementValues((prev) => ({ ...prev, [field]: e.target.value }))}
                               onKeyDown={(e) => {
                                 if (e.key === "Enter") e.preventDefault();
                               }}
-                              className="w-24 rounded-md border-2 border-black bg-background px-3 py-1 text-sm outline-none focus:ring-2 focus:ring-foreground/20"
+                              className="w-24 rounded-md border-2 border-black bg-background px-3 py-1 text-sm outline-none focus:ring-2 focus:ring-foreground/20 disabled:cursor-not-allowed disabled:opacity-50"
                             />
                           </div>
                         ))}
@@ -576,22 +672,106 @@ export default function NewOrderPage() {
 
                   {customer && !isLoadingMeasurements && measurementFields.length > 0 && (
                     <div className="flex justify-center gap-3 border-y-2 border-black py-3">
-                      <Button type="button" variant="secondary" onClick={handleClearMeasurement} disabled={isSavingMeasurement}>
+                      <Button type="button" variant="secondary" onClick={handleClearMeasurement} disabled={isSavingMeasurement || isOrderCreated}>
                         Clear
                       </Button>
-                      <Button type="button" onClick={handleSaveMeasurement} disabled={isSavingMeasurement}>
+                      <Button type="button" onClick={handleSaveMeasurement} disabled={isSavingMeasurement || isOrderCreated}>
                         {isSavingMeasurement ? "Saving…" : "Save"}
                       </Button>
                     </div>
                   )}
                 </>
               )}
-              {!activeMeasurementItem && <OrderStatusCounts />}
+              {/* "+ Add new customer" (from the Mobile Number or Customer field) opens the New
+                  customer form here, in the same top block, instead of inline in column 1 —
+                  mutually exclusive with the measurement panel above since starting either one
+                  clears the other's active state. */}
+              {!activeMeasurementItem && isAddingNewCustomer && (
+                <div className="flex flex-col gap-2">
+                  <span className="text-sm font-medium">New customer</span>
+                  <Input id="newCustomerName" label="Full name" value={newCustomerName} onChange={(e) => setNewCustomerName(e.target.value)} error={newCustomerFieldErrors.fullname} />
+                  <Input id="newCustomerPhone" label="Phone number" value={newCustomerPhone} onChange={(e) => setNewCustomerPhone(e.target.value)} error={newCustomerFieldErrors.phonenumber} />
+                  <Input id="newCustomerEmail" label="Email (optional)" type="email" value={newCustomerEmail} onChange={(e) => setNewCustomerEmail(e.target.value)} error={newCustomerFieldErrors.email} />
+                  {newCustomerError && (
+                    <p role="alert" className="text-sm text-red-600">
+                      {newCustomerError}
+                    </p>
+                  )}
+                  <div className="flex justify-end gap-3">
+                    <button type="button" onClick={() => setIsAddingNewCustomer(false)} className="text-sm text-foreground/70 hover:text-foreground">
+                      Cancel
+                    </button>
+                    <Button type="button" variant="secondary" disabled={isCreatingCustomer} onClick={handleCreateNewCustomer}>
+                      {isCreatingCustomer ? "Adding…" : "Add customer"}
+                    </Button>
+                  </div>
+                </div>
+              )}
+              {/* Clicking the Order summary cell opens an invoice-style preview here instead of
+                  just closing whatever was open — a read-only recap of items/total/advance/balance
+                  before committing to Create order. */}
+              {!activeMeasurementItem && !isAddingNewCustomer && isViewingSummary && (
+                <div className="flex flex-1 flex-col gap-3">
+                  <div className="flex items-center justify-between border-b-2 border-black pb-3">
+                    <span className="text-sm font-medium">Order Summary Preview</span>
+                    <button type="button" onClick={() => setIsViewingSummary(false)} className="text-sm text-foreground/70 hover:text-foreground">
+                      Close
+                    </button>
+                  </div>
+                  <table className="w-full text-sm">
+                    <thead>
+                      <tr className="border-b border-border text-left text-foreground/70">
+                        <th className="py-1 font-medium">#</th>
+                        <th className="py-1 font-medium">Garment</th>
+                        <th className="py-1 text-right font-medium">Qty</th>
+                        <th className="py-1 text-right font-medium">Unit price</th>
+                        <th className="py-1 text-right font-medium">Total</th>
+                      </tr>
+                    </thead>
+                    <tbody>
+                      {itemRows.map((row, index) => (
+                        <tr key={row.id} className="border-b border-border/50">
+                          <td className="py-1">{index + 1}</td>
+                          <td className="py-1">{row.garmentType}</td>
+                          <td className="py-1 text-right">{row.quantity || "0"}</td>
+                          <td className="py-1 text-right">{(Number(row.unitPrice) || 0).toFixed(2)}</td>
+                          <td className="py-1 text-right">{itemRowTotal(row).toFixed(2)}</td>
+                        </tr>
+                      ))}
+                    </tbody>
+                  </table>
+                  <div className="flex flex-col gap-1 border-t-2 border-black pt-2 text-sm">
+                    <div className="flex items-center justify-between">
+                      <span className="text-foreground/70">Total</span>
+                      <span className="font-medium">{orderTotal.toFixed(2)}</span>
+                    </div>
+                    <div className="flex items-center justify-between">
+                      <span className="text-foreground/70">Advance</span>
+                      <span className="font-medium">{advanceValue.toFixed(2)}</span>
+                    </div>
+                    <div className="flex items-center justify-between">
+                      <span className="text-foreground/70">Balance</span>
+                      <span className="font-medium">{orderBalance.toFixed(2)}</span>
+                    </div>
+                  </div>
+                </div>
+              )}
+              {/* Widget helps staff before they've picked a customer to work on; once a customer is
+                  selected this box is reserved for that customer's item measurements, so the
+                  widget is disabled (hidden) rather than shown alongside them. */}
+              {!activeMeasurementItem && !isAddingNewCustomer && !isViewingSummary && !customer && <OrderStatusCounts />}
             </div>
 
             <div className="flex flex-col items-start gap-3 lg:flex-row lg:items-stretch">
-              {/* Column 2: money. */}
-              <div className="flex w-full flex-1 flex-col gap-2 rounded-lg border border-border bg-surface p-3">
+              {/* Column 2: money. Clicking the cell (outside the interactive advance fields) opens
+                  the invoice preview above. */}
+              <div
+                ref={orderSummaryRef}
+                onClick={handleOpenSummary}
+                className={`flex w-full flex-1 cursor-pointer flex-col gap-2 rounded-lg border p-3 ${
+                  isViewingSummary ? "border-foreground bg-surface ring-1 ring-foreground" : "border-border bg-surface"
+                }`}
+              >
                 <span className="text-sm font-medium">Order summary</span>
                 <div className="flex items-center justify-between text-sm">
                   <span className="text-foreground/70">Total</span>
@@ -602,8 +782,23 @@ export default function NewOrderPage() {
                     Advance received (optional)
                   </label>
                   <div className="grid grid-cols-2 gap-2">
-                    <input id="advanceAmount" type="number" min="0" step="0.01" value={advanceAmount} onChange={(e) => setAdvanceAmount(e.target.value)} placeholder="0.00" className={fieldClassName} />
-                    <select value={advanceMethod} onChange={(e) => setAdvanceMethod(e.target.value as PaymentMethod)} className={fieldClassName}>
+                    <input
+                      id="advanceAmount"
+                      type="number"
+                      min="0"
+                      step="0.01"
+                      value={advanceAmount}
+                      disabled={isOrderCreated}
+                      onChange={(e) => setAdvanceAmount(e.target.value)}
+                      placeholder="0.00"
+                      className={`${fieldClassName} disabled:cursor-not-allowed disabled:opacity-50`}
+                    />
+                    <select
+                      value={advanceMethod}
+                      disabled={isOrderCreated}
+                      onChange={(e) => setAdvanceMethod(e.target.value as PaymentMethod)}
+                      className={`${fieldClassName} disabled:cursor-not-allowed disabled:opacity-50`}
+                    >
                       {PAYMENT_METHODS.map((method) => (
                         <option key={method} value={method}>
                           {method}
@@ -628,8 +823,9 @@ export default function NewOrderPage() {
                     id="dueAtUtc"
                     type="date"
                     value={dueAtUtc}
+                    disabled={isOrderCreated}
                     onChange={(e) => setDueAtUtc(e.target.value)}
-                    className={fieldClassName}
+                    className={`${fieldClassName} disabled:cursor-not-allowed disabled:opacity-50`}
                   />
                 </div>
 
@@ -643,6 +839,7 @@ export default function NewOrderPage() {
                   getId={(e) => e.id}
                   getLabel={(e) => e.fullName}
                   placeholder="Search employees…"
+                  disabled={isOrderCreated}
                 />
               </div>
             </div>
@@ -655,17 +852,81 @@ export default function NewOrderPage() {
                 </p>
               )}
               <div className="flex items-center justify-center gap-3">
-                <Button type="submit" disabled={isSubmitting || createdOrder !== null}>
-                  {isSubmitting ? "Creating…" : createdOrder ? "Order created" : "Create order"}
+                <Button type="submit" disabled={isSubmitting || isOrderCreated}>
+                  {isSubmitting ? "Creating…" : isOrderCreated ? "Order created" : "Create order"}
                 </Button>
-                <Button type="button" onClick={handleGenerateInvoice} disabled={!createdOrder || isGeneratingInvoice}>
-                  {isGeneratingInvoice ? "Generating…" : "Generate invoice"}
+                {createdInvoice ? (
+                  <>
+                    <Button
+                      type="button"
+                      variant="secondary"
+                      onClick={() => {
+                        setAutoPrintInvoice(false);
+                        setShowInvoiceModal(true);
+                      }}
+                    >
+                      View Invoice
+                    </Button>
+                    <Button
+                      type="button"
+                      variant="secondary"
+                      onClick={() => {
+                        setAutoPrintInvoice(true);
+                        setShowInvoiceModal(true);
+                      }}
+                    >
+                      Print Invoice
+                    </Button>
+                  </>
+                ) : (
+                  <Button type="button" onClick={() => setShowInvoiceConfirm(true)} disabled={!isOrderCreated || isGeneratingInvoice}>
+                    {isGeneratingInvoice ? "Generating…" : "Generate invoice"}
+                  </Button>
+                )}
+                <Button
+                  type="button"
+                  variant="secondary"
+                  disabled={!isOrderCreated}
+                  onClick={() => createdOrder && router.push(`/dashboard/orders/${createdOrder.id}`)}
+                >
+                  View order
+                </Button>
+                <Button type="button" variant="secondary" disabled={!isOrderCreated} onClick={handleStartNewOrder}>
+                  New order
                 </Button>
               </div>
             </div>
           </div>
         </div>
       </form>
+
+      <ConfirmDialog
+        open={showInvoiceConfirm}
+        title="Generate invoice"
+        description={`Generate an invoice for this order now? Total ${orderTotal.toFixed(2)}, advance ${advanceValue.toFixed(2)}, balance ${orderBalance.toFixed(2)}.`}
+        confirmLabel="Generate"
+        confirmingLabel="Generating…"
+        confirmVariant="primary"
+        isConfirming={isGeneratingInvoice}
+        onConfirm={() => {
+          setShowInvoiceConfirm(false);
+          handleGenerateInvoice();
+        }}
+        onCancel={() => setShowInvoiceConfirm(false)}
+      />
     </div>
+
+    {/* Rendered outside the print:hidden wrapper above so printing the modal doesn't also try
+        to print (and hide) the rest of the New Order form behind it. */}
+    {showInvoiceModal && createdInvoice && createdOrder && customer && (
+      <InvoicePrintModal
+        invoice={createdInvoice}
+        order={createdOrder}
+        customer={customer}
+        autoPrint={autoPrintInvoice}
+        onClose={() => setShowInvoiceModal(false)}
+      />
+    )}
+    </>
   );
 }

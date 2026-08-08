@@ -17,6 +17,8 @@ type SearchPickerProps<T> = {
   /** When provided, a "create new" action appears once a search returns no results — for pickers that also need to cover records that don't exist yet (e.g. a walk-in customer). */
   onCreateNew?: (query: string) => void;
   createNewLabel?: (query: string) => string;
+  /** Freezes the picker — the "Change" button disappears when a value is already selected, and the search input itself is disabled otherwise. */
+  disabled?: boolean;
 };
 
 /** A debounced, server-side search dropdown for picking a related record (00_MASTER_SPEC.md § 9.7 Search). */
@@ -32,6 +34,7 @@ export function SearchPicker<T>({
   placeholder,
   onCreateNew,
   createNewLabel,
+  disabled = false,
 }: SearchPickerProps<T>) {
   const [query, setQuery] = useState("");
   const debouncedQuery = useDebouncedValue(query, 300);
@@ -70,7 +73,7 @@ export function SearchPicker<T>({
         {label && <span className="text-sm font-medium">{label}</span>}
         <div className="flex items-center justify-between rounded-md border border-border bg-background px-3 py-2 text-sm">
           <span>{selectedLabel}</span>
-          {onClear && (
+          {onClear && !disabled && (
             <button type="button" onClick={onClear} className="text-foreground/70 hover:text-foreground">
               Change
             </button>
@@ -90,13 +93,14 @@ export function SearchPicker<T>({
       <input
         id={id}
         value={query}
+        disabled={disabled}
         onChange={(e) => {
           setQuery(e.target.value);
           setIsOpen(true);
         }}
         onFocus={() => setIsOpen(true)}
         placeholder={placeholder}
-        className="rounded-md border border-border bg-background px-3 py-2 text-sm outline-none focus:ring-2 focus:ring-foreground/20"
+        className="rounded-md border border-border bg-background px-3 py-2 text-sm outline-none focus:ring-2 focus:ring-foreground/20 disabled:cursor-not-allowed disabled:opacity-50"
       />
       {isOpen && debouncedQuery && results.length > 0 && (
         <ul className="absolute top-full z-10 mt-1 max-h-48 w-full overflow-y-auto rounded-md border border-border bg-background shadow-lg">
