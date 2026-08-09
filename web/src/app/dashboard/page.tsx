@@ -13,11 +13,6 @@ export default function DashboardPage() {
       </div>
 
       <OrderStatusCounts />
-
-      <p className="text-foreground/70">
-        More operational widgets (revenue, pending deliveries) arrive as their modules are built — see
-        docs/03_ROADMAP.md.
-      </p>
     </div>
   );
 }

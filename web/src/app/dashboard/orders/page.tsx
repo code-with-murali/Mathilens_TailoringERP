@@ -8,13 +8,19 @@ import { StatusBadge, ORDER_STATUS_BADGE } from "@/components/ui/StatusBadge";
 import { getAccessToken } from "@/lib/auth";
 import { ApiError, type PaginationMeta } from "@/lib/api-client";
 import { searchOrders, ORDER_STATUSES, type Order, type OrderStatus } from "@/lib/api/orders";
+import { getCustomer, type Customer } from "@/lib/api/customers";
 
 const PAGE_SIZE = 20;
+
+function orderNumber(order: Order) {
+  return `#${order.id.slice(0, 8).toUpperCase()}`;
+}
 
 export default function OrdersPage() {
   const [status, setStatus] = useState<OrderStatus | "">("");
   const [page, setPage] = useState(1);
   const [orders, setOrders] = useState<Order[]>([]);
+  const [customersById, setCustomersById] = useState<Record<string, Customer>>({});
   const [meta, setMeta] = useState<PaginationMeta | null>(null);
   const [isLoading, setIsLoading] = useState(true);
   const [loadError, setLoadError] = useState<string | null>(null);
@@ -26,6 +32,21 @@ export default function OrdersPage() {
       const { items, meta } = await searchOrders(null, status || null, page, PAGE_SIZE, getAccessToken());
       setOrders(items);
       setMeta(meta);
+
+      const token = getAccessToken();
+      const uniqueCustomerIds = Array.from(new Set(items.map((order) => order.customerId)));
+      const customers = await Promise.all(
+        uniqueCustomerIds.map((customerId) => getCustomer(customerId, token).catch(() => null)),
+      );
+      setCustomersById((prev) => {
+        const next = { ...prev };
+        customers.forEach((customer) => {
+          if (customer) {
+            next[customer.id] = customer;
+          }
+        });
+        return next;
+      });
     } catch (error) {
       setLoadError(error instanceof ApiError ? error.message : "Unable to load orders.");
     } finally {
@@ -86,29 +107,32 @@ export default function OrdersPage() {
           <table className="w-full text-left text-sm">
             <thead className="border-b border-border bg-surface">
               <tr>
+                <th className="px-4 py-3 font-medium">Order Number</th>
+                <th className="px-4 py-3 font-medium">Customer Name</th>
+                <th className="px-4 py-3 font-medium">Phone Number</th>
+                <th className="px-4 py-3 font-medium">Due Date</th>
                 <th className="px-4 py-3 font-medium">Status</th>
-                <th className="px-4 py-3 font-medium">Due</th>
-                <th className="px-4 py-3 font-medium">Items</th>
-                <th className="px-4 py-3 font-medium">
-                  <span className="sr-only">Actions</span>
-                </th>
               </tr>
             </thead>
             <tbody>
-              {orders.map((order) => (
-                <tr key={order.id} className="border-b border-border last:border-0">
-                  <td className="px-4 py-3">
-                    <StatusBadge {...ORDER_STATUS_BADGE[order.status]} />
-                  </td>
-                  <td className="px-4 py-3">{new Date(order.dueAtUtc).toLocaleDateString()}</td>
-                  <td className="px-4 py-3">{order.items.length}</td>
-                  <td className="px-4 py-3 text-right">
-                    <Link href={`/dashboard/orders/${order.id}`} className="text-foreground/70 hover:text-foreground">
-                      View
-                    </Link>
-                  </td>
-                </tr>
-              ))}
+              {orders.map((order) => {
+                const customer = customersById[order.customerId];
+                return (
+                  <tr key={order.id} className="border-b border-border last:border-0">
+                    <td className="px-4 py-3 font-mono">
+                      <Link href={`/dashboard/orders/${order.id}`} className="text-primary hover:underline">
+                        {orderNumber(order)}
+                      </Link>
+                    </td>
+                    <td className="px-4 py-3">{customer?.fullName ?? "—"}</td>
+                    <td className="px-4 py-3">{customer?.phoneNumber ?? "—"}</td>
+                    <td className="px-4 py-3">{new Date(order.dueAtUtc).toLocaleDateString()}</td>
+                    <td className="px-4 py-3">
+                      <StatusBadge {...ORDER_STATUS_BADGE[order.status]} />
+                    </td>
+                  </tr>
+                );
+              })}
             </tbody>
           </table>
         </div>

@@ -521,13 +521,13 @@ export default function NewOrderPage() {
           {/* Column 1: who the order is for, and what's being made. */}
           <div className="flex w-full flex-1 flex-col gap-2 rounded-lg border border-border bg-surface p-3 lg:flex-[2]">
           <div className="orderSection-customer flex flex-col gap-2">
-            {/* Once a customer is selected, the Customer field below is the single source of truth
-                for who the order is for — Mobile Number's only job was helping to find them, so it
-                hides rather than repeating the same name/phone a second time right next to it. */}
-            {!customer && (
+            {/* The Customer field (a second, name/phone search picker) was removed as redundant
+                with Mobile Number below — this block now doubles as both the search UI and, once
+                a customer is picked, their name/phone display with a Change link back to search. */}
+            {!customer ? (
               <div ref={mobileFieldRef} className="relative flex flex-col gap-1">
                 <label htmlFor="mobileNumber" className="text-sm font-medium">
-                  Mobile Number
+                  Customer Detail
                 </label>
                 <input
                   id="mobileNumber"
@@ -563,22 +563,21 @@ export default function NewOrderPage() {
                   </div>
                 )}
               </div>
+            ) : (
+              <div className="flex flex-col gap-1">
+                <label className="text-sm font-medium">Customer</label>
+                <div className="flex items-center justify-between rounded-md border border-border bg-surface px-3 py-2 text-sm">
+                  <span>
+                    {customer.fullName} ({customer.phoneNumber})
+                  </span>
+                  {!isOrderCreated && (
+                    <button type="button" onClick={clearCustomer} className="text-foreground/70 hover:text-foreground">
+                      Change
+                    </button>
+                  )}
+                </div>
+              </div>
             )}
-
-            <SearchPicker
-              id="customer"
-              label="Customer"
-              selectedLabel={customer ? `${customer.fullName} (${customer.phoneNumber})` : null}
-              onSelect={selectCustomer}
-              onClear={clearCustomer}
-              search={searchCustomers}
-              getId={(c) => c.id}
-              getLabel={(c) => `${c.fullName} (${c.phoneNumber})`}
-              placeholder="Search customers…"
-              onCreateNew={(query) => startAddingNewCustomer(query, "name")}
-              createNewLabel={(query) => `+ Add "${query}" as a new customer`}
-              disabled={isOrderCreated}
-            />
           </div>
 
             <div ref={itemsAreaRef} className="orderSection-items">

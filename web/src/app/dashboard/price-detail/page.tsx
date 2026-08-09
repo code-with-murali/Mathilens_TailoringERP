@@ -141,7 +141,7 @@ export default function PriceDetailPage() {
       </div>
 
       {formState && (
-        <form onSubmit={handleSubmit} className="flex max-w-2xl flex-col gap-4 rounded-lg border border-border bg-surface p-6">
+        <form onSubmit={handleSubmit} className="flex flex-col gap-4 rounded-lg border border-border bg-surface p-6">
           <div className="grid grid-cols-1 gap-4 sm:grid-cols-4">
             <Input id="clothCode" label="Cloth code" value={formClothCode} onChange={(e) => setFormClothCode(e.target.value)} />
             <Input id="clothName" label="Cloth name" value={formClothName} onChange={(e) => setFormClothName(e.target.value)} />

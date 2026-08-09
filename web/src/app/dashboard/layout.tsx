@@ -55,6 +55,11 @@ export default function DashboardLayout({ children }: LayoutProps<"/dashboard">)
     href === "/dashboard" ? pathname === href : pathname?.startsWith(href),
   )?.label ?? "Dashboard";
 
+  // The New Order page has its own immersive theme (a fixed dark skin, independent of the
+  // ThemeToggle) plus its own heading and "Back to orders" link — the shared breadcrumb/theme
+  // toggle bar would be redundant chrome and the toggle would visibly do nothing there.
+  const hideHeader = pathname === "/dashboard/orders/new";
+
   return (
     <div className="flex min-h-full flex-1">
       <aside className="flex w-60 shrink-0 flex-col border-r border-border bg-surface print:hidden">
@@ -99,10 +104,12 @@ export default function DashboardLayout({ children }: LayoutProps<"/dashboard">)
         </div>
       </aside>
       <div className="flex min-h-full flex-1 flex-col">
-        <header className="sticky top-0 z-10 flex h-14 shrink-0 items-center justify-between border-b border-border bg-surface/80 px-6 backdrop-blur-sm print:hidden">
-          <span className="text-sm font-medium text-foreground/70">{activeLabel}</span>
-          <ThemeToggle />
-        </header>
+        {!hideHeader && (
+          <header className="sticky top-0 z-10 flex h-14 shrink-0 items-center justify-between border-b border-border bg-surface/80 px-6 backdrop-blur-sm print:hidden">
+            <span className="text-sm font-medium text-foreground/70">{activeLabel}</span>
+            <ThemeToggle />
+          </header>
+        )}
         <main className="flex-1 px-6 py-6">{children}</main>
       </div>
     </div>
