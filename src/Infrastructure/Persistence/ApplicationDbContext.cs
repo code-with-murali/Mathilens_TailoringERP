@@ -13,6 +13,7 @@ using MathilensERP.Infrastructure.Identity;
 using Microsoft.AspNetCore.Identity;
 using Microsoft.AspNetCore.Identity.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore;
+using Microsoft.EntityFrameworkCore.Metadata;
 
 namespace MathilensERP.Infrastructure.Persistence;
 
@@ -63,6 +64,7 @@ public class ApplicationDbContext : IdentityDbContext<ApplicationUser, Applicati
 
         RenameIdentityTables(builder);
         ApplySoftDeleteQueryFilters(builder);
+        ConfigureClientGeneratedKeys(builder);
     }
 
     /// <summary>
@@ -99,6 +101,36 @@ public class ApplicationDbContext : IdentityDbContext<ApplicationUser, Applicati
             var lambda = Expression.Lambda(notDeleted, parameter);
 
             builder.Entity(entityType.ClrType).HasQueryFilter(lambda);
+        }
+    }
+
+    /// <summary>
+    /// Every domain entity's Guid id is assigned by application code (<c>Guid.NewGuid()</c> in
+    /// a factory method), never by the database. Without this, EF Core's default "value
+    /// generated on add" convention for Guid keys makes the change tracker's graph-fixup
+    /// misread a brand-new child discovered only via a collection navigation on an
+    /// already-tracked, unmodified-key parent — e.g. the <see cref="Payment"/> that
+    /// <see cref="Invoice.RecordPayment"/> adds to an existing invoice — as pre-existing,
+    /// because its key is already non-empty. That produces a no-op UPDATE instead of an
+    /// INSERT, which then fails EF's implicit "one row affected" check as a spurious
+    /// <c>DbUpdateConcurrencyException</c>. Entities added directly via <c>DbSet.Add()</c>
+    /// (every aggregate root created through its repository) are unaffected either way.
+    /// </summary>
+    private static void ConfigureClientGeneratedKeys(ModelBuilder builder)
+    {
+        foreach (var entityType in builder.Model.GetEntityTypes())
+        {
+            if (entityType.ClrType.Namespace?.StartsWith("MathilensERP.Domain", StringComparison.Ordinal) != true)
+            {
+                continue;
+            }
+
+            if (entityType.FindPrimaryKey()?.Properties is not [{ } keyProperty] || keyProperty.ClrType != typeof(Guid))
+            {
+                continue;
+            }
+
+            keyProperty.ValueGenerated = ValueGenerated.Never;
         }
     }
 }
