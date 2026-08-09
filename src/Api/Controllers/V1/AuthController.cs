@@ -3,6 +3,7 @@ using MathilensERP.Api.Contracts.Auth;
 using MathilensERP.Api.Contracts.Common;
 using MathilensERP.Application.Auth.Commands.Login;
 using MathilensERP.Application.Auth.Commands.RefreshAccessToken;
+using MathilensERP.Application.Auth.Commands.Register;
 using MathilensERP.Application.Common.Interfaces;
 using MathilensERP.Application.Common.Mediator;
 using Microsoft.AspNetCore.Authorization;
@@ -31,6 +32,17 @@ public sealed class AuthController : ApiControllerBase
     public async Task<IActionResult> Login([FromBody] LoginRequest request, CancellationToken cancellationToken)
     {
         var result = await _sender.Send(new LoginCommand(request.Email, request.Password), cancellationToken);
+        return ToActionResult(result);
+    }
+
+    /// <summary>Creates a new account and signs them straight in, issuing a JWT access token + refresh token pair.</summary>
+    [HttpPost("register")]
+    [ProducesResponseType(typeof(ApiResponse<AuthTokensDto>), StatusCodes.Status200OK)]
+    [ProducesResponseType(typeof(ApiErrorResponse), StatusCodes.Status400BadRequest)]
+    [ProducesResponseType(typeof(ApiErrorResponse), StatusCodes.Status409Conflict)]
+    public async Task<IActionResult> Register([FromBody] RegisterRequest request, CancellationToken cancellationToken)
+    {
+        var result = await _sender.Send(new RegisterCommand(request.Email, request.Password), cancellationToken);
         return ToActionResult(result);
     }
 

@@ -13,6 +13,12 @@ public interface IIdentityService
     Task<Result<AuthTokensDto>> LoginAsync(string email, string password, CancellationToken cancellationToken);
 
     /// <summary>
+    /// Creates a new user account and, on success, signs them straight in — matching the
+    /// pattern of a self-service sign-up page (00_MASTER_SPEC.md § 10.1).
+    /// </summary>
+    Task<Result<AuthTokensDto>> RegisterAsync(string email, string password, CancellationToken cancellationToken);
+
+    /// <summary>
     /// Redeems a refresh token for a new token pair. The presented token is rotated
     /// (revoked and replaced); if it was already revoked, this is treated as a replay and
     /// every active refresh token for that user is revoked (00_MASTER_SPEC.md § 10.1).

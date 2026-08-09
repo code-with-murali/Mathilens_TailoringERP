@@ -7,10 +7,11 @@ import { Button } from "@/components/ui/Button";
 import { apiPost, ApiError } from "@/lib/api-client";
 import { storeTokens, type AuthTokens } from "@/lib/auth";
 
-export default function LoginPage() {
+export default function RegisterPage() {
   const router = useRouter();
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
+  const [confirmPassword, setConfirmPassword] = useState("");
   const [fieldErrors, setFieldErrors] = useState<Record<string, string>>({});
   const [formError, setFormError] = useState<string | null>(null);
   const [isSubmitting, setIsSubmitting] = useState(false);
@@ -19,10 +20,15 @@ export default function LoginPage() {
     event.preventDefault();
     setFormError(null);
     setFieldErrors({});
-    setIsSubmitting(true);
 
+    if (password !== confirmPassword) {
+      setFieldErrors({ confirmpassword: "Passwords don't match." });
+      return;
+    }
+
+    setIsSubmitting(true);
     try {
-      const tokens = await apiPost<AuthTokens>("/api/v1/auth/login", { email, password });
+      const tokens = await apiPost<AuthTokens>("/api/v1/auth/register", { email, password });
       storeTokens(tokens);
       router.push("/dashboard");
     } catch (error) {
@@ -47,8 +53,8 @@ export default function LoginPage() {
         <span className="mb-4 flex h-10 w-10 items-center justify-center rounded-lg bg-primary text-base font-bold text-primary-foreground">
           M
         </span>
-        <h1 className="mb-1 text-xl font-semibold">Mathilens Tailoring ERP</h1>
-        <p className="mb-6 text-sm text-foreground/70">Sign in to your shop account.</p>
+        <h1 className="mb-1 text-xl font-semibold">Create your account</h1>
+        <p className="mb-6 text-sm text-foreground/70">Set up shop access for Mathilens Tailoring ERP.</p>
 
         <form onSubmit={handleSubmit} noValidate className="flex flex-col gap-4">
           <div className="flex flex-col gap-1">
@@ -76,14 +82,35 @@ export default function LoginPage() {
               id="password"
               name="password"
               type="password"
-              autoComplete="current-password"
+              autoComplete="new-password"
               value={password}
               onChange={(e) => setPassword(e.target.value)}
               className="rounded-md border border-border bg-background px-3 py-2 text-sm outline-none transition-colors focus:border-primary focus:ring-2 focus:ring-primary/25"
               aria-invalid={Boolean(fieldErrors.password)}
             />
-            {fieldErrors.password && (
+            {fieldErrors.password ? (
               <p className="text-sm text-danger">{fieldErrors.password}</p>
+            ) : (
+              <p className="text-sm text-foreground/60">At least 12 characters, with upper, lower, and a number.</p>
+            )}
+          </div>
+
+          <div className="flex flex-col gap-1">
+            <label htmlFor="confirmPassword" className="text-sm font-medium">
+              Confirm password
+            </label>
+            <input
+              id="confirmPassword"
+              name="confirmPassword"
+              type="password"
+              autoComplete="new-password"
+              value={confirmPassword}
+              onChange={(e) => setConfirmPassword(e.target.value)}
+              className="rounded-md border border-border bg-background px-3 py-2 text-sm outline-none transition-colors focus:border-primary focus:ring-2 focus:ring-primary/25"
+              aria-invalid={Boolean(fieldErrors.confirmpassword)}
+            />
+            {fieldErrors.confirmpassword && (
+              <p className="text-sm text-danger">{fieldErrors.confirmpassword}</p>
             )}
           </div>
 
@@ -94,14 +121,14 @@ export default function LoginPage() {
           )}
 
           <Button type="submit" disabled={isSubmitting} className="mt-2 w-full">
-            {isSubmitting ? "Signing in…" : "Sign in"}
+            {isSubmitting ? "Creating account…" : "Create account"}
           </Button>
         </form>
 
         <p className="mt-6 text-center text-sm text-foreground/70">
-          Need an account?{" "}
-          <Link href="/register" className="font-medium text-primary hover:underline">
-            Register
+          Already have an account?{" "}
+          <Link href="/login" className="font-medium text-primary hover:underline">
+            Sign in
           </Link>
         </p>
       </div>

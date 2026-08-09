@@ -58,6 +58,30 @@ public sealed class IdentityService : IIdentityService
         return Result.Success(tokens);
     }
 
+    public async Task<Result<AuthTokensDto>> RegisterAsync(string email, string password, CancellationToken cancellationToken)
+    {
+        var existingUser = await _userManager.FindByEmailAsync(email);
+        if (existingUser is not null)
+        {
+            return Result.Failure<AuthTokensDto>(
+                Error.Conflict("Auth.EmailAlreadyRegistered", "An account with this email already exists."));
+        }
+
+        var user = new ApplicationUser { UserName = email, Email = email };
+        var createResult = await _userManager.CreateAsync(user, password);
+        if (!createResult.Succeeded)
+        {
+            var details = createResult.Errors
+                .Select(e => new FieldError("password", e.Description))
+                .ToList();
+            return Result.Failure<AuthTokensDto>(
+                Error.Validation("Auth.RegistrationFailed", "This account could not be created.", details));
+        }
+
+        var tokens = await IssueTokensAsync(user, cancellationToken);
+        return Result.Success(tokens);
+    }
+
     public async Task<Result<AuthTokensDto>> RefreshTokenAsync(string refreshToken, CancellationToken cancellationToken)
     {
         var tokenHash = Hash(refreshToken);
