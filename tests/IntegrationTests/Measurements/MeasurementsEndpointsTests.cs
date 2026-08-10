@@ -54,16 +54,20 @@ public class MeasurementsEndpointsTests : IClassFixture<CustomWebApplicationFact
     {
         // Proves GarmentType actually deserializes from its JSON string name ("Shirt"), not
         // just that malformed requests get rejected — a request that's fully valid gets past
-        // both model binding and FluentValidation into CreateMeasurementCommandHandler, which
-        // then fails on the (expected, unreachable-in-this-environment) database with a 500,
-        // not a 400. Without a JsonStringEnumConverter registered, "Shirt" wouldn't bind to
-        // GarmentType at all and this would 400 instead, for the wrong reason.
+        // both model binding and FluentValidation into CreateMeasurementCommandHandler. Without
+        // a JsonStringEnumConverter registered, "Shirt" wouldn't bind to GarmentType at all and
+        // this would come back 400, for the wrong reason.
+        //
+        // What happens *after* validation depends on the machine: 500 where no PostgreSQL is
+        // listening on localhost (CI), 404 "no such customer" where one is (a dev box). Asserting
+        // the 500 made this test pass or fail on that accident rather than on the binding it
+        // exists to prove, so it asserts only what it can actually claim.
         AuthenticateClient();
 
         var response = await _client.PostAsJsonAsync(
             $"/api/v1/customers/{Guid.NewGuid()}/measurements", new { garmentType = "Shirt", values = new Dictionary<string, decimal> { ["Chest"] = 40 } });
 
-        Assert.Equal(HttpStatusCode.InternalServerError, response.StatusCode);
+        Assert.NotEqual(HttpStatusCode.BadRequest, response.StatusCode);
     }
 
     [Fact]

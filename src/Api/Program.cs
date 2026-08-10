@@ -4,7 +4,9 @@ using MathilensERP.Api.Common;
 using MathilensERP.Api.Contracts.Common;
 using MathilensERP.Application;
 using MathilensERP.Infrastructure;
+using MathilensERP.Infrastructure.Persistence;
 using Microsoft.AspNetCore.Authentication.JwtBearer;
+using Microsoft.EntityFrameworkCore;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.IdentityModel.Tokens;
 using Microsoft.OpenApi;
@@ -113,6 +115,28 @@ builder.Services.AddCors(options =>
 });
 
 var app = builder.Build();
+
+// Bring the schema up to date before the app serves a single request. Nothing else in the
+// pipeline does this: deploy-api.yml publishes and deploys, and migrations were left to whoever
+// remembered to run `dotnet ef database update` by hand. They stopped being run, so the API went
+// live querying an Orders.Notes column and a ClothPrices table that did not exist in the
+// production database — a silent outage that only surfaced when the next release was inspected.
+//
+// Everywhere except Development, rather than Production specifically: the integration tests boot
+// this same host through WebApplicationFactory with no database behind it and pin the environment
+// to Development to stay out of this path, while a deployed slot must migrate whether it calls
+// itself Production, Staging or nothing at all. Developers keep applying migrations themselves,
+// where a failure is cheap to see and undo.
+if (!app.Environment.IsDevelopment())
+{
+    await using var scope = app.Services.CreateAsyncScope();
+    var dbContext = scope.ServiceProvider.GetRequiredService<ApplicationDbContext>();
+
+    // Deliberately unguarded: if this throws, startup fails and the deployment is visibly broken.
+    // Serving traffic against a schema the code doesn't match is the worse outcome — that is
+    // precisely the failure this block exists to prevent.
+    await dbContext.Database.MigrateAsync();
+}
 
 // Configure the HTTP request pipeline.
 app.UseExceptionHandler();
