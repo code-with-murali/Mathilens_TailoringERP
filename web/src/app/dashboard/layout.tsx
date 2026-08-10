@@ -4,6 +4,7 @@ import { useEffect, useState } from "react";
 import { useRouter, usePathname } from "next/navigation";
 import Link from "next/link";
 import { isAuthenticated, clearTokens } from "@/lib/auth";
+import { useBranding } from "@/lib/use-branding";
 import { ThemeToggle } from "@/components/theme-toggle";
 
 const NAV_ITEMS = [
@@ -16,6 +17,7 @@ const NAV_ITEMS = [
   { href: "/dashboard/reports", label: "Reports", icon: ReportsIcon },
   { href: "/dashboard/price-detail", label: "Price Detail", icon: PriceDetailIcon },
   { href: "/dashboard/activity", label: "Activity Log", icon: ActivityIcon },
+  { href: "/dashboard/branding", label: "Branding", icon: BrandingIcon },
   { href: "/dashboard/settings", label: "Settings", icon: SettingsIcon },
 ] as const;
 
@@ -34,6 +36,9 @@ export default function DashboardLayout({ children }: LayoutProps<"/dashboard">)
   // mobile or collapse the desktop rail by default — both wrong.
   const [isDrawerOpen, setIsDrawerOpen] = useState(false);
   const [isCollapsed, setIsCollapsed] = useState(false);
+  // Also applies the shop's colour to the theme's CSS variables, which is why it lives in the
+  // shell rather than on the Branding page — every screen inside gets it.
+  const branding = useBranding();
 
   useEffect(() => {
     // Deliberately not `useSyncExternalStore`: this value has no valid server snapshot
@@ -87,10 +92,15 @@ export default function DashboardLayout({ children }: LayoutProps<"/dashboard">)
           href="/dashboard"
           className="flex items-center gap-2.5 whitespace-nowrap border-b border-border px-5 py-4 text-sm font-semibold"
         >
-          <span className="flex h-7 w-7 shrink-0 items-center justify-center rounded-md bg-primary text-xs font-bold text-primary-foreground">
-            M
-          </span>
-          <span className={isCollapsed ? "lg:hidden" : ""}>Mathilens ERP</span>
+          {branding.logoUrl ? (
+            // eslint-disable-next-line @next/next/no-img-element -- an arbitrary shop-supplied URL can't be known to next/image at build time
+            <img src={branding.logoUrl} alt="" className="h-7 w-7 shrink-0 rounded-md object-contain" />
+          ) : (
+            <span className="flex h-7 w-7 shrink-0 items-center justify-center rounded-md bg-primary text-xs font-bold text-primary-foreground">
+              {(branding.shopName || "Mathilens").charAt(0).toUpperCase()}
+            </span>
+          )}
+          <span className={isCollapsed ? "lg:hidden" : ""}>{branding.shopName || "Mathilens ERP"}</span>
         </Link>
         <nav className="flex flex-1 flex-col gap-0.5 px-3 py-4 text-sm">
           {NAV_ITEMS.map(({ href, label, icon: Icon }) => {
@@ -162,6 +172,17 @@ export default function DashboardLayout({ children }: LayoutProps<"/dashboard">)
 }
 
 type IconProps = { className?: string };
+
+function BrandingIcon({ className }: IconProps) {
+  return (
+    <svg className={className} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+      <circle cx="13.5" cy="6.5" r="2.5" />
+      <circle cx="6.5" cy="12" r="2.5" />
+      <circle cx="17" cy="14" r="2.5" />
+      <path d="M12 22a10 10 0 1 1 10-10c0 2-1.5 3-3 3h-2a3 3 0 0 0-3 3 3 3 0 0 1-2 4Z" />
+    </svg>
+  );
+}
 
 function ActivityIcon({ className }: IconProps) {
   return (
