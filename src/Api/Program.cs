@@ -95,17 +95,19 @@ builder.Services
 builder.Services.AddAuthorization();
 
 // The Next.js frontend is a separately deployable application communicating over REST
-// (01_ARCHITECTURE.md § 3 AD-007), so it calls the API cross-origin. The allowed origin is
-// configuration-driven, not hardcoded, so it differs correctly per environment.
+// (01_ARCHITECTURE.md § 3 AD-007), so it calls the API cross-origin. The allowed origins are
+// configuration-driven, not hardcoded, so they differ correctly per environment. Comma-separated
+// so a local dev frontend can be allowed alongside the deployed SWA origin without swapping config.
 const string FrontendCorsPolicy = "Frontend";
-var frontendOrigin = builder.Configuration["Cors:FrontendOrigin"];
+var frontendOrigins = (builder.Configuration["Cors:FrontendOrigin"] ?? string.Empty)
+    .Split(',', StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries);
 builder.Services.AddCors(options =>
 {
     options.AddPolicy(FrontendCorsPolicy, policy =>
     {
-        if (!string.IsNullOrWhiteSpace(frontendOrigin))
+        if (frontendOrigins.Length > 0)
         {
-            policy.WithOrigins(frontendOrigin).AllowAnyHeader().AllowAnyMethod();
+            policy.WithOrigins(frontendOrigins).AllowAnyHeader().AllowAnyMethod();
         }
     });
 });
