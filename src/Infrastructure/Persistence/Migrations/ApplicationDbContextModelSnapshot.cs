@@ -25,7 +25,6 @@ namespace MathilensERP.Infrastructure.Persistence.Migrations
             modelBuilder.Entity("MathilensERP.Domain.Billing.Invoice", b =>
                 {
                     b.Property<Guid>("Id")
-                        .ValueGeneratedOnAdd()
                         .HasColumnType("uuid");
 
                     b.Property<decimal>("AmountPaid")
@@ -100,7 +99,6 @@ namespace MathilensERP.Infrastructure.Persistence.Migrations
             modelBuilder.Entity("MathilensERP.Domain.Billing.Payment", b =>
                 {
                     b.Property<Guid>("Id")
-                        .ValueGeneratedOnAdd()
                         .HasColumnType("uuid");
 
                     b.Property<decimal>("Amount")
@@ -139,7 +137,6 @@ namespace MathilensERP.Infrastructure.Persistence.Migrations
             modelBuilder.Entity("MathilensERP.Domain.Customers.Customer", b =>
                 {
                     b.Property<Guid>("Id")
-                        .ValueGeneratedOnAdd()
                         .HasColumnType("uuid");
 
                     b.Property<string>("Address")
@@ -203,7 +200,6 @@ namespace MathilensERP.Infrastructure.Persistence.Migrations
             modelBuilder.Entity("MathilensERP.Domain.Employees.Employee", b =>
                 {
                     b.Property<Guid>("Id")
-                        .ValueGeneratedOnAdd()
                         .HasColumnType("uuid");
 
                     b.Property<DateTime>("CreatedAtUtc")
@@ -267,7 +263,6 @@ namespace MathilensERP.Infrastructure.Persistence.Migrations
             modelBuilder.Entity("MathilensERP.Domain.Identity.RefreshToken", b =>
                 {
                     b.Property<Guid>("Id")
-                        .ValueGeneratedOnAdd()
                         .HasColumnType("uuid");
 
                     b.Property<DateTime>("CreatedAtUtc")
@@ -318,7 +313,6 @@ namespace MathilensERP.Infrastructure.Persistence.Migrations
             modelBuilder.Entity("MathilensERP.Domain.Measurements.Measurement", b =>
                 {
                     b.Property<Guid>("Id")
-                        .ValueGeneratedOnAdd()
                         .HasColumnType("uuid");
 
                     b.Property<DateTime>("CreatedAtUtc")
@@ -373,7 +367,6 @@ namespace MathilensERP.Infrastructure.Persistence.Migrations
             modelBuilder.Entity("MathilensERP.Domain.Measurements.MeasurementHistory", b =>
                 {
                     b.Property<Guid>("Id")
-                        .ValueGeneratedOnAdd()
                         .HasColumnType("uuid");
 
                     b.Property<DateTime>("CreatedAtUtc")
@@ -413,7 +406,6 @@ namespace MathilensERP.Infrastructure.Persistence.Migrations
             modelBuilder.Entity("MathilensERP.Domain.Orders.FabricDetails", b =>
                 {
                     b.Property<Guid>("Id")
-                        .ValueGeneratedOnAdd()
                         .HasColumnType("uuid");
 
                     b.Property<string>("Color")
@@ -475,7 +467,6 @@ namespace MathilensERP.Infrastructure.Persistence.Migrations
             modelBuilder.Entity("MathilensERP.Domain.Orders.Order", b =>
                 {
                     b.Property<Guid>("Id")
-                        .ValueGeneratedOnAdd()
                         .HasColumnType("uuid");
 
                     b.Property<DateTime>("CreatedAtUtc")
@@ -508,6 +499,10 @@ namespace MathilensERP.Infrastructure.Persistence.Migrations
                     b.Property<Guid?>("LastModifiedBy")
                         .HasColumnType("uuid");
 
+                    b.Property<string>("Notes")
+                        .HasMaxLength(2000)
+                        .HasColumnType("character varying(2000)");
+
                     b.Property<string>("Status")
                         .IsRequired()
                         .HasMaxLength(50)
@@ -533,7 +528,6 @@ namespace MathilensERP.Infrastructure.Persistence.Migrations
             modelBuilder.Entity("MathilensERP.Domain.Orders.OrderItem", b =>
                 {
                     b.Property<Guid>("Id")
-                        .ValueGeneratedOnAdd()
                         .HasColumnType("uuid");
 
                     b.Property<DateTime>("CreatedAtUtc")
@@ -588,7 +582,6 @@ namespace MathilensERP.Infrastructure.Persistence.Migrations
             modelBuilder.Entity("MathilensERP.Domain.Pricing.ClothPrice", b =>
                 {
                     b.Property<Guid>("Id")
-                        .ValueGeneratedOnAdd()
                         .HasColumnType("uuid");
 
                     b.Property<string>("ClothCode")
@@ -646,7 +639,6 @@ namespace MathilensERP.Infrastructure.Persistence.Migrations
             modelBuilder.Entity("MathilensERP.Domain.Settings.Setting", b =>
                 {
                     b.Property<Guid>("Id")
-                        .ValueGeneratedOnAdd()
                         .HasColumnType("uuid");
 
                     b.Property<DateTime>("CreatedAtUtc")
@@ -688,7 +680,6 @@ namespace MathilensERP.Infrastructure.Persistence.Migrations
             modelBuilder.Entity("MathilensERP.Domain.WhatsApp.WhatsAppMessage", b =>
                 {
                     b.Property<Guid>("Id")
-                        .ValueGeneratedOnAdd()
                         .HasColumnType("uuid");
 
                     b.Property<string>("Content")

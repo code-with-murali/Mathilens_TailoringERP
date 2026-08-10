@@ -2,16 +2,17 @@
 
 import { useEffect, useState } from "react";
 import Link from "next/link";
-import { useParams, useRouter } from "next/navigation";
+import { useRouter } from "next/navigation";
 import { CustomerForm } from "../CustomerForm";
 import { MeasurementsSection } from "./MeasurementsSection";
 import { useToast } from "@/components/ui/ToastProvider";
 import { getAccessToken } from "@/lib/auth";
+import { useRouteId } from "@/lib/use-route-id";
 import { ApiError } from "@/lib/api-client";
 import { getCustomer, updateCustomer, type Customer, type CustomerInput } from "@/lib/api/customers";
 
 export default function EditCustomerPage() {
-  const params = useParams<{ id: string }>();
+  const customerId = useRouteId();
   const router = useRouter();
   const { showToast } = useToast();
   const [customer, setCustomer] = useState<Customer | null>(null);
@@ -20,7 +21,7 @@ export default function EditCustomerPage() {
   useEffect(() => {
     let cancelled = false;
 
-    getCustomer(params.id, getAccessToken())
+    getCustomer(customerId, getAccessToken())
       .then((data) => {
         if (!cancelled) {
           setCustomer(data);
@@ -36,10 +37,10 @@ export default function EditCustomerPage() {
     return () => {
       cancelled = true;
     };
-  }, [params.id]);
+  }, [customerId]);
 
   async function handleUpdate(input: CustomerInput) {
-    await updateCustomer(params.id, input, getAccessToken());
+    await updateCustomer(customerId, input, getAccessToken());
     showToast("Customer updated.");
     router.push("/dashboard/customers");
   }
@@ -75,7 +76,7 @@ export default function EditCustomerPage() {
             />
           </div>
 
-          <MeasurementsSection customerId={params.id} />
+          <MeasurementsSection customerId={customerId} />
         </div>
       )}
     </div>

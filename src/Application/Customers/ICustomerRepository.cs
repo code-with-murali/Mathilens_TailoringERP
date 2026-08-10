@@ -15,6 +15,12 @@ public interface ICustomerRepository
 
     Task<PagedResult<Customer>> SearchAsync(string? searchTerm, int page, int pageSize, CancellationToken cancellationToken);
 
+    /// <summary>Every customer, unpaginated — for spreadsheet export, which has no page to scroll.</summary>
+    Task<IReadOnlyList<Customer>> ListAllAsync(CancellationToken cancellationToken);
+
+    /// <summary>Exact match on the phone number, the natural key spreadsheet imports upsert against.</summary>
+    Task<Customer?> GetByPhoneNumberAsync(string phoneNumber, CancellationToken cancellationToken);
+
     void Add(Customer customer);
 
     Task SaveChangesAsync(CancellationToken cancellationToken);

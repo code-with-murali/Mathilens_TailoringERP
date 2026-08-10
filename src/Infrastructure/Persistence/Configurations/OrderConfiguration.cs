@@ -23,6 +23,8 @@ public class OrderConfiguration : IEntityTypeConfiguration<Order>
 
         builder.Property(o => o.DueAtUtc).IsRequired();
 
+        builder.Property(o => o.Notes).HasMaxLength(2000);
+
         builder.HasOne<Customer>()
             .WithMany()
             .HasForeignKey(o => o.CustomerId)

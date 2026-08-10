@@ -131,12 +131,12 @@ public class OrderTests
     }
 
     [Fact]
-    public void CanModifyItems_IsFalseOnceDelivered()
+    public void IsOpen_IsFalseOnceDelivered()
     {
         var order = Order.Create(Guid.NewGuid(), DateTime.UtcNow, null);
         AdvanceTo(order, OrderStatus.Delivered);
 
-        Assert.False(order.CanModifyItems);
+        Assert.False(order.IsOpen);
     }
 
     [Fact]
@@ -146,6 +146,120 @@ public class OrderTests
         AdvanceTo(order, OrderStatus.Delivered);
 
         Assert.Throws<InvalidOperationException>(() => order.AddItem(GarmentType.Shirt, 1, 100m));
+    }
+
+    [Fact]
+    public void UpdateDetails_OnOpenOrder_ReplacesHeaderFields()
+    {
+        var order = Order.Create(Guid.NewGuid(), DateTime.UtcNow, null);
+        var newCustomerId = Guid.NewGuid();
+        var newEmployeeId = Guid.NewGuid();
+        var newDueAt = DateTime.UtcNow.AddDays(14);
+
+        order.UpdateDetails(newCustomerId, newEmployeeId, newDueAt, "Rush job");
+
+        Assert.Equal(newCustomerId, order.CustomerId);
+        Assert.Equal(newEmployeeId, order.EmployeeId);
+        Assert.Equal(newDueAt, order.DueAtUtc);
+        Assert.Equal("Rush job", order.Notes);
+    }
+
+    [Fact]
+    public void UpdateDetails_WithEmptyCustomerId_Throws()
+    {
+        var order = Order.Create(Guid.NewGuid(), DateTime.UtcNow, null);
+
+        Assert.Throws<ArgumentException>(() => order.UpdateDetails(Guid.Empty, null, DateTime.UtcNow, null));
+    }
+
+    [Fact]
+    public void UpdateDetails_OnDeliveredOrder_Throws()
+    {
+        var order = Order.Create(Guid.NewGuid(), DateTime.UtcNow, null);
+        order.AddItem(GarmentType.Shirt, 1, 100m);
+        AdvanceTo(order, OrderStatus.Delivered);
+
+        Assert.Throws<InvalidOperationException>(() => order.UpdateDetails(Guid.NewGuid(), null, DateTime.UtcNow, null));
+    }
+
+    [Fact]
+    public void UpdateItem_WithValidInputs_ReplacesItemFieldsAndKeepsFabric()
+    {
+        var order = Order.Create(Guid.NewGuid(), DateTime.UtcNow, null);
+        var item = order.AddItem(GarmentType.Shirt, 2, 500m);
+        order.SetItemFabric(item.Id, "Cotton", FabricSource.ShopSupplied, "Blue", 3m);
+
+        order.UpdateItem(item.Id, GarmentType.Blazer, 5, 900m);
+
+        Assert.Equal(GarmentType.Blazer, item.GarmentType);
+        Assert.Equal(5, item.Quantity);
+        Assert.Equal(900m, item.UnitPrice);
+        Assert.NotNull(item.Fabric);
+        Assert.Equal("Cotton", item.Fabric!.FabricType);
+    }
+
+    [Fact]
+    public void UpdateItem_WithNonPositiveQuantity_Throws()
+    {
+        var order = Order.Create(Guid.NewGuid(), DateTime.UtcNow, null);
+        var item = order.AddItem(GarmentType.Shirt, 2, 500m);
+
+        Assert.Throws<ArgumentOutOfRangeException>(() => order.UpdateItem(item.Id, GarmentType.Shirt, 0, 500m));
+    }
+
+    [Fact]
+    public void UpdateItem_WithUnknownItemId_Throws()
+    {
+        var order = Order.Create(Guid.NewGuid(), DateTime.UtcNow, null);
+        order.AddItem(GarmentType.Shirt, 1, 100m);
+
+        Assert.Throws<InvalidOperationException>(() => order.UpdateItem(Guid.NewGuid(), GarmentType.Shirt, 1, 100m));
+    }
+
+    [Fact]
+    public void RemoveItem_WithMoreThanOneItem_SoftDeletesItAndDropsItFromItems()
+    {
+        var order = Order.Create(Guid.NewGuid(), DateTime.UtcNow, null);
+        var first = order.AddItem(GarmentType.Shirt, 1, 100m);
+        order.AddItem(GarmentType.Trousers, 1, 200m);
+
+        order.RemoveItem(first.Id, Guid.NewGuid(), DateTime.UtcNow);
+
+        Assert.True(first.IsDeleted);
+        Assert.Single(order.Items);
+        Assert.DoesNotContain(order.Items, i => i.Id == first.Id);
+    }
+
+    [Fact]
+    public void RemoveItem_WithOnlyOneItem_Throws()
+    {
+        var order = Order.Create(Guid.NewGuid(), DateTime.UtcNow, null);
+        var only = order.AddItem(GarmentType.Shirt, 1, 100m);
+
+        Assert.Throws<InvalidOperationException>(() => order.RemoveItem(only.Id, Guid.NewGuid(), DateTime.UtcNow));
+    }
+
+    [Fact]
+    public void RemoveItem_TwiceForTheSameItem_Throws()
+    {
+        var order = Order.Create(Guid.NewGuid(), DateTime.UtcNow, null);
+        var first = order.AddItem(GarmentType.Shirt, 1, 100m);
+        order.AddItem(GarmentType.Trousers, 1, 200m);
+        order.RemoveItem(first.Id, Guid.NewGuid(), DateTime.UtcNow);
+
+        // Already-removed items are invisible to the aggregate, so this is an unknown id.
+        Assert.Throws<InvalidOperationException>(() => order.RemoveItem(first.Id, Guid.NewGuid(), DateTime.UtcNow));
+    }
+
+    [Fact]
+    public void RemoveItem_OnDeliveredOrder_Throws()
+    {
+        var order = Order.Create(Guid.NewGuid(), DateTime.UtcNow, null);
+        var first = order.AddItem(GarmentType.Shirt, 1, 100m);
+        order.AddItem(GarmentType.Trousers, 1, 200m);
+        AdvanceTo(order, OrderStatus.Delivered);
+
+        Assert.Throws<InvalidOperationException>(() => order.RemoveItem(first.Id, Guid.NewGuid(), DateTime.UtcNow));
     }
 
     private static void AdvanceTo(Order order, OrderStatus target)

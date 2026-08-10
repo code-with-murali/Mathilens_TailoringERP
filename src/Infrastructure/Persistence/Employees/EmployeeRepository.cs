@@ -39,6 +39,12 @@ public class EmployeeRepository : IEmployeeRepository
         return new PagedResult<Employee>(items, page, pageSize, totalCount);
     }
 
+    public async Task<IReadOnlyList<Employee>> ListAllAsync(CancellationToken cancellationToken) =>
+        await _dbContext.Employees.OrderBy(e => e.FullName).ToListAsync(cancellationToken);
+
+    public Task<Employee?> GetByPhoneNumberAsync(string phoneNumber, CancellationToken cancellationToken) =>
+        _dbContext.Employees.FirstOrDefaultAsync(e => e.PhoneNumber == phoneNumber, cancellationToken);
+
     public void Add(Employee employee) => _dbContext.Employees.Add(employee);
 
     public Task SaveChangesAsync(CancellationToken cancellationToken) => _dbContext.SaveChangesAsync(cancellationToken);

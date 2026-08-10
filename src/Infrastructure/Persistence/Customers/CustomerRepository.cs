@@ -38,6 +38,12 @@ public class CustomerRepository : ICustomerRepository
         return new PagedResult<Customer>(items, page, pageSize, totalCount);
     }
 
+    public async Task<IReadOnlyList<Customer>> ListAllAsync(CancellationToken cancellationToken) =>
+        await _dbContext.Customers.OrderBy(c => c.FullName).ToListAsync(cancellationToken);
+
+    public Task<Customer?> GetByPhoneNumberAsync(string phoneNumber, CancellationToken cancellationToken) =>
+        _dbContext.Customers.FirstOrDefaultAsync(c => c.PhoneNumber == phoneNumber, cancellationToken);
+
     public void Add(Customer customer) => _dbContext.Customers.Add(customer);
 
     public Task SaveChangesAsync(CancellationToken cancellationToken) => _dbContext.SaveChangesAsync(cancellationToken);

@@ -2,16 +2,16 @@
 
 import { useCallback, useEffect, useState } from "react";
 import Link from "next/link";
-import { useParams } from "next/navigation";
 import { Pagination } from "@/components/ui/Pagination";
 import { getAccessToken } from "@/lib/auth";
+import { useRouteId } from "@/lib/use-route-id";
 import { ApiError, type PaginationMeta } from "@/lib/api-client";
 import { getMeasurementHistory, type MeasurementHistoryEntry } from "@/lib/api/measurements";
 
 const PAGE_SIZE = 20;
 
 export default function MeasurementHistoryPage() {
-  const params = useParams<{ id: string }>();
+  const measurementId = useRouteId(1);
   const [page, setPage] = useState(1);
   const [entries, setEntries] = useState<MeasurementHistoryEntry[]>([]);
   const [meta, setMeta] = useState<PaginationMeta | null>(null);
@@ -22,7 +22,7 @@ export default function MeasurementHistoryPage() {
     setIsLoading(true);
     setLoadError(null);
     try {
-      const { items, meta } = await getMeasurementHistory(params.id, page, PAGE_SIZE, getAccessToken());
+      const { items, meta } = await getMeasurementHistory(measurementId, page, PAGE_SIZE, getAccessToken());
       setEntries(items);
       setMeta(meta);
     } catch (error) {
@@ -30,7 +30,7 @@ export default function MeasurementHistoryPage() {
     } finally {
       setIsLoading(false);
     }
-  }, [params.id, page]);
+  }, [measurementId, page]);
 
   useEffect(() => {
     // See CustomersPage for why this fetch-on-dependency-change pattern is intentionally not

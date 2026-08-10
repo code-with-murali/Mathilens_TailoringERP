@@ -2,15 +2,16 @@
 
 import { useEffect, useState } from "react";
 import Link from "next/link";
-import { useParams, useRouter } from "next/navigation";
+import { useRouter } from "next/navigation";
 import { EmployeeForm } from "../EmployeeForm";
 import { useToast } from "@/components/ui/ToastProvider";
 import { getAccessToken } from "@/lib/auth";
+import { useRouteId } from "@/lib/use-route-id";
 import { ApiError } from "@/lib/api-client";
 import { getEmployee, updateEmployee, type Employee, type EmployeeInput } from "@/lib/api/employees";
 
 export default function EditEmployeePage() {
-  const params = useParams<{ id: string }>();
+  const employeeId = useRouteId();
   const router = useRouter();
   const { showToast } = useToast();
   const [employee, setEmployee] = useState<Employee | null>(null);
@@ -19,7 +20,7 @@ export default function EditEmployeePage() {
   useEffect(() => {
     let cancelled = false;
 
-    getEmployee(params.id, getAccessToken())
+    getEmployee(employeeId, getAccessToken())
       .then((data) => {
         if (!cancelled) {
           setEmployee(data);
@@ -35,10 +36,10 @@ export default function EditEmployeePage() {
     return () => {
       cancelled = true;
     };
-  }, [params.id]);
+  }, [employeeId]);
 
   async function handleUpdate(input: EmployeeInput) {
-    await updateEmployee(params.id, input, getAccessToken());
+    await updateEmployee(employeeId, input, getAccessToken());
     showToast("Employee updated.");
     router.push("/dashboard/employees");
   }

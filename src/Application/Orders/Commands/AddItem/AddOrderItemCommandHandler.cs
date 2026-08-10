@@ -21,7 +21,7 @@ public sealed class AddOrderItemCommandHandler : ICommandHandler<AddOrderItemCom
             return Result.Failure<OrderDto>(Error.NotFound("Order.NotFound", $"No order was found with id '{command.OrderId}'."));
         }
 
-        if (!order.CanModifyItems)
+        if (!order.IsOpen)
         {
             return Result.Failure<OrderDto>(Error.Conflict(
                 "Order.NotModifiable", $"Cannot add items to an order that is '{order.Status}'."));

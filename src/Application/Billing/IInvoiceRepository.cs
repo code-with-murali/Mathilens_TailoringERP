@@ -10,6 +10,9 @@ public interface IInvoiceRepository
 
     Task<PagedResult<Invoice>> SearchAsync(Guid? customerId, InvoiceStatus? status, int page, int pageSize, CancellationToken cancellationToken);
 
+    /// <summary>Whether any live (non-voided) invoice bills the given order — used to keep a billed order from being deleted.</summary>
+    Task<bool> ExistsBillableForOrderAsync(Guid orderId, CancellationToken cancellationToken);
+
     void Add(Invoice invoice);
 
     Task SaveChangesAsync(CancellationToken cancellationToken);

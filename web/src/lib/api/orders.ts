@@ -1,4 +1,4 @@
-import { apiGet, apiGetPaged, apiPost, apiPut } from "@/lib/api-client";
+import { apiDelete, apiDeleteFor, apiGet, apiGetPaged, apiPost, apiPut } from "@/lib/api-client";
 import type { GarmentType } from "./measurements";
 
 export const ORDER_STATUSES = ["Received", "InProgress", "ReadyForDelivery", "Delivered", "Cancelled"] as const;
@@ -28,13 +28,21 @@ export type Order = {
   employeeId: string | null;
   status: OrderStatus;
   dueAtUtc: string;
+  notes: string | null;
   createdAtUtc: string;
   items: OrderItem[];
 };
 
 export type CreateOrderItemFabricInput = { fabricType: string; source: FabricSource; color: string | null; quantity: number };
 export type CreateOrderItemInput = { garmentType: GarmentType; quantity: number; unitPrice: number; fabric: CreateOrderItemFabricInput | null };
-export type CreateOrderInput = { customerId: string; employeeId: string | null; dueAtUtc: string; items: CreateOrderItemInput[] };
+export type CreateOrderInput = {
+  customerId: string;
+  employeeId: string | null;
+  dueAtUtc: string;
+  notes: string | null;
+  items: CreateOrderItemInput[];
+};
+export type UpdateOrderInput = { customerId: string; employeeId: string | null; dueAtUtc: string; notes: string | null };
 
 export function searchOrders(
   customerId: string | null,
@@ -61,8 +69,32 @@ export function createOrder(input: CreateOrderInput, token: string | null) {
   return apiPost<Order>("/api/v1/orders", input, token);
 }
 
+export function updateOrder(id: string, input: UpdateOrderInput, token: string | null) {
+  return apiPut<Order>(`/api/v1/orders/${id}`, input, token);
+}
+
+export function deleteOrder(id: string, token: string | null) {
+  return apiDelete(`/api/v1/orders/${id}`, token);
+}
+
 export function addOrderItem(orderId: string, garmentType: GarmentType, quantity: number, unitPrice: number, token: string | null) {
   return apiPost<Order>(`/api/v1/orders/${orderId}/items`, { garmentType, quantity, unitPrice }, token);
+}
+
+export function updateOrderItem(
+  orderId: string,
+  itemId: string,
+  garmentType: GarmentType,
+  quantity: number,
+  unitPrice: number,
+  token: string | null,
+) {
+  return apiPut<Order>(`/api/v1/orders/${orderId}/items/${itemId}`, { garmentType, quantity, unitPrice }, token);
+}
+
+/** Returns the updated order rather than 204 — the totals and remaining items change with it. */
+export function removeOrderItem(orderId: string, itemId: string, token: string | null) {
+  return apiDeleteFor<Order>(`/api/v1/orders/${orderId}/items/${itemId}`, token);
 }
 
 export function setOrderItemFabric(

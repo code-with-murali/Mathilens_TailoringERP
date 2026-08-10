@@ -202,6 +202,45 @@ export async function apiDelete(path: string, token?: string | null): Promise<vo
   await throwIfError(response);
 }
 
+/** For DELETE endpoints that return the mutated resource in the standard envelope rather than 204. */
+export async function apiDeleteFor<T>(path: string, token?: string | null): Promise<T> {
+  return request<T>(path, { method: "DELETE", headers: authHeaders(token) }, token);
+}
+
+/**
+ * Downloads a file endpoint (spreadsheet exports). Returns the raw blob plus the filename the
+ * server chose, so the caller doesn't have to duplicate the naming convention.
+ */
+export async function apiGetFile(path: string, token?: string | null): Promise<{ blob: Blob; filename: string }> {
+  const response = await fetchWithAuthRetry(path, { headers: authHeaders(token) }, token);
+
+  await throwIfError(response);
+
+  const disposition = response.headers.get("Content-Disposition") ?? "";
+  const match = /filename\*?=(?:UTF-8'')?"?([^";]+)"?/i.exec(disposition);
+
+  return {
+    blob: await response.blob(),
+    filename: match ? decodeURIComponent(match[1]) : "export.xlsx",
+  };
+}
+
+/**
+ * Uploads a single file as multipart/form-data. Deliberately does not set Content-Type — the
+ * browser has to append its own multipart boundary, and naming the type here would strip it.
+ */
+export async function apiPostFile<T>(path: string, file: File, token?: string | null): Promise<T> {
+  const body = new FormData();
+  body.append("file", file);
+
+  const response = await fetchWithAuthRetry(path, { method: "POST", body, headers: authHeaders(token) }, token);
+
+  await throwIfError(response);
+
+  const envelope = (await response.json()) as ApiSuccessResponse<T>;
+  return envelope.data;
+}
+
 /** For POST endpoints (typically actions, not resource creation) that return 204 No Content on success — never attempts to parse a body. */
 export async function apiPostNoContent(path: string, payload: unknown, token?: string | null): Promise<void> {
   const response = await fetchWithAuthRetry(

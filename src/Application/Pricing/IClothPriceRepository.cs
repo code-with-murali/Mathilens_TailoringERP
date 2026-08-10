@@ -13,6 +13,9 @@ public interface IClothPriceRepository
 
     Task<PagedResult<ClothPrice>> SearchAsync(string? searchTerm, int page, int pageSize, CancellationToken cancellationToken);
 
+    /// <summary>Every price, unpaginated — for spreadsheet export, which has no page to scroll.</summary>
+    Task<IReadOnlyList<ClothPrice>> ListAllAsync(CancellationToken cancellationToken);
+
     void Add(ClothPrice clothPrice);
 
     Task SaveChangesAsync(CancellationToken cancellationToken);

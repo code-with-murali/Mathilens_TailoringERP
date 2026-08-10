@@ -17,6 +17,9 @@ public sealed class CreateOrderCommandValidator : AbstractValidator<CreateOrderC
             .NotEmpty()
             .WithMessage("An order must have at least one item.");
 
+        RuleFor(x => x.Notes)
+            .MaximumLength(2000);
+
         RuleForEach(x => x.Items).SetValidator(new CreateOrderItemInputValidator());
     }
 }

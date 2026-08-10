@@ -46,6 +46,7 @@ export default function NewOrderPage() {
   const [isCreatingCustomer, setIsCreatingCustomer] = useState(false);
   const [employee, setEmployee] = useState<Employee | null>(null);
   const [dueAtUtc, setDueAtUtc] = useState("");
+  const [orderNotes, setOrderNotes] = useState("");
   const [itemRows, setItemRows] = useState<ItemRow[]>([]);
   const [formError, setFormError] = useState<string | null>(null);
   const [isSubmitting, setIsSubmitting] = useState(false);
@@ -465,6 +466,7 @@ export default function NewOrderPage() {
           customerId: customer.id,
           employeeId: employee?.id ?? null,
           dueAtUtc: new Date(dueAtUtc).toISOString(),
+          notes: orderNotes.trim() === "" ? null : orderNotes,
           items,
         },
         getAccessToken(),
@@ -843,6 +845,21 @@ export default function NewOrderPage() {
                   placeholder="Search employees…"
                   disabled={isOrderCreated}
                 />
+
+                <div className="flex flex-col gap-1">
+                  <label htmlFor="orderNotes" className="text-sm font-medium">
+                    Notes (optional)
+                  </label>
+                  <textarea
+                    id="orderNotes"
+                    rows={3}
+                    value={orderNotes}
+                    disabled={isOrderCreated}
+                    onChange={(e) => setOrderNotes(e.target.value)}
+                    placeholder="Anything the tailor should know…"
+                    className={`${fieldClassName} disabled:cursor-not-allowed disabled:opacity-50`}
+                  />
+                </div>
               </div>
             </div>
 

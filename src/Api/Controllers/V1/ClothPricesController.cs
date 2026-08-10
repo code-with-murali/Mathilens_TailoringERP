@@ -1,14 +1,19 @@
 using MathilensERP.Api.Common;
+using MathilensERP.Api.Common.Excel;
 using MathilensERP.Api.Contracts.Common;
 using MathilensERP.Api.Contracts.Pricing;
+using MathilensERP.Application.Common;
 using MathilensERP.Application.Common.Mediator;
 using MathilensERP.Application.Pricing;
 using MathilensERP.Application.Pricing.Commands.Create;
 using MathilensERP.Application.Pricing.Commands.Delete;
+using MathilensERP.Application.Pricing.Commands.Import;
 using MathilensERP.Application.Pricing.Commands.Update;
 using MathilensERP.Application.Pricing.Queries.GetById;
+using MathilensERP.Application.Pricing.Queries.ListAll;
 using MathilensERP.Application.Pricing.Queries.Search;
 using MathilensERP.Shared.Constants;
+using MathilensERP.Shared.Results;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
 
@@ -25,6 +30,66 @@ public sealed class ClothPricesController : ApiControllerBase
     public ClothPricesController(ISender sender)
     {
         _sender = sender;
+    }
+
+    /// <summary>Downloads the whole price list as an .xlsx sheet. The Id column round-trips back through <see cref="Import"/> as the match key.</summary>
+    [HttpGet("export")]
+    [ProducesResponseType(typeof(FileContentResult), StatusCodes.Status200OK)]
+    public async Task<IActionResult> Export(CancellationToken cancellationToken)
+    {
+        var result = await _sender.Send(new ListAllClothPricesQuery(), cancellationToken);
+        if (result.IsFailure)
+        {
+            return ToActionResult(result);
+        }
+
+        var content = ExcelSheet.Write(
+            "Cloth Prices",
+            ClothPriceSheet.Headers,
+            result.Value.Select(c => new object?[] { c.Id, c.ClothCode, c.ClothName, c.CostPrice, c.SellingPrice }));
+
+        return File(content, ExcelSheet.ContentType, "cloth-prices.xlsx");
+    }
+
+    /// <summary>
+    /// Upserts the price list from an .xlsx sheet — matched on Id, else cloth code. Partial
+    /// success: valid rows are saved and invalid ones come back listed by their row number.
+    /// </summary>
+    [HttpPost("import")]
+    [RequestSizeLimit(ImportLimits.MaxFileBytes)]
+    [ProducesResponseType(typeof(ApiResponse<ImportResultDto>), StatusCodes.Status200OK)]
+    [ProducesResponseType(typeof(ApiErrorResponse), StatusCodes.Status400BadRequest)]
+    public async Task<IActionResult> Import(IFormFile file, CancellationToken cancellationToken)
+    {
+        if (file is null || file.Length == 0)
+        {
+            return ToActionResult(Result.Failure<ImportResultDto>(
+                Error.Validation("Import.NoFile", "Select an .xlsx file to import.")));
+        }
+
+        IReadOnlyList<ExcelRow> rows;
+        try
+        {
+            await using var stream = file.OpenReadStream();
+            rows = ExcelSheet.Read(stream);
+        }
+        catch (InvalidDataException ex)
+        {
+            return ToActionResult(Result.Failure<ImportResultDto>(Error.Validation("Import.InvalidFile", ex.Message)));
+        }
+
+        var command = new ImportClothPricesCommand(rows
+            .Select(r => new ClothPriceImportRow(
+                r.RowNumber,
+                r.GetGuid(ClothPriceSheet.Id),
+                r.GetRequiredString(ClothPriceSheet.ClothCode),
+                r.GetRequiredString(ClothPriceSheet.ClothName),
+                r.GetDecimal(ClothPriceSheet.CostPrice),
+                r.GetDecimal(ClothPriceSheet.SellingPrice)))
+            .ToList());
+
+        var result = await _sender.Send(command, cancellationToken);
+        return ToActionResult(result);
     }
 
     /// <summary>Creates a new cloth price entry.</summary>

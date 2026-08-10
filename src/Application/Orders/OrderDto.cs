@@ -9,6 +9,7 @@ public sealed record OrderDto(
     Guid? EmployeeId,
     OrderStatus Status,
     DateTime DueAtUtc,
+    string? Notes,
     DateTime CreatedAtUtc,
     IReadOnlyList<OrderItemDto> Items);
 

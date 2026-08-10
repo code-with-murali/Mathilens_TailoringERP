@@ -39,7 +39,7 @@ public sealed class CreateOrderCommandHandler : ICommandHandler<CreateOrderComma
             }
         }
 
-        var order = Order.Create(command.CustomerId, command.DueAtUtc, command.EmployeeId);
+        var order = Order.Create(command.CustomerId, command.DueAtUtc, command.EmployeeId, command.Notes);
 
         foreach (var itemInput in command.Items)
         {

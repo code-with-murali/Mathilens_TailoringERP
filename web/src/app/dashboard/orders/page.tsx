@@ -5,9 +5,11 @@ import Link from "next/link";
 import { Button } from "@/components/ui/Button";
 import { Pagination } from "@/components/ui/Pagination";
 import { StatusBadge, ORDER_STATUS_BADGE } from "@/components/ui/StatusBadge";
+import { ConfirmDialog } from "@/components/ui/ConfirmDialog";
+import { useToast } from "@/components/ui/ToastProvider";
 import { getAccessToken } from "@/lib/auth";
 import { ApiError, type PaginationMeta } from "@/lib/api-client";
-import { searchOrders, ORDER_STATUSES, type Order, type OrderStatus } from "@/lib/api/orders";
+import { searchOrders, deleteOrder, ORDER_STATUSES, type Order, type OrderStatus } from "@/lib/api/orders";
 import { getCustomer, type Customer } from "@/lib/api/customers";
 
 const PAGE_SIZE = 20;
@@ -17,6 +19,7 @@ function orderNumber(order: Order) {
 }
 
 export default function OrdersPage() {
+  const { showToast } = useToast();
   const [status, setStatus] = useState<OrderStatus | "">("");
   const [page, setPage] = useState(1);
   const [orders, setOrders] = useState<Order[]>([]);
@@ -24,6 +27,8 @@ export default function OrdersPage() {
   const [meta, setMeta] = useState<PaginationMeta | null>(null);
   const [isLoading, setIsLoading] = useState(true);
   const [loadError, setLoadError] = useState<string | null>(null);
+  const [pendingDelete, setPendingDelete] = useState<Order | null>(null);
+  const [isDeleting, setIsDeleting] = useState(false);
 
   const loadOrders = useCallback(async () => {
     setIsLoading(true);
@@ -64,6 +69,24 @@ export default function OrdersPage() {
   function handleStatusChange(value: string) {
     setStatus(value as OrderStatus | "");
     setPage(1);
+  }
+
+  async function handleConfirmDelete() {
+    if (!pendingDelete) {
+      return;
+    }
+
+    setIsDeleting(true);
+    try {
+      await deleteOrder(pendingDelete.id, getAccessToken());
+      showToast("Order deleted.");
+      setPendingDelete(null);
+      await loadOrders();
+    } catch (error) {
+      showToast(error instanceof ApiError ? error.message : "Unable to delete this order.", "error");
+    } finally {
+      setIsDeleting(false);
+    }
   }
 
   return (
@@ -112,6 +135,9 @@ export default function OrdersPage() {
                 <th className="px-4 py-3 font-medium">Phone Number</th>
                 <th className="px-4 py-3 font-medium">Due Date</th>
                 <th className="px-4 py-3 font-medium">Status</th>
+                <th className="px-4 py-3 font-medium">
+                  <span className="sr-only">Actions</span>
+                </th>
               </tr>
             </thead>
             <tbody>
@@ -130,6 +156,20 @@ export default function OrdersPage() {
                     <td className="px-4 py-3">
                       <StatusBadge {...ORDER_STATUS_BADGE[order.status]} />
                     </td>
+                    <td className="px-4 py-3">
+                      <div className="flex justify-end gap-3">
+                        <Link href={`/dashboard/orders/${order.id}`} className="text-foreground/70 hover:text-foreground">
+                          View
+                        </Link>
+                        <button
+                          type="button"
+                          onClick={() => setPendingDelete(order)}
+                          className="text-danger hover:text-danger-hover"
+                        >
+                          Delete
+                        </button>
+                      </div>
+                    </td>
                   </tr>
                 );
               })}
@@ -139,6 +179,19 @@ export default function OrdersPage() {
       )}
 
       {meta && <Pagination meta={meta} onPageChange={setPage} />}
+
+      <ConfirmDialog
+        open={pendingDelete !== null}
+        title="Delete order"
+        description={
+          pendingDelete
+            ? `Are you sure you want to delete order ${orderNumber(pendingDelete)}? To keep it in reporting, cancel it instead.`
+            : ""
+        }
+        isConfirming={isDeleting}
+        onConfirm={handleConfirmDelete}
+        onCancel={() => setPendingDelete(null)}
+      />
     </div>
   );
 }

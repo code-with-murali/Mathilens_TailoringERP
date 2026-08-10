@@ -2,20 +2,20 @@
 
 import { useEffect, useState } from "react";
 import Link from "next/link";
-import { useParams } from "next/navigation";
 import { getAccessToken } from "@/lib/auth";
+import { useRouteId } from "@/lib/use-route-id";
 import { ApiError } from "@/lib/api-client";
 import { getWhatsAppMessage, type WhatsAppMessage } from "@/lib/api/whatsapp";
 
 export default function WhatsAppMessageDetailPage() {
-  const params = useParams<{ id: string }>();
+  const messageId = useRouteId();
   const [message, setMessage] = useState<WhatsAppMessage | null>(null);
   const [loadError, setLoadError] = useState<string | null>(null);
 
   useEffect(() => {
     let cancelled = false;
 
-    getWhatsAppMessage(params.id, getAccessToken())
+    getWhatsAppMessage(messageId, getAccessToken())
       .then((data) => {
         if (!cancelled) {
           setMessage(data);
@@ -31,7 +31,7 @@ export default function WhatsAppMessageDetailPage() {
     return () => {
       cancelled = true;
     };
-  }, [params.id]);
+  }, [messageId]);
 
   return (
     <div className="flex flex-col gap-6">

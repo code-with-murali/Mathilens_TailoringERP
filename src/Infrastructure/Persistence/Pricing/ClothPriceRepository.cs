@@ -40,6 +40,9 @@ public class ClothPriceRepository : IClothPriceRepository
         return new PagedResult<ClothPrice>(items, page, pageSize, totalCount);
     }
 
+    public async Task<IReadOnlyList<ClothPrice>> ListAllAsync(CancellationToken cancellationToken) =>
+        await _dbContext.ClothPrices.OrderBy(c => c.ClothCode).ToListAsync(cancellationToken);
+
     public void Add(ClothPrice clothPrice) => _dbContext.ClothPrices.Add(clothPrice);
 
     public Task SaveChangesAsync(CancellationToken cancellationToken) => _dbContext.SaveChangesAsync(cancellationToken);

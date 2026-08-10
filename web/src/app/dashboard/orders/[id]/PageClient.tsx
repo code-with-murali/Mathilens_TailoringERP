@@ -2,24 +2,31 @@
 
 import { useCallback, useEffect, useState, type FormEvent } from "react";
 import Link from "next/link";
-import { useParams, useRouter } from "next/navigation";
+import { useRouter } from "next/navigation";
 import { Button } from "@/components/ui/Button";
 import { SearchPicker } from "@/components/ui/SearchPicker";
 import { StatusBadge, ORDER_STATUS_BADGE } from "@/components/ui/StatusBadge";
+import { ConfirmDialog } from "@/components/ui/ConfirmDialog";
 import { useToast } from "@/components/ui/ToastProvider";
 import { getAccessToken } from "@/lib/auth";
+import { useRouteId } from "@/lib/use-route-id";
 import { ApiError } from "@/lib/api-client";
 import { searchEmployees, type Employee } from "@/lib/api/employees";
+import { getCustomer, searchCustomers, type Customer } from "@/lib/api/customers";
 import { GARMENT_TYPES, type GarmentType } from "@/lib/api/measurements";
 import { createInvoice } from "@/lib/api/billing";
 import {
   getOrder,
+  updateOrder,
   transitionOrderStatus,
   assignOrderEmployee,
   addOrderItem,
+  updateOrderItem,
+  removeOrderItem,
   setOrderItemFabric,
   FABRIC_SOURCES,
   type Order,
+  type OrderItem,
   type OrderStatus,
   type FabricSource,
 } from "@/lib/api/orders";
@@ -36,12 +43,30 @@ const fieldClassName =
   "rounded-md border border-border bg-surface px-3 py-2 text-sm outline-none transition-colors focus:border-primary focus:ring-2 focus:ring-primary/25";
 
 export default function OrderDetailPage() {
-  const params = useParams<{ id: string }>();
+  const orderId = useRouteId();
   const router = useRouter();
   const { showToast } = useToast();
   const [order, setOrder] = useState<Order | null>(null);
+  const [customer, setCustomer] = useState<Customer | null>(null);
   const [loadError, setLoadError] = useState<string | null>(null);
   const [isTransitioning, setIsTransitioning] = useState(false);
+
+  const [isEditingDetails, setIsEditingDetails] = useState(false);
+  const [editCustomer, setEditCustomer] = useState<Customer | null>(null);
+  const [editDueAt, setEditDueAt] = useState("");
+  const [editNotes, setEditNotes] = useState("");
+  const [detailsError, setDetailsError] = useState<string | null>(null);
+  const [isSavingDetails, setIsSavingDetails] = useState(false);
+
+  const [editItemId, setEditItemId] = useState<string | null>(null);
+  const [editItemGarmentType, setEditItemGarmentType] = useState<GarmentType>(GARMENT_TYPES[0]);
+  const [editItemQuantity, setEditItemQuantity] = useState("1");
+  const [editItemUnitPrice, setEditItemUnitPrice] = useState("");
+  const [editItemError, setEditItemError] = useState<string | null>(null);
+  const [isSavingItem, setIsSavingItem] = useState(false);
+
+  const [pendingRemoveItem, setPendingRemoveItem] = useState<OrderItem | null>(null);
+  const [isRemovingItem, setIsRemovingItem] = useState(false);
 
   const [showCreateInvoice, setShowCreateInvoice] = useState(false);
   const [invoiceTax, setInvoiceTax] = useState("0");
@@ -66,12 +91,15 @@ export default function OrderDetailPage() {
 
   const load = useCallback(async () => {
     try {
-      const data = await getOrder(params.id, getAccessToken());
+      const token = getAccessToken();
+      const data = await getOrder(orderId, token);
       setOrder(data);
+      // A missing customer shouldn't blank the whole page — the order is still workable.
+      setCustomer(await getCustomer(data.customerId, token).catch(() => null));
     } catch (error) {
       setLoadError(error instanceof ApiError ? error.message : "Unable to load this order.");
     }
-  }, [params.id]);
+  }, [orderId]);
 
   useEffect(() => {
     // See CustomersPage for why this fetch-on-mount pattern is intentionally not restructured
@@ -83,7 +111,7 @@ export default function OrderDetailPage() {
   async function handleTransition(target: OrderStatus) {
     setIsTransitioning(true);
     try {
-      await transitionOrderStatus(params.id, target, getAccessToken());
+      await transitionOrderStatus(orderId, target, getAccessToken());
       showToast(`Order marked ${target}.`);
       await load();
     } catch (error) {
@@ -93,9 +121,111 @@ export default function OrderDetailPage() {
     }
   }
 
+  function openDetailsForm() {
+    if (!order) {
+      return;
+    }
+    setEditCustomer(customer);
+    // <input type="date"> only speaks yyyy-MM-dd.
+    setEditDueAt(order.dueAtUtc.slice(0, 10));
+    setEditNotes(order.notes ?? "");
+    setDetailsError(null);
+    setIsEditingDetails(true);
+  }
+
+  async function handleSaveDetails(event: FormEvent<HTMLFormElement>) {
+    event.preventDefault();
+    if (!order) {
+      return;
+    }
+    setDetailsError(null);
+
+    const customerId = editCustomer?.id ?? order.customerId;
+    if (!editDueAt) {
+      setDetailsError("Choose a due date.");
+      return;
+    }
+
+    setIsSavingDetails(true);
+    try {
+      await updateOrder(
+        orderId,
+        {
+          customerId,
+          // The employee is managed by its own section below; pass the current value through
+          // rather than clearing it.
+          employeeId: order.employeeId,
+          dueAtUtc: new Date(`${editDueAt}T00:00:00Z`).toISOString(),
+          notes: editNotes.trim() === "" ? null : editNotes,
+        },
+        getAccessToken(),
+      );
+      showToast("Order updated.");
+      setIsEditingDetails(false);
+      await load();
+    } catch (error) {
+      setDetailsError(error instanceof ApiError ? error.message : "Unable to update this order.");
+    } finally {
+      setIsSavingDetails(false);
+    }
+  }
+
+  function openItemForm(item: OrderItem) {
+    setEditItemId(item.id);
+    setEditItemGarmentType(item.garmentType);
+    setEditItemQuantity(String(item.quantity));
+    setEditItemUnitPrice(String(item.unitPrice));
+    setEditItemError(null);
+  }
+
+  async function handleSaveItem(event: FormEvent<HTMLFormElement>) {
+    event.preventDefault();
+    if (!editItemId) {
+      return;
+    }
+    setEditItemError(null);
+
+    const quantity = Number(editItemQuantity);
+    const unitPrice = Number(editItemUnitPrice);
+    if (!Number.isFinite(quantity) || quantity <= 0 || !Number.isFinite(unitPrice) || unitPrice <= 0) {
+      setEditItemError("Enter a positive quantity and unit price.");
+      return;
+    }
+
+    setIsSavingItem(true);
+    try {
+      await updateOrderItem(orderId, editItemId, editItemGarmentType, quantity, unitPrice, getAccessToken());
+      showToast("Item updated.");
+      setEditItemId(null);
+      await load();
+    } catch (error) {
+      setEditItemError(error instanceof ApiError ? error.message : "Unable to update this item.");
+    } finally {
+      setIsSavingItem(false);
+    }
+  }
+
+  async function handleConfirmRemoveItem() {
+    if (!pendingRemoveItem) {
+      return;
+    }
+
+    setIsRemovingItem(true);
+    try {
+      await removeOrderItem(orderId, pendingRemoveItem.id, getAccessToken());
+      showToast("Item removed.");
+      setPendingRemoveItem(null);
+      await load();
+    } catch (error) {
+      showToast(error instanceof ApiError ? error.message : "Unable to remove this item.", "error");
+    } finally {
+      setIsRemovingItem(false);
+    }
+  }
+
   async function handleAssignEmployee(employee: Employee) {
     try {
-      await assignOrderEmployee(params.id, employee.id, getAccessToken());
+      await assignOrderEmployee(orderId, employee.id, getAccessToken());
       showToast("Employee assigned.");
       await load();
     } catch (error) {
@@ -116,7 +246,7 @@ export default function OrderDetailPage() {
 
     setIsCreatingInvoice(true);
     try {
-      const invoice = await createInvoice(params.id, tax, discount, getAccessToken());
+      const invoice = await createInvoice(orderId, tax, discount, getAccessToken());
       showToast("Invoice created.");
       router.push(`/dashboard/invoices/${invoice.id}`);
     } catch (error) {
@@ -139,7 +269,7 @@ export default function OrderDetailPage() {
 
     setIsAddingItem(true);
     try {
-      await addOrderItem(params.id, newItemGarmentType, quantity, unitPrice, getAccessToken());
+      await addOrderItem(orderId, newItemGarmentType, quantity, unitPrice, getAccessToken());
       showToast("Item added.");
       setShowAddItem(false);
       setNewItemQuantity("1");
@@ -177,7 +307,7 @@ export default function OrderDetailPage() {
     setIsSavingFabric(true);
     try {
       await setOrderItemFabric(
-        params.id,
+        orderId,
         fabricItemId,
         fabricType,
         fabricSource,
@@ -220,20 +350,89 @@ export default function OrderDetailPage() {
       </div>
 
       <div className="rounded-lg border border-border bg-surface p-6">
-        <dl className="grid grid-cols-2 gap-4 text-sm">
-          <div>
-            <dt className="text-foreground/70">Status</dt>
-            <dd className="mt-0.5">
-              <StatusBadge {...ORDER_STATUS_BADGE[order.status]} />
-            </dd>
-          </div>
-          <div>
-            <dt className="text-foreground/70">Due date</dt>
-            <dd className="font-medium">{new Date(order.dueAtUtc).toLocaleDateString()}</dd>
-          </div>
-        </dl>
+        <div className="mb-3 flex items-center justify-between">
+          <h2 className="text-lg font-semibold">Details</h2>
+          {canModifyItems && !isEditingDetails && (
+            <Button type="button" variant="secondary" onClick={openDetailsForm}>
+              Edit Details
+            </Button>
+          )}
+        </div>
 
-        {nextStatuses.length > 0 && (
+        {isEditingDetails ? (
+          <form onSubmit={handleSaveDetails} className="flex flex-col gap-3">
+            <SearchPicker
+              id="editCustomer"
+              label="Customer"
+              selectedLabel={editCustomer?.fullName ?? null}
+              onSelect={setEditCustomer}
+              search={searchCustomers}
+              getId={(c) => c.id}
+              getLabel={(c) => c.fullName}
+              placeholder="Search customers…"
+            />
+            <div className="flex flex-col gap-1">
+              <label htmlFor="editDueAt" className="text-sm">
+                Due date
+              </label>
+              <input
+                id="editDueAt"
+                type="date"
+                value={editDueAt}
+                onChange={(e) => setEditDueAt(e.target.value)}
+                className={fieldClassName}
+              />
+            </div>
+            <div className="flex flex-col gap-1">
+              <label htmlFor="editNotes" className="text-sm">
+                Notes
+              </label>
+              <textarea
+                id="editNotes"
+                rows={3}
+                value={editNotes}
+                onChange={(e) => setEditNotes(e.target.value)}
+                className={fieldClassName}
+              />
+            </div>
+            {detailsError && (
+              <p role="alert" className="text-sm text-danger">
+                {detailsError}
+              </p>
+            )}
+            <div className="flex justify-end gap-2">
+              <button type="button" onClick={() => setIsEditingDetails(false)} className="text-sm text-foreground/70 hover:text-foreground">
+                Cancel
+              </button>
+              <Button type="submit" disabled={isSavingDetails}>
+                {isSavingDetails ? "Saving…" : "Save changes"}
+              </Button>
+            </div>
+          </form>
+        ) : (
+          <dl className="grid grid-cols-2 gap-4 text-sm">
+            <div>
+              <dt className="text-foreground/70">Status</dt>
+              <dd className="mt-0.5">
+                <StatusBadge {...ORDER_STATUS_BADGE[order.status]} />
+              </dd>
+            </div>
+            <div>
+              <dt className="text-foreground/70">Due date</dt>
+              <dd className="font-medium">{new Date(order.dueAtUtc).toLocaleDateString()}</dd>
+            </div>
+            <div>
+              <dt className="text-foreground/70">Customer</dt>
+              <dd className="font-medium">{customer?.fullName ?? "—"}</dd>
+            </div>
+            <div>
+              <dt className="text-foreground/70">Notes</dt>
+              <dd className="font-medium whitespace-pre-wrap">{order.notes ?? "—"}</dd>
+            </div>
+          </dl>
+        )}
+
+        {nextStatuses.length > 0 && !isEditingDetails && (
           <div className="mt-4 flex gap-3">
             {nextStatuses.map((target) => (
               <Button
@@ -323,16 +522,76 @@ export default function OrderDetailPage() {
         <ul className="flex flex-col gap-3">
           {order.items.map((item) => (
             <li key={item.id} className="rounded-md border border-border p-3 text-sm">
-              <div className="flex items-center justify-between">
+              <div className="flex items-center justify-between gap-3">
                 <span className="font-medium">
                   {item.garmentType} × {item.quantity} @ {item.unitPrice}
                 </span>
-                {!item.fabric && canModifyItems && (
-                  <button type="button" onClick={() => openFabricForm(item.id)} className="text-foreground/70 hover:text-foreground">
-                    Add fabric
-                  </button>
+                {canModifyItems && (
+                  <div className="flex shrink-0 gap-3">
+                    {!item.fabric && (
+                      <button type="button" onClick={() => openFabricForm(item.id)} className="text-foreground/70 hover:text-foreground">
+                        Add fabric
+                      </button>
+                    )}
+                    <button type="button" onClick={() => openItemForm(item)} className="text-foreground/70 hover:text-foreground">
+                      Edit
+                    </button>
+                    {order.items.length > 1 && (
+                      <button type="button" onClick={() => setPendingRemoveItem(item)} className="text-danger hover:text-danger-hover">
+                        Remove
+                      </button>
+                    )}
+                  </div>
                 )}
               </div>
+
+              {editItemId === item.id && (
+                <form onSubmit={handleSaveItem} className="mt-3 flex flex-col gap-2 rounded-md bg-surface p-3">
+                  <div className="grid grid-cols-3 gap-3">
+                    <select
+                      value={editItemGarmentType}
+                      onChange={(e) => setEditItemGarmentType(e.target.value as GarmentType)}
+                      className={fieldClassName}
+                    >
+                      {GARMENT_TYPES.map((type) => (
+                        <option key={type} value={type}>
+                          {type}
+                        </option>
+                      ))}
+                    </select>
+                    <input
+                      type="number"
+                      min="1"
+                      value={editItemQuantity}
+                      onChange={(e) => setEditItemQuantity(e.target.value)}
+                      placeholder="Quantity"
+                      className={fieldClassName}
+                    />
+                    <input
+                      type="number"
+                      min="0"
+                      step="0.01"
+                      value={editItemUnitPrice}
+                      onChange={(e) => setEditItemUnitPrice(e.target.value)}
+                      placeholder="Unit price"
+                      className={fieldClassName}
+                    />
+                  </div>
+                  {editItemError && (
+                    <p role="alert" className="text-sm text-danger">
+                      {editItemError}
+                    </p>
+                  )}
+                  <div className="flex justify-end gap-2">
+                    <button type="button" onClick={() => setEditItemId(null)} className="text-sm text-foreground/70 hover:text-foreground">
+                      Cancel
+                    </button>
+                    <Button type="submit" disabled={isSavingItem}>
+                      {isSavingItem ? "Saving…" : "Save item"}
+                    </Button>
+                  </div>
+                </form>
+              )}
               {item.fabric && (
                 <p className="mt-1 text-foreground/70">
                   Fabric: {item.fabric.fabricType} (
@@ -428,6 +687,19 @@ export default function OrderDetailPage() {
           </form>
         )}
       </div>
+
+      <ConfirmDialog
+        open={pendingRemoveItem !== null}
+        title="Remove item"
+        description={
+          pendingRemoveItem
+            ? `Remove ${pendingRemoveItem.garmentType} × ${pendingRemoveItem.quantity} from this order?`
+            : ""
+        }
+        isConfirming={isRemovingItem}
+        onConfirm={handleConfirmRemoveItem}
+        onCancel={() => setPendingRemoveItem(null)}
+      />
     </div>
   );
 }

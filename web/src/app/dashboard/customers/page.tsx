@@ -6,6 +6,7 @@ import { Button } from "@/components/ui/Button";
 import { Input } from "@/components/ui/Input";
 import { Pagination } from "@/components/ui/Pagination";
 import { ConfirmDialog } from "@/components/ui/ConfirmDialog";
+import { ImportExportButtons } from "@/components/ui/ImportExportButtons";
 import { useToast } from "@/components/ui/ToastProvider";
 import { useDebouncedValue } from "@/lib/use-debounced-value";
 import { getAccessToken } from "@/lib/auth";
@@ -74,11 +75,14 @@ export default function CustomersPage() {
 
   return (
     <div className="flex flex-col gap-6">
-      <div className="flex items-center justify-between">
+      <div className="flex items-start justify-between gap-4">
         <h1 className="text-2xl font-semibold">Customers</h1>
-        <Link href="/dashboard/customers/new">
-          <Button type="button">New Customer</Button>
-        </Link>
+        <div className="flex items-start gap-2">
+          <ImportExportButtons resource="customers" label="customers" onImported={loadCustomers} />
+          <Link href="/dashboard/customers/new">
+            <Button type="button">New Customer</Button>
+          </Link>
+        </div>
       </div>
 
       <Input

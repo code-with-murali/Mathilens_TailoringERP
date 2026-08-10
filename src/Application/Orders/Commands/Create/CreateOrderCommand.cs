@@ -10,7 +10,8 @@ public sealed record CreateOrderCommand(
     Guid CustomerId,
     Guid? EmployeeId,
     DateTime DueAtUtc,
-    IReadOnlyList<CreateOrderItemInput> Items) : ICommand<Result<OrderDto>>;
+    IReadOnlyList<CreateOrderItemInput> Items,
+    string? Notes = null) : ICommand<Result<OrderDto>>;
 
 public sealed record CreateOrderItemInput(GarmentType GarmentType, int Quantity, decimal UnitPrice, CreateOrderItemFabricInput? Fabric);
 

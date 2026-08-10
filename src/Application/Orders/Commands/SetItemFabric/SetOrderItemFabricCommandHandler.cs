@@ -27,7 +27,7 @@ public sealed class SetOrderItemFabricCommandHandler : ICommandHandler<SetOrderI
                 "OrderItem.NotFound", $"No item with id '{command.OrderItemId}' was found on this order."));
         }
 
-        if (!order.CanModifyItems)
+        if (!order.IsOpen)
         {
             return Result.Failure<OrderDto>(Error.Conflict(
                 "Order.NotModifiable", $"Cannot modify items on an order that is '{order.Status}'."));

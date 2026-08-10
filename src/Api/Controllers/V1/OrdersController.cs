@@ -6,8 +6,12 @@ using MathilensERP.Application.Orders;
 using MathilensERP.Application.Orders.Commands.AddItem;
 using MathilensERP.Application.Orders.Commands.AssignEmployee;
 using MathilensERP.Application.Orders.Commands.Create;
+using MathilensERP.Application.Orders.Commands.Delete;
+using MathilensERP.Application.Orders.Commands.RemoveItem;
 using MathilensERP.Application.Orders.Commands.SetItemFabric;
 using MathilensERP.Application.Orders.Commands.TransitionStatus;
+using MathilensERP.Application.Orders.Commands.Update;
+using MathilensERP.Application.Orders.Commands.UpdateItem;
 using MathilensERP.Application.Orders.Queries.GetById;
 using MathilensERP.Application.Orders.Queries.Search;
 using MathilensERP.Domain.Orders;
@@ -45,8 +49,32 @@ public sealed class OrdersController : ApiControllerBase
                 i.Fabric is null ? null : new CreateOrderItemFabricInput(i.Fabric.FabricType, i.Fabric.Source, i.Fabric.Color, i.Fabric.Quantity)))
             .ToList();
 
-        var command = new CreateOrderCommand(request.CustomerId, request.EmployeeId, request.DueAtUtc, items);
+        var command = new CreateOrderCommand(request.CustomerId, request.EmployeeId, request.DueAtUtc, items, request.Notes);
         var result = await _sender.Send(command, cancellationToken);
+        return ToActionResult(result);
+    }
+
+    /// <summary>Updates an open order's header details — customer, assigned employee, due date and notes.</summary>
+    [HttpPut("{id:guid}")]
+    [ProducesResponseType(typeof(ApiResponse<OrderDto>), StatusCodes.Status200OK)]
+    [ProducesResponseType(typeof(ApiErrorResponse), StatusCodes.Status400BadRequest)]
+    [ProducesResponseType(typeof(ApiErrorResponse), StatusCodes.Status404NotFound)]
+    [ProducesResponseType(typeof(ApiErrorResponse), StatusCodes.Status409Conflict)]
+    public async Task<IActionResult> Update(Guid id, [FromBody] UpdateOrderRequest request, CancellationToken cancellationToken)
+    {
+        var command = new UpdateOrderCommand(id, request.CustomerId, request.EmployeeId, request.DueAtUtc, request.Notes);
+        var result = await _sender.Send(command, cancellationToken);
+        return ToActionResult(result);
+    }
+
+    /// <summary>Soft-deletes an order. Refused with 409 once the order has been invoiced.</summary>
+    [HttpDelete("{id:guid}")]
+    [ProducesResponseType(StatusCodes.Status204NoContent)]
+    [ProducesResponseType(typeof(ApiErrorResponse), StatusCodes.Status404NotFound)]
+    [ProducesResponseType(typeof(ApiErrorResponse), StatusCodes.Status409Conflict)]
+    public async Task<IActionResult> Delete(Guid id, CancellationToken cancellationToken)
+    {
+        var result = await _sender.Send(new DeleteOrderCommand(id), cancellationToken);
         return ToActionResult(result);
     }
 
@@ -85,6 +113,30 @@ public sealed class OrdersController : ApiControllerBase
     {
         var command = new AddOrderItemCommand(id, request.GarmentType, request.Quantity, request.UnitPrice);
         var result = await _sender.Send(command, cancellationToken);
+        return ToActionResult(result);
+    }
+
+    /// <summary>Updates a garment item's type, quantity and price on an open order. Its fabric details are unaffected.</summary>
+    [HttpPut("{id:guid}/items/{itemId:guid}")]
+    [ProducesResponseType(typeof(ApiResponse<OrderDto>), StatusCodes.Status200OK)]
+    [ProducesResponseType(typeof(ApiErrorResponse), StatusCodes.Status400BadRequest)]
+    [ProducesResponseType(typeof(ApiErrorResponse), StatusCodes.Status404NotFound)]
+    [ProducesResponseType(typeof(ApiErrorResponse), StatusCodes.Status409Conflict)]
+    public async Task<IActionResult> UpdateItem(Guid id, Guid itemId, [FromBody] UpdateOrderItemRequest request, CancellationToken cancellationToken)
+    {
+        var command = new UpdateOrderItemCommand(id, itemId, request.GarmentType, request.Quantity, request.UnitPrice);
+        var result = await _sender.Send(command, cancellationToken);
+        return ToActionResult(result);
+    }
+
+    /// <summary>Removes a garment item from an open order. An order must keep at least one item.</summary>
+    [HttpDelete("{id:guid}/items/{itemId:guid}")]
+    [ProducesResponseType(typeof(ApiResponse<OrderDto>), StatusCodes.Status200OK)]
+    [ProducesResponseType(typeof(ApiErrorResponse), StatusCodes.Status404NotFound)]
+    [ProducesResponseType(typeof(ApiErrorResponse), StatusCodes.Status409Conflict)]
+    public async Task<IActionResult> RemoveItem(Guid id, Guid itemId, CancellationToken cancellationToken)
+    {
+        var result = await _sender.Send(new RemoveOrderItemCommand(id, itemId), cancellationToken);
         return ToActionResult(result);
     }
 

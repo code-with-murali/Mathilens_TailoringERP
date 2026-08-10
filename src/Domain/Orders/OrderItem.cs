@@ -32,20 +32,26 @@ public sealed class OrderItem : AuditableEntity
 
     internal static OrderItem Create(Guid orderId, GarmentType garmentType, int quantity, decimal unitPrice)
     {
+        var item = new OrderItem(Guid.NewGuid())
+        {
+            OrderId = Guard.AgainstEmpty(orderId, nameof(orderId)),
+        };
+
+        item.UpdateDetails(garmentType, quantity, unitPrice);
+        return item;
+    }
+
+    /// <summary>Corrects this item's garment, quantity and price. Fabric details are unaffected.</summary>
+    internal void UpdateDetails(GarmentType garmentType, int quantity, decimal unitPrice)
+    {
         if (quantity <= 0)
         {
             throw new ArgumentOutOfRangeException(nameof(quantity), quantity, "Quantity must be greater than zero.");
         }
 
-        var item = new OrderItem(Guid.NewGuid())
-        {
-            OrderId = Guard.AgainstEmpty(orderId, nameof(orderId)),
-            GarmentType = garmentType,
-            Quantity = quantity,
-            UnitPrice = Guard.AgainstNegativeOrZero(unitPrice, nameof(unitPrice)),
-        };
-
-        return item;
+        GarmentType = garmentType;
+        Quantity = quantity;
+        UnitPrice = Guard.AgainstNegativeOrZero(unitPrice, nameof(unitPrice));
     }
 
     /// <summary>Sets (or replaces) this item's fabric details (02_DATABASE.md § 10.11).</summary>

@@ -5,6 +5,7 @@ import { Button } from "@/components/ui/Button";
 import { Input } from "@/components/ui/Input";
 import { Pagination } from "@/components/ui/Pagination";
 import { ConfirmDialog } from "@/components/ui/ConfirmDialog";
+import { ImportExportButtons } from "@/components/ui/ImportExportButtons";
 import { useToast } from "@/components/ui/ToastProvider";
 import { getAccessToken } from "@/lib/auth";
 import { ApiError, type PaginationMeta } from "@/lib/api-client";
@@ -131,13 +132,16 @@ export default function PriceDetailPage() {
 
   return (
     <div className="flex flex-col gap-6">
-      <div className="flex items-center justify-between">
+      <div className="flex items-start justify-between gap-4">
         <h1 className="text-2xl font-semibold">Price Detail</h1>
-        {formState === null && (
-          <Button type="button" onClick={openCreateForm}>
-            New Price
-          </Button>
-        )}
+        <div className="flex items-start gap-2">
+          <ImportExportButtons resource="cloth-prices" label="prices" onImported={load} />
+          {formState === null && (
+            <Button type="button" onClick={openCreateForm}>
+              New Price
+            </Button>
+          )}
+        </div>
       </div>
 
       {formState && (

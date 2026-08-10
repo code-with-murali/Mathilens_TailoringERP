@@ -2,12 +2,12 @@
 
 import { useCallback, useEffect, useState, type FormEvent } from "react";
 import Link from "next/link";
-import { useParams } from "next/navigation";
 import { Button } from "@/components/ui/Button";
 import { ConfirmDialog } from "@/components/ui/ConfirmDialog";
 import { StatusBadge, INVOICE_STATUS_BADGE } from "@/components/ui/StatusBadge";
 import { useToast } from "@/components/ui/ToastProvider";
 import { getAccessToken } from "@/lib/auth";
+import { useRouteId } from "@/lib/use-route-id";
 import { ApiError } from "@/lib/api-client";
 import { getInvoice, recordPayment, voidInvoice, PAYMENT_METHODS, type Invoice, type PaymentMethod } from "@/lib/api/billing";
 import { getOrder, type Order } from "@/lib/api/orders";
@@ -17,7 +17,7 @@ const fieldClassName =
   "rounded-md border border-border bg-surface px-3 py-2 text-sm outline-none transition-colors focus:border-primary focus:ring-2 focus:ring-primary/25";
 
 export default function InvoiceDetailPage() {
-  const params = useParams<{ id: string }>();
+  const invoiceId = useRouteId();
   const { showToast } = useToast();
   const [invoice, setInvoice] = useState<Invoice | null>(null);
   const [order, setOrder] = useState<Order | null>(null);
@@ -34,7 +34,7 @@ export default function InvoiceDetailPage() {
 
   const load = useCallback(async () => {
     try {
-      const data = await getInvoice(params.id, getAccessToken());
+      const data = await getInvoice(invoiceId, getAccessToken());
       setInvoice(data);
       // Neither the customer's name/phone nor the order's due date live on the invoice itself
       // (Invoice only stores CustomerId/OrderId) — fetched separately so this page can show them.
@@ -47,7 +47,7 @@ export default function InvoiceDetailPage() {
     } catch (error) {
       setLoadError(error instanceof ApiError ? error.message : "Unable to load this invoice.");
     }
-  }, [params.id]);
+  }, [invoiceId]);
 
   useEffect(() => {
     // See CustomersPage for why this fetch-on-mount pattern is intentionally not restructured
@@ -68,7 +68,7 @@ export default function InvoiceDetailPage() {
 
     setIsRecordingPayment(true);
     try {
-      await recordPayment(params.id, amount, paymentMethod, getAccessToken());
+      await recordPayment(invoiceId, amount, paymentMethod, getAccessToken());
       showToast("Payment recorded.");
       setPaymentAmount("");
       await load();
@@ -82,7 +82,7 @@ export default function InvoiceDetailPage() {
   async function handleVoid() {
     setIsVoiding(true);
     try {
-      await voidInvoice(params.id, getAccessToken());
+      await voidInvoice(invoiceId, getAccessToken());
       showToast("Invoice voided.");
       setConfirmingVoid(false);
       await load();

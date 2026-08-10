@@ -42,6 +42,9 @@ public class InvoiceRepository : IInvoiceRepository
         return new PagedResult<Invoice>(items, page, pageSize, totalCount);
     }
 
+    public Task<bool> ExistsBillableForOrderAsync(Guid orderId, CancellationToken cancellationToken) =>
+        _dbContext.Invoices.AnyAsync(i => i.OrderId == orderId && i.Status != InvoiceStatus.Void, cancellationToken);
+
     public void Add(Invoice invoice) => _dbContext.Invoices.Add(invoice);
 
     public Task SaveChangesAsync(CancellationToken cancellationToken) => _dbContext.SaveChangesAsync(cancellationToken);
