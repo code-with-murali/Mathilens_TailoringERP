@@ -1,4 +1,5 @@
 using MathilensERP.Api.Common;
+using MathilensERP.Shared.Authorization;
 using MathilensERP.Api.Contracts.Common;
 using MathilensERP.Api.Contracts.Settings;
 using MathilensERP.Application.Common.Mediator;
@@ -16,7 +17,7 @@ namespace MathilensERP.Api.Controllers.V1;
 /// <summary>Shop-level configuration endpoints (00_MASTER_SPEC.md § 3, 02_DATABASE.md § 10.12). URL-segment versioned per § 8.2.</summary>
 [ApiController]
 [Route("api/v1/settings")]
-[Authorize]
+[Authorize(Policy = Permissions.SettingsView)]
 public sealed class SettingsController : ApiControllerBase
 {
     private readonly ISender _sender;
@@ -28,6 +29,7 @@ public sealed class SettingsController : ApiControllerBase
 
     /// <summary>Creates or updates a setting's value — settings are written only through explicit administrative action (02_DATABASE.md § 10.12).</summary>
     [HttpPut("{key}")]
+    [Authorize(Policy = Permissions.SettingsManage)]
     [ProducesResponseType(typeof(ApiResponse<SettingDto>), StatusCodes.Status200OK)]
     [ProducesResponseType(typeof(ApiErrorResponse), StatusCodes.Status400BadRequest)]
     public async Task<IActionResult> Upsert(string key, [FromBody] UpsertSettingRequest request, CancellationToken cancellationToken)
@@ -61,6 +63,7 @@ public sealed class SettingsController : ApiControllerBase
 
     /// <summary>Removes a setting entirely.</summary>
     [HttpDelete("{key}")]
+    [Authorize(Policy = Permissions.SettingsManage)]
     [ProducesResponseType(StatusCodes.Status204NoContent)]
     [ProducesResponseType(typeof(ApiErrorResponse), StatusCodes.Status404NotFound)]
     public async Task<IActionResult> Delete(string key, CancellationToken cancellationToken)

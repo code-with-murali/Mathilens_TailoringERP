@@ -1,4 +1,5 @@
 using MathilensERP.Api.Common;
+using MathilensERP.Shared.Authorization;
 using MathilensERP.Api.Contracts.Common;
 using MathilensERP.Application.Common.Mediator;
 using MathilensERP.Application.Reports;
@@ -15,7 +16,7 @@ namespace MathilensERP.Api.Controllers.V1;
 /// <summary>Operational and business reporting endpoints (00_MASTER_SPEC.md § 3, 01_ARCHITECTURE.md § 20). URL-segment versioned per § 8.2.</summary>
 [ApiController]
 [Route("api/v1/reports")]
-[Authorize]
+[Authorize(Policy = Permissions.ReportsView)]
 public sealed class ReportsController : ApiControllerBase
 {
     private readonly ISender _sender;

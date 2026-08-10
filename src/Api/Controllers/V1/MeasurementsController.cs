@@ -1,4 +1,5 @@
 using MathilensERP.Api.Common;
+using MathilensERP.Shared.Authorization;
 using MathilensERP.Api.Contracts.Common;
 using MathilensERP.Api.Contracts.Measurements;
 using MathilensERP.Application.Common.Mediator;
@@ -17,7 +18,7 @@ namespace MathilensERP.Api.Controllers.V1;
 /// <summary>Measurement management endpoints (00_MASTER_SPEC.md § 3, 02_DATABASE.md §§ 10.4-10.5). URL-segment versioned per § 8.2.</summary>
 [ApiController]
 [Route("api/v1")]
-[Authorize]
+[Authorize(Policy = Permissions.MeasurementsView)]
 public sealed class MeasurementsController : ApiControllerBase
 {
     private readonly ISender _sender;
@@ -29,6 +30,7 @@ public sealed class MeasurementsController : ApiControllerBase
 
     /// <summary>Records a new garment-type measurement set for a customer.</summary>
     [HttpPost("customers/{customerId:guid}/measurements")]
+    [Authorize(Policy = Permissions.MeasurementsManage)]
     [ProducesResponseType(typeof(ApiResponse<MeasurementDto>), StatusCodes.Status200OK)]
     [ProducesResponseType(typeof(ApiErrorResponse), StatusCodes.Status400BadRequest)]
     [ProducesResponseType(typeof(ApiErrorResponse), StatusCodes.Status404NotFound)]
@@ -61,6 +63,7 @@ public sealed class MeasurementsController : ApiControllerBase
 
     /// <summary>Updates a measurement's values, snapshotting the previous values into history first.</summary>
     [HttpPut("measurements/{id:guid}")]
+    [Authorize(Policy = Permissions.MeasurementsManage)]
     [ProducesResponseType(typeof(ApiResponse<MeasurementDto>), StatusCodes.Status200OK)]
     [ProducesResponseType(typeof(ApiErrorResponse), StatusCodes.Status400BadRequest)]
     [ProducesResponseType(typeof(ApiErrorResponse), StatusCodes.Status404NotFound)]

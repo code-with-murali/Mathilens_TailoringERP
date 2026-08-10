@@ -1,4 +1,5 @@
 using MathilensERP.Api.Common;
+using MathilensERP.Shared.Authorization;
 using MathilensERP.Api.Contracts.Common;
 using MathilensERP.Api.Contracts.WhatsApp;
 using MathilensERP.Application.Common.Mediator;
@@ -16,7 +17,7 @@ namespace MathilensERP.Api.Controllers.V1;
 /// <summary>WhatsApp customer-communication endpoints (00_MASTER_SPEC.md § 3). URL-segment versioned per § 8.2.</summary>
 [ApiController]
 [Route("api/v1/whatsapp-messages")]
-[Authorize]
+[Authorize(Policy = Permissions.WhatsAppView)]
 public sealed class WhatsAppMessagesController : ApiControllerBase
 {
     private readonly ISender _sender;
@@ -28,6 +29,7 @@ public sealed class WhatsAppMessagesController : ApiControllerBase
 
     /// <summary>Sends a WhatsApp message to a customer and logs the attempt/outcome.</summary>
     [HttpPost]
+    [Authorize(Policy = Permissions.WhatsAppManage)]
     [ProducesResponseType(typeof(ApiResponse<WhatsAppMessageDto>), StatusCodes.Status200OK)]
     [ProducesResponseType(typeof(ApiErrorResponse), StatusCodes.Status400BadRequest)]
     [ProducesResponseType(typeof(ApiErrorResponse), StatusCodes.Status404NotFound)]

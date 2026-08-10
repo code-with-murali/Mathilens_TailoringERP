@@ -5,6 +5,7 @@ using System.Text;
 using MathilensERP.Application.Common.Interfaces;
 using MathilensERP.Domain.Identity;
 using MathilensERP.Infrastructure.Persistence;
+using MathilensERP.Shared.Authorization;
 using MathilensERP.Shared.Results;
 using Microsoft.AspNetCore.Identity;
 using Microsoft.EntityFrameworkCore;
@@ -77,6 +78,12 @@ public sealed class IdentityService : IIdentityService
             return Result.Failure<AuthTokensDto>(
                 Error.Validation("Auth.RegistrationFailed", "This account could not be created.", details));
         }
+
+        // The very first account to register is the shop owner — otherwise nobody would hold the
+        // permission to grant anyone else access, and the system would be locked out of itself.
+        // Everyone after that starts with the least privilege and is raised deliberately.
+        var isFirstUser = await _userManager.Users.CountAsync(cancellationToken) == 1;
+        await _userManager.AddToRoleAsync(user, isFirstUser ? AppRoles.Owner : AppRoles.Tailor);
 
         var tokens = await IssueTokensAsync(user, cancellationToken);
         return Result.Success(tokens);

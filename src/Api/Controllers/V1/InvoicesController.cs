@@ -1,4 +1,5 @@
 using MathilensERP.Api.Common;
+using MathilensERP.Shared.Authorization;
 using MathilensERP.Api.Contracts.Billing;
 using MathilensERP.Api.Contracts.Common;
 using MathilensERP.Application.Billing;
@@ -18,7 +19,7 @@ namespace MathilensERP.Api.Controllers.V1;
 /// <summary>Billing endpoints (00_MASTER_SPEC.md § 3, 02_DATABASE.md §§ 10.9-10.10). URL-segment versioned per § 8.2.</summary>
 [ApiController]
 [Route("api/v1/invoices")]
-[Authorize]
+[Authorize(Policy = Permissions.InvoicesView)]
 public sealed class InvoicesController : ApiControllerBase
 {
     private readonly ISender _sender;
@@ -30,6 +31,7 @@ public sealed class InvoicesController : ApiControllerBase
 
     /// <summary>Issues a new invoice for an order.</summary>
     [HttpPost]
+    [Authorize(Policy = Permissions.InvoicesManage)]
     [ProducesResponseType(typeof(ApiResponse<InvoiceDto>), StatusCodes.Status200OK)]
     [ProducesResponseType(typeof(ApiErrorResponse), StatusCodes.Status400BadRequest)]
     [ProducesResponseType(typeof(ApiErrorResponse), StatusCodes.Status404NotFound)]
@@ -67,6 +69,7 @@ public sealed class InvoicesController : ApiControllerBase
 
     /// <summary>Records a payment against an invoice, supporting partial and multiple payments.</summary>
     [HttpPost("{id:guid}/payments")]
+    [Authorize(Policy = Permissions.InvoicesManage)]
     [ProducesResponseType(typeof(ApiResponse<InvoiceDto>), StatusCodes.Status200OK)]
     [ProducesResponseType(typeof(ApiErrorResponse), StatusCodes.Status400BadRequest)]
     [ProducesResponseType(typeof(ApiErrorResponse), StatusCodes.Status404NotFound)]
@@ -79,6 +82,7 @@ public sealed class InvoicesController : ApiControllerBase
 
     /// <summary>Voids an unpaid invoice with no recorded payments.</summary>
     [HttpPost("{id:guid}/void")]
+    [Authorize(Policy = Permissions.InvoicesManage)]
     [ProducesResponseType(StatusCodes.Status204NoContent)]
     [ProducesResponseType(typeof(ApiErrorResponse), StatusCodes.Status404NotFound)]
     [ProducesResponseType(typeof(ApiErrorResponse), StatusCodes.Status409Conflict)]

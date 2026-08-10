@@ -81,6 +81,7 @@ public static class DependencyInjection
             .ValidateOnStart();
 
         services.AddScoped<IIdentityService, IdentityService>();
+        services.AddScoped<IUserAdminService, UserAdminService>();
         services.AddScoped<ICustomerRepository, CustomerRepository>();
         services.AddScoped<IMeasurementRepository, MeasurementRepository>();
         services.AddScoped<IEmployeeRepository, EmployeeRepository>();

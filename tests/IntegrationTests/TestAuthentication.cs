@@ -1,5 +1,6 @@
 using System.IdentityModel.Tokens.Jwt;
 using System.Security.Claims;
+using MathilensERP.Shared.Authorization;
 using Microsoft.IdentityModel.Tokens;
 
 namespace MathilensERP.IntegrationTests;
@@ -16,12 +17,17 @@ internal static class TestAuthentication
     private const string Issuer = "MathilensERP.Api.Tests";
     private const string Audience = "MathilensERP.Client.Tests";
 
-    public static string CreateBearerToken(Guid? userId = null)
+    /// <summary>
+    /// Defaults to an Owner so that endpoint tests exercise the behavior they exist to test rather
+    /// than stopping at the permission gate. Pass a narrower role to test the gate itself.
+    /// </summary>
+    public static string CreateBearerToken(Guid? userId = null, string role = AppRoles.Owner)
     {
         var claims = new[]
         {
             new Claim(ClaimTypes.NameIdentifier, (userId ?? Guid.NewGuid()).ToString()),
             new Claim(ClaimTypes.Email, "test-user@shop.example"),
+            new Claim(ClaimTypes.Role, role),
         };
 
         var signingKey = new SymmetricSecurityKey(Convert.FromBase64String(SigningKey));

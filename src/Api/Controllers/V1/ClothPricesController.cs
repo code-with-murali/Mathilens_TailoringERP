@@ -1,4 +1,5 @@
 using MathilensERP.Api.Common;
+using MathilensERP.Shared.Authorization;
 using MathilensERP.Api.Common.Excel;
 using MathilensERP.Api.Contracts.Common;
 using MathilensERP.Api.Contracts.Pricing;
@@ -22,7 +23,7 @@ namespace MathilensERP.Api.Controllers.V1;
 /// <summary>Price list endpoints — one unit price per cloth code, looked up on the New Order screen. URL-segment versioned per 00_MASTER_SPEC.md § 8.2.</summary>
 [ApiController]
 [Route("api/v1/cloth-prices")]
-[Authorize]
+[Authorize(Policy = Permissions.PricingView)]
 public sealed class ClothPricesController : ApiControllerBase
 {
     private readonly ISender _sender;
@@ -56,6 +57,7 @@ public sealed class ClothPricesController : ApiControllerBase
     /// success: valid rows are saved and invalid ones come back listed by their row number.
     /// </summary>
     [HttpPost("import")]
+    [Authorize(Policy = Permissions.PricingManage)]
     [RequestSizeLimit(ImportLimits.MaxFileBytes)]
     [ProducesResponseType(typeof(ApiResponse<ImportResultDto>), StatusCodes.Status200OK)]
     [ProducesResponseType(typeof(ApiErrorResponse), StatusCodes.Status400BadRequest)]
@@ -94,6 +96,7 @@ public sealed class ClothPricesController : ApiControllerBase
 
     /// <summary>Creates a new cloth price entry.</summary>
     [HttpPost]
+    [Authorize(Policy = Permissions.PricingManage)]
     [ProducesResponseType(typeof(ApiResponse<ClothPriceDto>), StatusCodes.Status200OK)]
     [ProducesResponseType(typeof(ApiErrorResponse), StatusCodes.Status400BadRequest)]
     [ProducesResponseType(typeof(ApiErrorResponse), StatusCodes.Status409Conflict)]
@@ -130,6 +133,7 @@ public sealed class ClothPricesController : ApiControllerBase
 
     /// <summary>Updates an existing cloth price entry.</summary>
     [HttpPut("{id:guid}")]
+    [Authorize(Policy = Permissions.PricingManage)]
     [ProducesResponseType(typeof(ApiResponse<ClothPriceDto>), StatusCodes.Status200OK)]
     [ProducesResponseType(typeof(ApiErrorResponse), StatusCodes.Status400BadRequest)]
     [ProducesResponseType(typeof(ApiErrorResponse), StatusCodes.Status404NotFound)]
@@ -143,6 +147,7 @@ public sealed class ClothPricesController : ApiControllerBase
 
     /// <summary>Soft-deletes a cloth price entry.</summary>
     [HttpDelete("{id:guid}")]
+    [Authorize(Policy = Permissions.PricingManage)]
     [ProducesResponseType(StatusCodes.Status204NoContent)]
     [ProducesResponseType(typeof(ApiErrorResponse), StatusCodes.Status404NotFound)]
     public async Task<IActionResult> Delete(Guid id, CancellationToken cancellationToken)

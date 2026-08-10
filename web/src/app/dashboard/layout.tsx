@@ -5,20 +5,23 @@ import { useRouter, usePathname } from "next/navigation";
 import Link from "next/link";
 import { isAuthenticated, clearTokens } from "@/lib/auth";
 import { useBranding } from "@/lib/use-branding";
+import { usePermissions } from "@/lib/use-permissions";
+import { PERMISSIONS } from "@/lib/api/users";
 import { ThemeToggle } from "@/components/theme-toggle";
 
 const NAV_ITEMS = [
-  { href: "/dashboard", label: "Dashboard", icon: DashboardIcon },
-  { href: "/dashboard/customers", label: "Customers", icon: CustomersIcon },
-  { href: "/dashboard/employees", label: "Employees", icon: EmployeesIcon },
-  { href: "/dashboard/orders", label: "Orders", icon: OrdersIcon },
-  { href: "/dashboard/invoices", label: "Invoices", icon: InvoicesIcon },
-  { href: "/dashboard/whatsapp", label: "WhatsApp", icon: WhatsAppIcon },
-  { href: "/dashboard/reports", label: "Reports", icon: ReportsIcon },
-  { href: "/dashboard/price-detail", label: "Price Detail", icon: PriceDetailIcon },
-  { href: "/dashboard/activity", label: "Activity Log", icon: ActivityIcon },
-  { href: "/dashboard/branding", label: "Branding", icon: BrandingIcon },
-  { href: "/dashboard/settings", label: "Settings", icon: SettingsIcon },
+  { href: "/dashboard", label: "Dashboard", icon: DashboardIcon, permission: null },
+  { href: "/dashboard/customers", label: "Customers", icon: CustomersIcon, permission: PERMISSIONS.customersView },
+  { href: "/dashboard/employees", label: "Employees", icon: EmployeesIcon, permission: PERMISSIONS.employeesView },
+  { href: "/dashboard/orders", label: "Orders", icon: OrdersIcon, permission: PERMISSIONS.ordersView },
+  { href: "/dashboard/invoices", label: "Invoices", icon: InvoicesIcon, permission: PERMISSIONS.invoicesView },
+  { href: "/dashboard/whatsapp", label: "WhatsApp", icon: WhatsAppIcon, permission: PERMISSIONS.whatsAppView },
+  { href: "/dashboard/reports", label: "Reports", icon: ReportsIcon, permission: PERMISSIONS.reportsView },
+  { href: "/dashboard/price-detail", label: "Price Detail", icon: PriceDetailIcon, permission: PERMISSIONS.pricingView },
+  { href: "/dashboard/activity", label: "Activity Log", icon: ActivityIcon, permission: PERMISSIONS.activityView },
+  { href: "/dashboard/users", label: "Users", icon: UsersIcon, permission: PERMISSIONS.usersView },
+  { href: "/dashboard/branding", label: "Branding", icon: BrandingIcon, permission: PERMISSIONS.settingsView },
+  { href: "/dashboard/settings", label: "Settings", icon: SettingsIcon, permission: PERMISSIONS.settingsView },
 ] as const;
 
 /**
@@ -39,6 +42,7 @@ export default function DashboardLayout({ children }: LayoutProps<"/dashboard">)
   // Also applies the shop's colour to the theme's CSS variables, which is why it lives in the
   // shell rather than on the Branding page — every screen inside gets it.
   const branding = useBranding();
+  const { isLoaded: permissionsLoaded, can } = usePermissions();
 
   useEffect(() => {
     // Deliberately not `useSyncExternalStore`: this value has no valid server snapshot
@@ -62,6 +66,10 @@ export default function DashboardLayout({ children }: LayoutProps<"/dashboard">)
   if (!checked) {
     return null;
   }
+
+  const navItems = permissionsLoaded
+    ? NAV_ITEMS.filter((item) => item.permission === null || can(item.permission))
+    : [];
 
   const activeLabel = NAV_ITEMS.find(({ href }) =>
     href === "/dashboard" ? pathname === href : pathname?.startsWith(href),
@@ -103,7 +111,9 @@ export default function DashboardLayout({ children }: LayoutProps<"/dashboard">)
           <span className={isCollapsed ? "lg:hidden" : ""}>{branding.shopName || "Mathilens ERP"}</span>
         </Link>
         <nav className="flex flex-1 flex-col gap-0.5 px-3 py-4 text-sm">
-          {NAV_ITEMS.map(({ href, label, icon: Icon }) => {
+          {/* Nothing is shown until /me has answered — briefly rendering links the user turns out
+              not to have would be worse than a moment of an empty rail. */}
+          {navItems.map(({ href, label, icon: Icon }) => {
             const isActive =
               href === "/dashboard" ? pathname === href : pathname?.startsWith(href);
             return (
@@ -172,6 +182,16 @@ export default function DashboardLayout({ children }: LayoutProps<"/dashboard">)
 }
 
 type IconProps = { className?: string };
+
+function UsersIcon({ className }: IconProps) {
+  return (
+    <svg className={className} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+      <path d="M16 21v-2a4 4 0 0 0-4-4H6a4 4 0 0 0-4 4v2" />
+      <circle cx="9" cy="7" r="4" />
+      <path d="M22 21v-2a4 4 0 0 0-3-3.87M16 3.13a4 4 0 0 1 0 7.75" />
+    </svg>
+  );
+}
 
 function BrandingIcon({ className }: IconProps) {
   return (

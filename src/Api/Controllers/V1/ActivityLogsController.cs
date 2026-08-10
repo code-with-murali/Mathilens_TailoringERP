@@ -1,4 +1,5 @@
 using MathilensERP.Api.Common;
+using MathilensERP.Shared.Authorization;
 using MathilensERP.Api.Contracts.Common;
 using MathilensERP.Application.Activity;
 using MathilensERP.Application.Activity.Queries.Filters;
@@ -13,7 +14,7 @@ namespace MathilensERP.Api.Controllers.V1;
 /// <summary>Activity trail endpoints — who did what, when (01_ARCHITECTURE.md § 12 Logging Strategy). URL-segment versioned per § 8.2.</summary>
 [ApiController]
 [Route("api/v1/activity-logs")]
-[Authorize]
+[Authorize(Policy = Permissions.ActivityView)]
 public sealed class ActivityLogsController : ApiControllerBase
 {
     private readonly ISender _sender;

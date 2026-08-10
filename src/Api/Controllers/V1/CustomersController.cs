@@ -1,4 +1,5 @@
 using MathilensERP.Api.Common;
+using MathilensERP.Shared.Authorization;
 using MathilensERP.Api.Common.Excel;
 using MathilensERP.Api.Contracts.Common;
 using MathilensERP.Api.Contracts.Customers;
@@ -23,7 +24,7 @@ namespace MathilensERP.Api.Controllers.V1;
 /// <summary>Customer management endpoints (00_MASTER_SPEC.md § 3, 02_DATABASE.md § 10.3). URL-segment versioned per § 8.2.</summary>
 [ApiController]
 [Route("api/v1/customers")]
-[Authorize]
+[Authorize(Policy = Permissions.CustomersView)]
 public sealed class CustomersController : ApiControllerBase
 {
     private readonly ISender _sender;
@@ -35,6 +36,7 @@ public sealed class CustomersController : ApiControllerBase
 
     /// <summary>Creates a new customer.</summary>
     [HttpPost]
+    [Authorize(Policy = Permissions.CustomersManage)]
     [ProducesResponseType(typeof(ApiResponse<CustomerDto>), StatusCodes.Status200OK)]
     [ProducesResponseType(typeof(ApiErrorResponse), StatusCodes.Status400BadRequest)]
     public async Task<IActionResult> Create([FromBody] CreateCustomerRequest request, CancellationToken cancellationToken)
@@ -102,6 +104,7 @@ public sealed class CustomersController : ApiControllerBase
     /// valid rows are saved and invalid ones come back listed by their row number.
     /// </summary>
     [HttpPost("import")]
+    [Authorize(Policy = Permissions.CustomersManage)]
     [RequestSizeLimit(ImportLimits.MaxFileBytes)]
     [ProducesResponseType(typeof(ApiResponse<ImportResultDto>), StatusCodes.Status200OK)]
     [ProducesResponseType(typeof(ApiErrorResponse), StatusCodes.Status400BadRequest)]
@@ -141,6 +144,7 @@ public sealed class CustomersController : ApiControllerBase
 
     /// <summary>Updates an existing customer's details.</summary>
     [HttpPut("{id:guid}")]
+    [Authorize(Policy = Permissions.CustomersManage)]
     [ProducesResponseType(typeof(ApiResponse<CustomerDto>), StatusCodes.Status200OK)]
     [ProducesResponseType(typeof(ApiErrorResponse), StatusCodes.Status400BadRequest)]
     [ProducesResponseType(typeof(ApiErrorResponse), StatusCodes.Status404NotFound)]
@@ -163,6 +167,7 @@ public sealed class CustomersController : ApiControllerBase
 
     /// <summary>Soft-deletes a customer.</summary>
     [HttpDelete("{id:guid}")]
+    [Authorize(Policy = Permissions.CustomersManage)]
     [ProducesResponseType(StatusCodes.Status204NoContent)]
     [ProducesResponseType(typeof(ApiErrorResponse), StatusCodes.Status404NotFound)]
     public async Task<IActionResult> Delete(Guid id, CancellationToken cancellationToken)

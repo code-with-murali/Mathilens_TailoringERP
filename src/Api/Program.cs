@@ -1,11 +1,16 @@
 using System.Text;
 using System.Text.Json.Serialization;
 using MathilensERP.Api.Common;
+using MathilensERP.Api.Common.Authorization;
 using MathilensERP.Api.Contracts.Common;
+using MathilensERP.Shared.Authorization;
 using MathilensERP.Application;
 using MathilensERP.Infrastructure;
+using MathilensERP.Infrastructure.Identity;
 using MathilensERP.Infrastructure.Persistence;
+using Microsoft.AspNetCore.Identity;
 using Microsoft.AspNetCore.Authentication.JwtBearer;
+using Microsoft.AspNetCore.Authorization;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.IdentityModel.Tokens;
@@ -94,7 +99,16 @@ builder.Services
         };
     });
 
-builder.Services.AddAuthorization();
+// One policy per permission, generated from the catalogue rather than listed by hand — a new
+// permission becomes enforceable the moment it is added to Permissions.All.
+builder.Services.AddSingleton<IAuthorizationHandler, PermissionAuthorizationHandler>();
+builder.Services.AddAuthorization(options =>
+{
+    foreach (var permission in Permissions.All)
+    {
+        options.AddPolicy(permission, policy => policy.Requirements.Add(new PermissionRequirement(permission)));
+    }
+});
 
 // The Next.js frontend is a separately deployable application communicating over REST
 // (01_ARCHITECTURE.md § 3 AD-007), so it calls the API cross-origin. The allowed origins are
@@ -136,6 +150,17 @@ if (!app.Environment.IsDevelopment())
     // Serving traffic against a schema the code doesn't match is the worse outcome — that is
     // precisely the failure this block exists to prevent.
     await dbContext.Database.MigrateAsync();
+
+    // Roles are reference data the authorization model depends on, so they are created here
+    // rather than left to a manual step someone has to remember on a fresh database.
+    var roleManager = scope.ServiceProvider.GetRequiredService<RoleManager<ApplicationRole>>();
+    foreach (var role in AppRoles.All)
+    {
+        if (!await roleManager.RoleExistsAsync(role))
+        {
+            await roleManager.CreateAsync(new ApplicationRole { Name = role });
+        }
+    }
 }
 
 // Configure the HTTP request pipeline.
