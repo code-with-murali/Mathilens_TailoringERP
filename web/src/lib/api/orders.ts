@@ -32,6 +32,16 @@ export type Order = {
   deliveredAtUtc: string | null;
   notes: string | null;
   createdAtUtc: string;
+  /** The order's own value — quantity × unit price, before any invoice tax or discount. */
+  totalAmount: number;
+  /**
+   * Collected against this order. Null on responses returned by a write (create, update, status
+   * change) — those don't consult billing, so null means "not looked up", not "nothing paid".
+   * Always populated when an order is read via search or get-by-id.
+   */
+  amountPaid: number | null;
+  /** totalAmount − amountPaid, and null alongside it. */
+  balanceAmount: number | null;
   items: OrderItem[];
 };
 

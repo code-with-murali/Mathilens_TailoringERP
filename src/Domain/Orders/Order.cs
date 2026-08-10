@@ -47,6 +47,13 @@ public sealed class Order : AuditableEntity
     /// <summary>An order's details, items and fabric can only be changed while it's still open — not once delivered or cancelled.</summary>
     public bool IsOpen => Status is not (OrderStatus.Delivered or OrderStatus.Cancelled);
 
+    /// <summary>
+    /// What this order's live items are worth — quantity × unit price. This is the order's own
+    /// value, so it carries no invoice tax or discount: those belong to the bill, not the work.
+    /// Computed in memory over a loaded aggregate; not usable inside a database query.
+    /// </summary>
+    public decimal TotalAmount => Items.Sum(i => i.Quantity * i.UnitPrice);
+
     private Order()
     {
         // Reserved for EF Core materialization.

@@ -20,6 +20,13 @@ public interface IInvoiceRepository
     /// </summary>
     Task<decimal> GetOutstandingAmountForOrderAsync(Guid orderId, CancellationToken cancellationToken);
 
+    /// <summary>
+    /// What has been collected against each of the given orders, across their live (non-voided)
+    /// invoices. Answered for a whole page of orders in one query rather than one per order; orders
+    /// with nothing collected are simply absent from the result.
+    /// </summary>
+    Task<IReadOnlyDictionary<Guid, decimal>> GetPaidAmountsForOrdersAsync(IReadOnlyCollection<Guid> orderIds, CancellationToken cancellationToken);
+
     void Add(Invoice invoice);
 
     Task SaveChangesAsync(CancellationToken cancellationToken);

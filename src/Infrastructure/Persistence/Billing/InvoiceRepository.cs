@@ -51,6 +51,22 @@ public class InvoiceRepository : IInvoiceRepository
             .Where(i => i.OrderId == orderId && i.Status != InvoiceStatus.Void)
             .SumAsync(i => i.TotalAmount - i.AmountPaid, cancellationToken);
 
+    public async Task<IReadOnlyDictionary<Guid, decimal>> GetPaidAmountsForOrdersAsync(IReadOnlyCollection<Guid> orderIds, CancellationToken cancellationToken)
+    {
+        if (orderIds.Count == 0)
+        {
+            return new Dictionary<Guid, decimal>();
+        }
+
+        var paidByOrder = await _dbContext.Invoices
+            .Where(i => i.Status != InvoiceStatus.Void && orderIds.Contains(i.OrderId))
+            .GroupBy(i => i.OrderId)
+            .Select(g => new { OrderId = g.Key, AmountPaid = g.Sum(i => i.AmountPaid) })
+            .ToListAsync(cancellationToken);
+
+        return paidByOrder.ToDictionary(p => p.OrderId, p => p.AmountPaid);
+    }
+
     public void Add(Invoice invoice) => _dbContext.Invoices.Add(invoice);
 
     public Task SaveChangesAsync(CancellationToken cancellationToken) => _dbContext.SaveChangesAsync(cancellationToken);

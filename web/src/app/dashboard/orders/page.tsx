@@ -134,6 +134,9 @@ export default function OrdersPage() {
                 <th className="px-4 py-3 font-medium">Customer Name</th>
                 <th className="px-4 py-3 font-medium">Phone Number</th>
                 <th className="px-4 py-3 font-medium">Due Date</th>
+                <th className="px-4 py-3 text-right font-medium">Amount</th>
+                <th className="px-4 py-3 text-right font-medium">Advanced</th>
+                <th className="px-4 py-3 text-right font-medium">Balance</th>
                 <th className="px-4 py-3 font-medium">Status</th>
                 <th className="px-4 py-3 font-medium">
                   <span className="sr-only">Actions</span>
@@ -153,6 +156,18 @@ export default function OrdersPage() {
                     <td className="px-4 py-3">{customer?.fullName ?? "—"}</td>
                     <td className="px-4 py-3">{customer?.phoneNumber ?? "—"}</td>
                     <td className="px-4 py-3">{new Date(order.dueAtUtc).toLocaleDateString()}</td>
+                    <td className="px-4 py-3 text-right tabular-nums">{order.totalAmount.toFixed(2)}</td>
+                    <td className="px-4 py-3 text-right tabular-nums">{order.amountPaid?.toFixed(2) ?? "—"}</td>
+                    {/* Outstanding money is the number worth spotting from across the room. */}
+                    <td
+                      className={
+                        order.balanceAmount !== null && order.balanceAmount > 0
+                          ? "px-4 py-3 text-right font-medium tabular-nums text-danger"
+                          : "px-4 py-3 text-right tabular-nums"
+                      }
+                    >
+                      {order.balanceAmount?.toFixed(2) ?? "—"}
+                    </td>
                     <td className="px-4 py-3">
                       <StatusBadge {...ORDER_STATUS_BADGE[order.status]} />
                     </td>
