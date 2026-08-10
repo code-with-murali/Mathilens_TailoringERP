@@ -161,6 +161,26 @@ if (!app.Environment.IsDevelopment())
             await roleManager.CreateAsync(new ApplicationRole { Name = role });
         }
     }
+
+    // One-time backfill for databases created before permissions existed. Every endpoint used to be
+    // plain [Authorize], so an authenticated user could already do everything; now that the same
+    // endpoints demand a permission, a user carrying no role would be locked out of the system the
+    // moment this version starts — including the shop owner, with nobody left able to grant access.
+    // Making those pre-existing users Owner preserves exactly the access they already had rather
+    // than granting anything new, and they can be demoted from the Users screen afterwards.
+    //
+    // Guarded on *no user holding any role at all*, which is precisely the upgrading-from-the-old-world
+    // state and can never be true again once this has run. That matters: a role-less user created
+    // later is someone an Owner has not yet given access to, and they must stay locked out rather
+    // than be quietly promoted by the next restart.
+    if (!await dbContext.UserRoles.AnyAsync())
+    {
+        var userManager = scope.ServiceProvider.GetRequiredService<UserManager<ApplicationUser>>();
+        foreach (var user in await dbContext.Users.ToListAsync())
+        {
+            await userManager.AddToRoleAsync(user, AppRoles.Owner);
+        }
+    }
 }
 
 // Configure the HTTP request pipeline.
