@@ -22,4 +22,16 @@ public class CurrentUserService : ICurrentUserService
             return Guid.TryParse(value, out var id) ? id : null;
         }
     }
+
+    /// <summary>Falls back through the claims a token might carry a name under, rather than assuming one is always present.</summary>
+    public string? UserName
+    {
+        get
+        {
+            var user = _httpContextAccessor.HttpContext?.User;
+            return user?.FindFirst(ClaimTypes.Name)?.Value
+                ?? user?.FindFirst("preferred_username")?.Value
+                ?? user?.FindFirst(ClaimTypes.Email)?.Value;
+        }
+    }
 }

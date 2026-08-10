@@ -1,4 +1,5 @@
 using System.Linq.Expressions;
+using MathilensERP.Domain.Activity;
 using MathilensERP.Domain.Common;
 using MathilensERP.Domain.Billing;
 using MathilensERP.Domain.Customers;
@@ -55,6 +56,8 @@ public class ApplicationDbContext : IdentityDbContext<ApplicationUser, Applicati
     public DbSet<Setting> Settings => Set<Setting>();
 
     public DbSet<ClothPrice> ClothPrices => Set<ClothPrice>();
+
+    public DbSet<ActivityLog> ActivityLogs => Set<ActivityLog>();
 
     protected override void OnModelCreating(ModelBuilder builder)
     {

@@ -15,6 +15,7 @@ const NAV_ITEMS = [
   { href: "/dashboard/whatsapp", label: "WhatsApp", icon: WhatsAppIcon },
   { href: "/dashboard/reports", label: "Reports", icon: ReportsIcon },
   { href: "/dashboard/price-detail", label: "Price Detail", icon: PriceDetailIcon },
+  { href: "/dashboard/activity", label: "Activity Log", icon: ActivityIcon },
   { href: "/dashboard/settings", label: "Settings", icon: SettingsIcon },
 ] as const;
 
@@ -161,6 +162,14 @@ export default function DashboardLayout({ children }: LayoutProps<"/dashboard">)
 }
 
 type IconProps = { className?: string };
+
+function ActivityIcon({ className }: IconProps) {
+  return (
+    <svg className={className} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+      <path d="M22 12h-4l-3 9L9 3l-3 9H2" />
+    </svg>
+  );
+}
 
 function MenuIcon({ className }: IconProps) {
   return (

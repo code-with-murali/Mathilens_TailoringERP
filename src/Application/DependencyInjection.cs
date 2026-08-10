@@ -24,7 +24,11 @@ public static class DependencyInjection
         RegisterOpenGenericImplementations(services, assembly, typeof(IQueryHandler<,>));
         RegisterOpenGenericImplementations(services, assembly, typeof(IValidator<>));
 
+        // Order matters: validation runs first, so a rejected command never reaches the handler and
+        // never reaches the activity trail either — the trail records what happened, not what was
+        // attempted and refused.
         services.AddScoped(typeof(IPipelineBehavior<,>), typeof(ValidationBehavior<,>));
+        services.AddScoped(typeof(IPipelineBehavior<,>), typeof(ActivityLogBehavior<,>));
 
         return services;
     }

@@ -8,4 +8,7 @@ namespace MathilensERP.Application.Common.Interfaces;
 public interface ICurrentUserService
 {
     Guid? UserId { get; }
+
+    /// <summary>The caller's display name, for stamping into records that must stay readable after the login changes or goes away.</summary>
+    string? UserName { get; }
 }
