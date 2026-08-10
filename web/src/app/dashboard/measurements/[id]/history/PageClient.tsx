@@ -2,17 +2,17 @@
 
 import { useCallback, useEffect, useState } from "react";
 import Link from "next/link";
-import { Pagination } from "@/components/ui/Pagination";
+import { DEFAULT_PAGE_SIZE, Pagination } from "@/components/ui/Pagination";
 import { getAccessToken } from "@/lib/auth";
 import { useRouteId } from "@/lib/use-route-id";
 import { ApiError, type PaginationMeta } from "@/lib/api-client";
 import { getMeasurementHistory, type MeasurementHistoryEntry } from "@/lib/api/measurements";
 
-const PAGE_SIZE = 20;
 
 export default function MeasurementHistoryPage() {
   const measurementId = useRouteId(1);
   const [page, setPage] = useState(1);
+  const [pageSize, setPageSize] = useState(DEFAULT_PAGE_SIZE);
   const [entries, setEntries] = useState<MeasurementHistoryEntry[]>([]);
   const [meta, setMeta] = useState<PaginationMeta | null>(null);
   const [isLoading, setIsLoading] = useState(true);
@@ -22,7 +22,7 @@ export default function MeasurementHistoryPage() {
     setIsLoading(true);
     setLoadError(null);
     try {
-      const { items, meta } = await getMeasurementHistory(measurementId, page, PAGE_SIZE, getAccessToken());
+      const { items, meta } = await getMeasurementHistory(measurementId, page, pageSize, getAccessToken());
       setEntries(items);
       setMeta(meta);
     } catch (error) {
@@ -30,7 +30,7 @@ export default function MeasurementHistoryPage() {
     } finally {
       setIsLoading(false);
     }
-  }, [measurementId, page]);
+  }, [measurementId, page, pageSize]);
 
   useEffect(() => {
     // See CustomersPage for why this fetch-on-dependency-change pattern is intentionally not
@@ -83,7 +83,14 @@ export default function MeasurementHistoryPage() {
         </div>
       )}
 
-      {meta && <Pagination meta={meta} onPageChange={setPage} />}
+      {meta && <Pagination
+          meta={meta}
+          onPageChange={setPage}
+          onPageSizeChange={(size) => {
+            setPageSize(size);
+            setPage(1);
+          }}
+        />}
     </div>
   );
 }

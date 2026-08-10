@@ -4,22 +4,25 @@ import { useCallback, useEffect, useState } from "react";
 import Link from "next/link";
 import { Button } from "@/components/ui/Button";
 import { Input } from "@/components/ui/Input";
-import { Pagination } from "@/components/ui/Pagination";
+import { DEFAULT_PAGE_SIZE, Pagination } from "@/components/ui/Pagination";
 import { ConfirmDialog } from "@/components/ui/ConfirmDialog";
 import { ImportExportButtons } from "@/components/ui/ImportExportButtons";
 import { useToast } from "@/components/ui/ToastProvider";
 import { useDebouncedValue } from "@/lib/use-debounced-value";
 import { getAccessToken } from "@/lib/auth";
 import { ApiError, type PaginationMeta } from "@/lib/api-client";
-import { searchCustomers, deleteCustomer, type Customer } from "@/lib/api/customers";
+import { searchCustomers, deleteCustomer, RELIGIONS, type Customer, type Religion } from "@/lib/api/customers";
 
-const PAGE_SIZE = 20;
+const filterClassName =
+  "rounded-md border border-border bg-surface px-3 py-2 text-sm outline-none transition-colors focus:border-primary focus:ring-2 focus:ring-primary/25";
 
 export default function CustomersPage() {
   const { showToast } = useToast();
   const [searchInput, setSearchInput] = useState("");
   const debouncedSearch = useDebouncedValue(searchInput, 300);
+  const [religion, setReligion] = useState<Religion | "">("");
   const [page, setPage] = useState(1);
+  const [pageSize, setPageSize] = useState(DEFAULT_PAGE_SIZE);
   const [customers, setCustomers] = useState<Customer[]>([]);
   const [meta, setMeta] = useState<PaginationMeta | null>(null);
   const [isLoading, setIsLoading] = useState(true);
@@ -31,7 +34,7 @@ export default function CustomersPage() {
     setIsLoading(true);
     setLoadError(null);
     try {
-      const { items, meta } = await searchCustomers(debouncedSearch, page, PAGE_SIZE, getAccessToken());
+      const { items, meta } = await searchCustomers(debouncedSearch, page, pageSize, getAccessToken(), religion || null);
       setCustomers(items);
       setMeta(meta);
     } catch (error) {
@@ -39,7 +42,7 @@ export default function CustomersPage() {
     } finally {
       setIsLoading(false);
     }
-  }, [debouncedSearch, page]);
+  }, [debouncedSearch, religion, page, pageSize]);
 
   useEffect(() => {
     // The standard fetch-on-dependency-change pattern: loadCustomers' setState calls all
@@ -85,13 +88,39 @@ export default function CustomersPage() {
         </div>
       </div>
 
-      <Input
-        id="search"
-        label="Search by name or phone"
-        value={searchInput}
-        onChange={(e) => handleSearchChange(e.target.value)}
-        placeholder="Search customers…"
-      />
+      <div className="flex flex-wrap items-end gap-4">
+        <div className="min-w-[16rem] flex-1">
+          <Input
+            id="search"
+            label="Search by name or phone"
+            value={searchInput}
+            onChange={(e) => handleSearchChange(e.target.value)}
+            placeholder="Search customers…"
+          />
+        </div>
+        <div className="flex flex-col gap-1">
+          <label htmlFor="religionFilter" className="text-sm font-medium">
+            Religion
+          </label>
+          <select
+            id="religionFilter"
+            value={religion}
+            onChange={(e) => {
+              setReligion(e.target.value as Religion | "");
+              // A narrower list can be shorter than the page you're on.
+              setPage(1);
+            }}
+            className={filterClassName}
+          >
+            <option value="">All religions</option>
+            {RELIGIONS.map((option) => (
+              <option key={option} value={option}>
+                {option}
+              </option>
+            ))}
+          </select>
+        </div>
+      </div>
 
       {isLoading ? (
         <p className="text-sm text-foreground/70">Loading…</p>
@@ -141,7 +170,14 @@ export default function CustomersPage() {
         </div>
       )}
 
-      {meta && <Pagination meta={meta} onPageChange={setPage} />}
+      {meta && <Pagination
+          meta={meta}
+          onPageChange={setPage}
+          onPageSizeChange={(size) => {
+            setPageSize(size);
+            setPage(1);
+          }}
+        />}
 
       <ConfirmDialog
         open={pendingDelete !== null}

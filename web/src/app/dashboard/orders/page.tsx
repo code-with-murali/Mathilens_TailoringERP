@@ -3,7 +3,7 @@
 import { useCallback, useEffect, useState } from "react";
 import Link from "next/link";
 import { Button } from "@/components/ui/Button";
-import { Pagination } from "@/components/ui/Pagination";
+import { DEFAULT_PAGE_SIZE, Pagination } from "@/components/ui/Pagination";
 import { StatusBadge, ORDER_STATUS_BADGE } from "@/components/ui/StatusBadge";
 import { ConfirmDialog } from "@/components/ui/ConfirmDialog";
 import { useToast } from "@/components/ui/ToastProvider";
@@ -12,7 +12,6 @@ import { ApiError, type PaginationMeta } from "@/lib/api-client";
 import { searchOrders, deleteOrder, ORDER_STATUSES, type Order, type OrderStatus } from "@/lib/api/orders";
 import { getCustomer, type Customer } from "@/lib/api/customers";
 
-const PAGE_SIZE = 20;
 
 function orderNumber(order: Order) {
   return `#${order.id.slice(0, 8).toUpperCase()}`;
@@ -22,6 +21,7 @@ export default function OrdersPage() {
   const { showToast } = useToast();
   const [status, setStatus] = useState<OrderStatus | "">("");
   const [page, setPage] = useState(1);
+  const [pageSize, setPageSize] = useState(DEFAULT_PAGE_SIZE);
   const [orders, setOrders] = useState<Order[]>([]);
   const [customersById, setCustomersById] = useState<Record<string, Customer>>({});
   const [meta, setMeta] = useState<PaginationMeta | null>(null);
@@ -34,7 +34,7 @@ export default function OrdersPage() {
     setIsLoading(true);
     setLoadError(null);
     try {
-      const { items, meta } = await searchOrders(null, status || null, page, PAGE_SIZE, getAccessToken());
+      const { items, meta } = await searchOrders(null, status || null, page, pageSize, getAccessToken());
       setOrders(items);
       setMeta(meta);
 
@@ -57,7 +57,7 @@ export default function OrdersPage() {
     } finally {
       setIsLoading(false);
     }
-  }, [status, page]);
+  }, [status, page, pageSize]);
 
   useEffect(() => {
     // See CustomersPage for why this fetch-on-dependency-change pattern is intentionally not
@@ -193,7 +193,14 @@ export default function OrdersPage() {
         </div>
       )}
 
-      {meta && <Pagination meta={meta} onPageChange={setPage} />}
+      {meta && <Pagination
+          meta={meta}
+          onPageChange={setPage}
+          onPageSizeChange={(size) => {
+            setPageSize(size);
+            setPage(1);
+          }}
+        />}
 
       <ConfirmDialog
         open={pendingDelete !== null}

@@ -77,6 +77,11 @@ export function getOrder(id: string, token: string | null) {
   return apiGet<Order>(`/api/v1/orders/${id}`, token);
 }
 
+/** This customer's other orders, newest first — matched on their phone number, so a duplicate customer record still shows one history. */
+export function getPreviousOrders(id: string, token: string | null) {
+  return apiGet<Order[]>(`/api/v1/orders/${id}/previous`, token);
+}
+
 export function createOrder(input: CreateOrderInput, token: string | null) {
   return apiPost<Order>("/api/v1/orders", input, token);
 }

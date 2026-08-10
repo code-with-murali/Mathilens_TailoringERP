@@ -3,16 +3,16 @@
 import { useCallback, useEffect, useState } from "react";
 import Link from "next/link";
 import { Button } from "@/components/ui/Button";
-import { Pagination } from "@/components/ui/Pagination";
+import { DEFAULT_PAGE_SIZE, Pagination } from "@/components/ui/Pagination";
 import { getAccessToken } from "@/lib/auth";
 import { ApiError, type PaginationMeta } from "@/lib/api-client";
 import { searchWhatsAppMessages, WHATSAPP_MESSAGE_STATUSES, type WhatsAppMessage, type WhatsAppMessageStatus } from "@/lib/api/whatsapp";
 
-const PAGE_SIZE = 20;
 
 export default function WhatsAppMessagesPage() {
   const [status, setStatus] = useState<WhatsAppMessageStatus | "">("");
   const [page, setPage] = useState(1);
+  const [pageSize, setPageSize] = useState(DEFAULT_PAGE_SIZE);
   const [messages, setMessages] = useState<WhatsAppMessage[]>([]);
   const [meta, setMeta] = useState<PaginationMeta | null>(null);
   const [isLoading, setIsLoading] = useState(true);
@@ -22,7 +22,7 @@ export default function WhatsAppMessagesPage() {
     setIsLoading(true);
     setLoadError(null);
     try {
-      const { items, meta } = await searchWhatsAppMessages(null, null, status || null, page, PAGE_SIZE, getAccessToken());
+      const { items, meta } = await searchWhatsAppMessages(null, null, status || null, page, pageSize, getAccessToken());
       setMessages(items);
       setMeta(meta);
     } catch (error) {
@@ -30,7 +30,7 @@ export default function WhatsAppMessagesPage() {
     } finally {
       setIsLoading(false);
     }
-  }, [status, page]);
+  }, [status, page, pageSize]);
 
   useEffect(() => {
     // See CustomersPage for why this fetch-on-dependency-change pattern is intentionally not
@@ -111,7 +111,14 @@ export default function WhatsAppMessagesPage() {
         </div>
       )}
 
-      {meta && <Pagination meta={meta} onPageChange={setPage} />}
+      {meta && <Pagination
+          meta={meta}
+          onPageChange={setPage}
+          onPageSizeChange={(size) => {
+            setPageSize(size);
+            setPage(1);
+          }}
+        />}
     </div>
   );
 }

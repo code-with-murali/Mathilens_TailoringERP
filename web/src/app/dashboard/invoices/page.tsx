@@ -2,17 +2,17 @@
 
 import { useCallback, useEffect, useState } from "react";
 import Link from "next/link";
-import { Pagination } from "@/components/ui/Pagination";
+import { DEFAULT_PAGE_SIZE, Pagination } from "@/components/ui/Pagination";
 import { StatusBadge, INVOICE_STATUS_BADGE } from "@/components/ui/StatusBadge";
 import { getAccessToken } from "@/lib/auth";
 import { ApiError, type PaginationMeta } from "@/lib/api-client";
 import { searchInvoices, INVOICE_STATUSES, type Invoice, type InvoiceStatus } from "@/lib/api/billing";
 
-const PAGE_SIZE = 20;
 
 export default function InvoicesPage() {
   const [status, setStatus] = useState<InvoiceStatus | "">("");
   const [page, setPage] = useState(1);
+  const [pageSize, setPageSize] = useState(DEFAULT_PAGE_SIZE);
   const [invoices, setInvoices] = useState<Invoice[]>([]);
   const [meta, setMeta] = useState<PaginationMeta | null>(null);
   const [isLoading, setIsLoading] = useState(true);
@@ -22,7 +22,7 @@ export default function InvoicesPage() {
     setIsLoading(true);
     setLoadError(null);
     try {
-      const { items, meta } = await searchInvoices(null, status || null, page, PAGE_SIZE, getAccessToken());
+      const { items, meta } = await searchInvoices(null, status || null, page, pageSize, getAccessToken());
       setInvoices(items);
       setMeta(meta);
     } catch (error) {
@@ -30,7 +30,7 @@ export default function InvoicesPage() {
     } finally {
       setIsLoading(false);
     }
-  }, [status, page]);
+  }, [status, page, pageSize]);
 
   useEffect(() => {
     // See CustomersPage for why this fetch-on-dependency-change pattern is intentionally not
@@ -110,7 +110,14 @@ export default function InvoicesPage() {
         </div>
       )}
 
-      {meta && <Pagination meta={meta} onPageChange={setPage} />}
+      {meta && <Pagination
+          meta={meta}
+          onPageChange={setPage}
+          onPageSizeChange={(size) => {
+            setPageSize(size);
+            setPage(1);
+          }}
+        />}
     </div>
   );
 }

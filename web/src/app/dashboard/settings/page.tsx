@@ -3,7 +3,7 @@
 import { useCallback, useEffect, useState, type FormEvent } from "react";
 import { Button } from "@/components/ui/Button";
 import { Input, Textarea } from "@/components/ui/Input";
-import { Pagination } from "@/components/ui/Pagination";
+import { DEFAULT_PAGE_SIZE, Pagination } from "@/components/ui/Pagination";
 import { ConfirmDialog } from "@/components/ui/ConfirmDialog";
 import { useToast } from "@/components/ui/ToastProvider";
 import { ThemeToggle } from "@/components/theme-toggle";
@@ -18,13 +18,13 @@ import {
   type Setting,
 } from "@/lib/api/settings";
 
-const PAGE_SIZE = 20;
 
 type FormState = { mode: "create" } | { mode: "edit"; setting: Setting } | null;
 
 export default function SettingsPage() {
   const { showToast } = useToast();
   const [page, setPage] = useState(1);
+  const [pageSize, setPageSize] = useState(DEFAULT_PAGE_SIZE);
   const [settings, setSettings] = useState<Setting[]>([]);
   const [meta, setMeta] = useState<PaginationMeta | null>(null);
   const [isLoading, setIsLoading] = useState(true);
@@ -46,7 +46,7 @@ export default function SettingsPage() {
     setIsLoading(true);
     setLoadError(null);
     try {
-      const { items, meta } = await listSettings(page, PAGE_SIZE, getAccessToken());
+      const { items, meta } = await listSettings(page, pageSize, getAccessToken());
       setSettings(items.filter((s) => s.key !== DEFAULT_ORDER_DUE_DATE_DAYS_KEY));
       setMeta(meta);
     } catch (error) {
@@ -54,7 +54,7 @@ export default function SettingsPage() {
     } finally {
       setIsLoading(false);
     }
-  }, [page]);
+  }, [page, pageSize]);
 
   const loadOrderDuration = useCallback(async () => {
     setIsLoadingOrderDuration(true);
@@ -273,7 +273,14 @@ export default function SettingsPage() {
         </div>
       )}
 
-      {meta && <Pagination meta={meta} onPageChange={setPage} />}
+      {meta && <Pagination
+          meta={meta}
+          onPageChange={setPage}
+          onPageSizeChange={(size) => {
+            setPageSize(size);
+            setPage(1);
+          }}
+        />}
 
       <ConfirmDialog
         open={pendingDelete !== null}

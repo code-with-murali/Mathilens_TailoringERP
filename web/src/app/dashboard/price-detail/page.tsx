@@ -3,7 +3,7 @@
 import { useCallback, useEffect, useState, type FormEvent } from "react";
 import { Button } from "@/components/ui/Button";
 import { Input } from "@/components/ui/Input";
-import { Pagination } from "@/components/ui/Pagination";
+import { DEFAULT_PAGE_SIZE, Pagination } from "@/components/ui/Pagination";
 import { ConfirmDialog } from "@/components/ui/ConfirmDialog";
 import { ImportExportButtons } from "@/components/ui/ImportExportButtons";
 import { useToast } from "@/components/ui/ToastProvider";
@@ -11,13 +11,13 @@ import { getAccessToken } from "@/lib/auth";
 import { ApiError, type PaginationMeta } from "@/lib/api-client";
 import { searchClothPrices, createClothPrice, updateClothPrice, deleteClothPrice, type ClothPrice } from "@/lib/api/clothPrices";
 
-const PAGE_SIZE = 20;
 
 type FormState = { mode: "create" } | { mode: "edit"; clothPrice: ClothPrice } | null;
 
 export default function PriceDetailPage() {
   const { showToast } = useToast();
   const [page, setPage] = useState(1);
+  const [pageSize, setPageSize] = useState(DEFAULT_PAGE_SIZE);
   const [clothPrices, setClothPrices] = useState<ClothPrice[]>([]);
   const [meta, setMeta] = useState<PaginationMeta | null>(null);
   const [isLoading, setIsLoading] = useState(true);
@@ -36,7 +36,7 @@ export default function PriceDetailPage() {
     setIsLoading(true);
     setLoadError(null);
     try {
-      const { items, meta } = await searchClothPrices("", page, PAGE_SIZE, getAccessToken());
+      const { items, meta } = await searchClothPrices("", page, pageSize, getAccessToken());
       setClothPrices(items);
       setMeta(meta);
     } catch (error) {
@@ -44,7 +44,7 @@ export default function PriceDetailPage() {
     } finally {
       setIsLoading(false);
     }
-  }, [page]);
+  }, [page, pageSize]);
 
   useEffect(() => {
     // See CustomersPage for why this fetch-on-dependency-change pattern is intentionally not
@@ -214,7 +214,14 @@ export default function PriceDetailPage() {
         </div>
       )}
 
-      {meta && <Pagination meta={meta} onPageChange={setPage} />}
+      {meta && <Pagination
+          meta={meta}
+          onPageChange={setPage}
+          onPageSizeChange={(size) => {
+            setPageSize(size);
+            setPage(1);
+          }}
+        />}
 
       <ConfirmDialog
         open={pendingDelete !== null}

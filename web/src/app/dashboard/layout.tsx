@@ -27,6 +27,12 @@ export default function DashboardLayout({ children }: LayoutProps<"/dashboard">)
   const router = useRouter();
   const pathname = usePathname();
   const [checked, setChecked] = useState(false);
+  // Two separate pieces of state because the toggle means two different things by screen size:
+  // on a phone or tablet the nav is a drawer that slides over the content, on a desktop it is a
+  // rail that shrinks to icons. One shared boolean would either open the drawer by default on
+  // mobile or collapse the desktop rail by default — both wrong.
+  const [isDrawerOpen, setIsDrawerOpen] = useState(false);
+  const [isCollapsed, setIsCollapsed] = useState(false);
 
   useEffect(() => {
     // Deliberately not `useSyncExternalStore`: this value has no valid server snapshot
@@ -62,7 +68,20 @@ export default function DashboardLayout({ children }: LayoutProps<"/dashboard">)
 
   return (
     <div className="flex min-h-full flex-1">
-      <aside className="flex w-60 shrink-0 flex-col border-r border-border bg-surface print:hidden">
+      {/* Backdrop for the small-screen drawer. Tapping it closes the nav, as a drawer should. */}
+      {isDrawerOpen && (
+        <button
+          type="button"
+          aria-label="Close navigation"
+          onClick={() => setIsDrawerOpen(false)}
+          className="fixed inset-0 z-30 bg-black/50 lg:hidden"
+        />
+      )}
+      <aside
+        className={`fixed inset-y-0 left-0 z-40 flex shrink-0 flex-col border-r border-border bg-surface transition-[transform,width] duration-200 lg:static lg:translate-x-0 print:hidden ${
+          isDrawerOpen ? "w-60 translate-x-0" : "w-60 -translate-x-full"
+        } ${isCollapsed ? "lg:w-16" : "lg:w-60"}`}
+      >
         <Link
           href="/dashboard"
           className="flex items-center gap-2.5 whitespace-nowrap border-b border-border px-5 py-4 text-sm font-semibold"
@@ -70,7 +89,7 @@ export default function DashboardLayout({ children }: LayoutProps<"/dashboard">)
           <span className="flex h-7 w-7 shrink-0 items-center justify-center rounded-md bg-primary text-xs font-bold text-primary-foreground">
             M
           </span>
-          Mathilens ERP
+          <span className={isCollapsed ? "lg:hidden" : ""}>Mathilens ERP</span>
         </Link>
         <nav className="flex flex-1 flex-col gap-0.5 px-3 py-4 text-sm">
           {NAV_ITEMS.map(({ href, label, icon: Icon }) => {
@@ -80,6 +99,10 @@ export default function DashboardLayout({ children }: LayoutProps<"/dashboard">)
               <Link
                 key={href}
                 href={href}
+                // Navigating on a phone should get the drawer out of the way, not leave it
+                // covering the page the user just asked for.
+                onClick={() => setIsDrawerOpen(false)}
+                title={isCollapsed ? label : undefined}
                 className={`flex items-center gap-3 rounded-md px-3 py-2 transition-colors ${
                   isActive
                     ? "bg-primary/10 font-medium text-primary"
@@ -87,7 +110,7 @@ export default function DashboardLayout({ children }: LayoutProps<"/dashboard">)
                 }`}
               >
                 <Icon className="h-4 w-4 shrink-0" />
-                {label}
+                <span className={isCollapsed ? "lg:hidden" : ""}>{label}</span>
               </Link>
             );
           })}
@@ -99,14 +122,35 @@ export default function DashboardLayout({ children }: LayoutProps<"/dashboard">)
             className="flex w-full items-center gap-3 rounded-md px-3 py-2 text-sm text-foreground/65 transition-colors hover:bg-surface-hover hover:text-foreground"
           >
             <LogoutIcon className="h-4 w-4 shrink-0" />
-            Sign out
+            <span className={isCollapsed ? "lg:hidden" : ""}>Sign out</span>
           </button>
         </div>
       </aside>
       <div className="flex min-h-full flex-1 flex-col">
         {!hideHeader && (
           <header className="sticky top-0 z-10 flex h-14 shrink-0 items-center justify-between border-b border-border bg-surface/80 px-6 backdrop-blur-sm print:hidden">
-            <span className="text-sm font-medium text-foreground/70">{activeLabel}</span>
+            <div className="flex items-center gap-3">
+              {/* Two buttons rather than one, each shown at the size it belongs to — CSS decides
+                  which, so neither needs to guess the viewport before the first paint. */}
+              <button
+                type="button"
+                onClick={() => setIsDrawerOpen(true)}
+                aria-label="Open navigation"
+                className="-ml-2 rounded-md p-2 text-foreground/65 transition-colors hover:bg-surface-hover hover:text-foreground lg:hidden"
+              >
+                <MenuIcon className="h-5 w-5" />
+              </button>
+              <button
+                type="button"
+                onClick={() => setIsCollapsed((collapsed) => !collapsed)}
+                aria-label={isCollapsed ? "Expand navigation" : "Collapse navigation"}
+                aria-pressed={isCollapsed}
+                className="-ml-2 hidden rounded-md p-2 text-foreground/65 transition-colors hover:bg-surface-hover hover:text-foreground lg:block"
+              >
+                <MenuIcon className="h-5 w-5" />
+              </button>
+              <span className="text-sm font-medium text-foreground/70">{activeLabel}</span>
+            </div>
             <ThemeToggle />
           </header>
         )}
@@ -117,6 +161,14 @@ export default function DashboardLayout({ children }: LayoutProps<"/dashboard">)
 }
 
 type IconProps = { className?: string };
+
+function MenuIcon({ className }: IconProps) {
+  return (
+    <svg className={className} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" aria-hidden="true">
+      <path d="M4 6h16M4 12h16M4 18h16" />
+    </svg>
+  );
+}
 
 function DashboardIcon({ className }: IconProps) {
   return (

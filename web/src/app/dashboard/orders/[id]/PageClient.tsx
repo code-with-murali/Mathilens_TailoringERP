@@ -17,6 +17,7 @@ import { GARMENT_TYPES, type GarmentType } from "@/lib/api/measurements";
 import { createInvoice } from "@/lib/api/billing";
 import {
   getOrder,
+  getPreviousOrders,
   updateOrder,
   transitionOrderStatus,
   assignOrderEmployee,
@@ -53,6 +54,7 @@ export default function OrderDetailPage() {
   const { showToast } = useToast();
   const [order, setOrder] = useState<Order | null>(null);
   const [customer, setCustomer] = useState<Customer | null>(null);
+  const [previousOrders, setPreviousOrders] = useState<Order[]>([]);
   const [loadError, setLoadError] = useState<string | null>(null);
   const [isTransitioning, setIsTransitioning] = useState(false);
 
@@ -104,6 +106,8 @@ export default function OrderDetailPage() {
       setOrder(data);
       // A missing customer shouldn't blank the whole page — the order is still workable.
       setCustomer(await getCustomer(data.customerId, token).catch(() => null));
+      // Same reasoning for the history panel: it's context, not something to fail the page over.
+      setPreviousOrders(await getPreviousOrders(orderId, token).catch(() => []));
     } catch (error) {
       setLoadError(error instanceof ApiError ? error.message : "Unable to load this order.");
     }
@@ -473,6 +477,58 @@ export default function OrderDetailPage() {
                 Mark as {target}
               </Button>
             ))}
+          </div>
+        )}
+      </div>
+
+      <div className="rounded-lg border border-border bg-surface p-6">
+        <div className="mb-3">
+          <h2 className="text-lg font-semibold">Previous Orders</h2>
+          <p className="mt-1 text-sm text-foreground/70">
+            Everything else this shop has made for {customer?.phoneNumber ?? "this customer"} — matched on the phone number, so orders placed
+            under a duplicate customer record appear here too.
+          </p>
+        </div>
+        {previousOrders.length === 0 ? (
+          <p className="text-sm text-foreground/70">No earlier orders for this customer.</p>
+        ) : (
+          <div className="overflow-x-auto rounded-md border border-border">
+            <table className="w-full text-left text-sm">
+              <thead className="border-b border-border">
+                <tr>
+                  <th className="px-4 py-2 font-medium">Order</th>
+                  <th className="px-4 py-2 font-medium">Placed</th>
+                  <th className="px-4 py-2 font-medium">Status</th>
+                  <th className="px-4 py-2 text-right font-medium">Amount</th>
+                  <th className="px-4 py-2 text-right font-medium">Balance</th>
+                </tr>
+              </thead>
+              <tbody>
+                {previousOrders.map((previous) => (
+                  <tr key={previous.id} className="border-b border-border last:border-0">
+                    <td className="px-4 py-2 font-mono">
+                      <Link href={`/dashboard/orders/${previous.id}`} className="text-primary hover:underline">
+                        #{previous.id.slice(0, 8).toUpperCase()}
+                      </Link>
+                    </td>
+                    <td className="px-4 py-2">{new Date(previous.createdAtUtc).toLocaleDateString()}</td>
+                    <td className="px-4 py-2">
+                      <StatusBadge {...ORDER_STATUS_BADGE[previous.status]} />
+                    </td>
+                    <td className="px-4 py-2 text-right tabular-nums">{previous.totalAmount.toFixed(2)}</td>
+                    <td
+                      className={
+                        previous.balanceAmount !== null && previous.balanceAmount > 0
+                          ? "px-4 py-2 text-right font-medium tabular-nums text-danger"
+                          : "px-4 py-2 text-right tabular-nums"
+                      }
+                    >
+                      {previous.balanceAmount?.toFixed(2) ?? "—"}
+                    </td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
           </div>
         )}
       </div>

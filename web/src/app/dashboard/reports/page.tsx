@@ -1,7 +1,7 @@
 "use client";
 
 import { useCallback, useEffect, useState } from "react";
-import { Pagination } from "@/components/ui/Pagination";
+import { DEFAULT_PAGE_SIZE, Pagination } from "@/components/ui/Pagination";
 import { getAccessToken } from "@/lib/auth";
 import { ApiError, type PaginationMeta } from "@/lib/api-client";
 import {
@@ -15,7 +15,6 @@ import {
   type OutstandingInvoice,
 } from "@/lib/api/reports";
 
-const PAGE_SIZE = 20;
 const fieldClassName =
   "rounded-md border border-border bg-surface px-3 py-2 text-sm outline-none transition-colors focus:border-primary focus:ring-2 focus:ring-primary/25";
 
@@ -92,6 +91,7 @@ export default function ReportsPage() {
   const [summariesError, setSummariesError] = useState<string | null>(null);
 
   const [invoicePage, setInvoicePage] = useState(1);
+  const [invoicePageSize, setInvoicePageSize] = useState(DEFAULT_PAGE_SIZE);
   const [outstandingInvoices, setOutstandingInvoices] = useState<OutstandingInvoice[]>([]);
   const [invoicesMeta, setInvoicesMeta] = useState<PaginationMeta | null>(null);
   const [isLoadingInvoices, setIsLoadingInvoices] = useState(true);
@@ -128,7 +128,7 @@ export default function ReportsPage() {
     setIsLoadingInvoices(true);
     setInvoicesError(null);
     try {
-      const { items, meta } = await getOutstandingInvoicesReport(invoicePage, PAGE_SIZE, getAccessToken());
+      const { items, meta } = await getOutstandingInvoicesReport(invoicePage, invoicePageSize, getAccessToken());
       setOutstandingInvoices(items);
       setInvoicesMeta(meta);
     } catch (error) {
@@ -136,7 +136,7 @@ export default function ReportsPage() {
     } finally {
       setIsLoadingInvoices(false);
     }
-  }, [invoicePage]);
+  }, [invoicePage, invoicePageSize]);
 
   useEffect(() => {
     // See CustomersPage for why this fetch-on-dependency-change pattern is intentionally not
@@ -325,7 +325,16 @@ export default function ReportsPage() {
             </table>
           </div>
         )}
-        {invoicesMeta && <Pagination meta={invoicesMeta} onPageChange={setInvoicePage} />}
+        {invoicesMeta && (
+          <Pagination
+            meta={invoicesMeta}
+            onPageChange={setInvoicePage}
+            onPageSizeChange={(size) => {
+              setInvoicePageSize(size);
+              setInvoicePage(1);
+            }}
+          />
+        )}
       </section>
     </div>
   );

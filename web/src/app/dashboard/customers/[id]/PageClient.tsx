@@ -70,6 +70,10 @@ export default function EditCustomerPage() {
                 email: customer.email,
                 address: customer.address,
                 notes: customer.notes,
+                gender: customer.gender,
+                religion: customer.religion,
+                dateOfBirth: customer.dateOfBirth,
+                weddingDate: customer.weddingDate,
               }}
               submitLabel="Save changes"
               onSubmit={handleUpdate}

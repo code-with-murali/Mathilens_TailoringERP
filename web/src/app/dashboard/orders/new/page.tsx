@@ -379,6 +379,12 @@ export default function NewOrderPage() {
           email: newCustomerEmail.trim() === "" ? null : newCustomerEmail,
           address: null,
           notes: null,
+          // The quick-add at the counter captures only what's needed to take the order; the rest
+          // of the profile is filled in later on the customer page.
+          gender: null,
+          religion: null,
+          dateOfBirth: null,
+          weddingDate: null,
         },
         getAccessToken(),
       );

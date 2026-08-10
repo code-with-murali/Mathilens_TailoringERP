@@ -4,7 +4,7 @@ import { useCallback, useEffect, useState } from "react";
 import Link from "next/link";
 import { Button } from "@/components/ui/Button";
 import { Input } from "@/components/ui/Input";
-import { Pagination } from "@/components/ui/Pagination";
+import { DEFAULT_PAGE_SIZE, Pagination } from "@/components/ui/Pagination";
 import { ConfirmDialog } from "@/components/ui/ConfirmDialog";
 import { ImportExportButtons } from "@/components/ui/ImportExportButtons";
 import { useToast } from "@/components/ui/ToastProvider";
@@ -13,13 +13,13 @@ import { getAccessToken } from "@/lib/auth";
 import { ApiError, type PaginationMeta } from "@/lib/api-client";
 import { searchEmployees, deleteEmployee, type Employee } from "@/lib/api/employees";
 
-const PAGE_SIZE = 20;
 
 export default function EmployeesPage() {
   const { showToast } = useToast();
   const [searchInput, setSearchInput] = useState("");
   const debouncedSearch = useDebouncedValue(searchInput, 300);
   const [page, setPage] = useState(1);
+  const [pageSize, setPageSize] = useState(DEFAULT_PAGE_SIZE);
   const [employees, setEmployees] = useState<Employee[]>([]);
   const [meta, setMeta] = useState<PaginationMeta | null>(null);
   const [isLoading, setIsLoading] = useState(true);
@@ -31,7 +31,7 @@ export default function EmployeesPage() {
     setIsLoading(true);
     setLoadError(null);
     try {
-      const { items, meta } = await searchEmployees(debouncedSearch, page, PAGE_SIZE, getAccessToken());
+      const { items, meta } = await searchEmployees(debouncedSearch, page, pageSize, getAccessToken());
       setEmployees(items);
       setMeta(meta);
     } catch (error) {
@@ -39,7 +39,7 @@ export default function EmployeesPage() {
     } finally {
       setIsLoading(false);
     }
-  }, [debouncedSearch, page]);
+  }, [debouncedSearch, page, pageSize]);
 
   useEffect(() => {
     // See CustomersPage for why this fetch-on-dependency-change pattern is intentionally not
@@ -139,7 +139,14 @@ export default function EmployeesPage() {
         </div>
       )}
 
-      {meta && <Pagination meta={meta} onPageChange={setPage} />}
+      {meta && <Pagination
+          meta={meta}
+          onPageChange={setPage}
+          onPageSizeChange={(size) => {
+            setPageSize(size);
+            setPage(1);
+          }}
+        />}
 
       <ConfirmDialog
         open={pendingDelete !== null}
