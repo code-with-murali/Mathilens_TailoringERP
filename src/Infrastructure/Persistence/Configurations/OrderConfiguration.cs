@@ -23,6 +23,9 @@ public class OrderConfiguration : IEntityTypeConfiguration<Order>
 
         builder.Property(o => o.DueAtUtc).IsRequired();
 
+        // Null until the order is delivered.
+        builder.Property(o => o.DeliveredAtUtc);
+
         builder.Property(o => o.Notes).HasMaxLength(2000);
 
         builder.HasOne<Customer>()

@@ -1,3 +1,4 @@
+using MathilensERP.Application.Billing;
 using MathilensERP.Application.Orders;
 using MathilensERP.Application.Orders.Commands.TransitionStatus;
 using MathilensERP.Domain.Orders;
@@ -7,46 +8,103 @@ namespace MathilensERP.UnitTests.Application.Orders.Commands.TransitionStatus;
 
 public class TransitionOrderStatusCommandHandlerTests
 {
+    private readonly IOrderRepository _orderRepository = Substitute.For<IOrderRepository>();
+    private readonly IInvoiceRepository _invoiceRepository = Substitute.For<IInvoiceRepository>();
+
     [Fact]
     public async Task Handle_WithValidTransition_UpdatesStatus()
     {
         var order = Order.Create(Guid.NewGuid(), DateTime.UtcNow, null);
-        var repository = Substitute.For<IOrderRepository>();
-        repository.GetByIdAsync(order.Id, Arg.Any<CancellationToken>()).Returns(order);
-        var handler = new TransitionOrderStatusCommandHandler(repository);
+        _orderRepository.GetByIdAsync(order.Id, Arg.Any<CancellationToken>()).Returns(order);
+        var handler = new TransitionOrderStatusCommandHandler(_orderRepository, _invoiceRepository);
 
         var result = await handler.Handle(new TransitionOrderStatusCommand(order.Id, OrderStatus.InProgress), CancellationToken.None);
 
         Assert.True(result.IsSuccess);
         Assert.Equal(OrderStatus.InProgress, result.Value.Status);
-        await repository.Received(1).SaveChangesAsync(Arg.Any<CancellationToken>());
+        await _orderRepository.Received(1).SaveChangesAsync(Arg.Any<CancellationToken>());
     }
 
     [Fact]
     public async Task Handle_WithInvalidTransition_ReturnsConflict()
     {
         var order = Order.Create(Guid.NewGuid(), DateTime.UtcNow, null);
-        var repository = Substitute.For<IOrderRepository>();
-        repository.GetByIdAsync(order.Id, Arg.Any<CancellationToken>()).Returns(order);
-        var handler = new TransitionOrderStatusCommandHandler(repository);
+        _orderRepository.GetByIdAsync(order.Id, Arg.Any<CancellationToken>()).Returns(order);
+        var handler = new TransitionOrderStatusCommandHandler(_orderRepository, _invoiceRepository);
 
-        var result = await handler.Handle(new TransitionOrderStatusCommand(order.Id, OrderStatus.Delivered), CancellationToken.None);
+        var result = await handler.Handle(
+            new TransitionOrderStatusCommand(order.Id, OrderStatus.Delivered, DateTime.UtcNow), CancellationToken.None);
 
         Assert.True(result.IsFailure);
         Assert.Equal("Order.InvalidStatusTransition", result.Error.Code);
-        await repository.DidNotReceive().SaveChangesAsync(Arg.Any<CancellationToken>());
+        await _orderRepository.DidNotReceive().SaveChangesAsync(Arg.Any<CancellationToken>());
     }
 
     [Fact]
     public async Task Handle_WithUnknownOrder_ReturnsNotFound()
     {
-        var repository = Substitute.For<IOrderRepository>();
-        repository.GetByIdAsync(Arg.Any<Guid>(), Arg.Any<CancellationToken>()).Returns((Order?)null);
-        var handler = new TransitionOrderStatusCommandHandler(repository);
+        _orderRepository.GetByIdAsync(Arg.Any<Guid>(), Arg.Any<CancellationToken>()).Returns((Order?)null);
+        var handler = new TransitionOrderStatusCommandHandler(_orderRepository, _invoiceRepository);
 
         var result = await handler.Handle(new TransitionOrderStatusCommand(Guid.NewGuid(), OrderStatus.InProgress), CancellationToken.None);
 
         Assert.True(result.IsFailure);
         Assert.Equal("Order.NotFound", result.Error.Code);
+    }
+
+    [Fact]
+    public async Task Handle_DeliveringWithAnOutstandingAmount_ReturnsConflict()
+    {
+        var order = ReadyForDeliveryOrder();
+        _orderRepository.GetByIdAsync(order.Id, Arg.Any<CancellationToken>()).Returns(order);
+        _invoiceRepository.GetOutstandingAmountForOrderAsync(order.Id, Arg.Any<CancellationToken>()).Returns(250m);
+        var handler = new TransitionOrderStatusCommandHandler(_orderRepository, _invoiceRepository);
+
+        var result = await handler.Handle(
+            new TransitionOrderStatusCommand(order.Id, OrderStatus.Delivered, DateTime.UtcNow), CancellationToken.None);
+
+        Assert.True(result.IsFailure);
+        Assert.Equal("Order.PaymentPending", result.Error.Code);
+        Assert.Equal(OrderStatus.ReadyForDelivery, order.Status);
+        await _orderRepository.DidNotReceive().SaveChangesAsync(Arg.Any<CancellationToken>());
+    }
+
+    [Fact]
+    public async Task Handle_DeliveringWithNothingOutstanding_RecordsTheDeliveryDate()
+    {
+        var order = ReadyForDeliveryOrder();
+        var deliveredAtUtc = new DateTime(2026, 8, 9, 0, 0, 0, DateTimeKind.Utc);
+        _orderRepository.GetByIdAsync(order.Id, Arg.Any<CancellationToken>()).Returns(order);
+        _invoiceRepository.GetOutstandingAmountForOrderAsync(order.Id, Arg.Any<CancellationToken>()).Returns(0m);
+        var handler = new TransitionOrderStatusCommandHandler(_orderRepository, _invoiceRepository);
+
+        var result = await handler.Handle(
+            new TransitionOrderStatusCommand(order.Id, OrderStatus.Delivered, deliveredAtUtc), CancellationToken.None);
+
+        Assert.True(result.IsSuccess);
+        Assert.Equal(OrderStatus.Delivered, result.Value.Status);
+        Assert.Equal(deliveredAtUtc, result.Value.DeliveredAtUtc);
+        await _orderRepository.Received(1).SaveChangesAsync(Arg.Any<CancellationToken>());
+    }
+
+    [Fact]
+    public async Task Handle_WithANonDeliveryTransition_DoesNotCheckTheBalance()
+    {
+        var order = Order.Create(Guid.NewGuid(), DateTime.UtcNow, null);
+        _orderRepository.GetByIdAsync(order.Id, Arg.Any<CancellationToken>()).Returns(order);
+        var handler = new TransitionOrderStatusCommandHandler(_orderRepository, _invoiceRepository);
+
+        var result = await handler.Handle(new TransitionOrderStatusCommand(order.Id, OrderStatus.Cancelled), CancellationToken.None);
+
+        Assert.True(result.IsSuccess);
+        await _invoiceRepository.DidNotReceive().GetOutstandingAmountForOrderAsync(Arg.Any<Guid>(), Arg.Any<CancellationToken>());
+    }
+
+    private static Order ReadyForDeliveryOrder()
+    {
+        var order = Order.Create(Guid.NewGuid(), DateTime.UtcNow, null);
+        order.TransitionTo(OrderStatus.InProgress);
+        order.TransitionTo(OrderStatus.ReadyForDelivery);
+        return order;
     }
 }

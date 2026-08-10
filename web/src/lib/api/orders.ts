@@ -28,6 +28,8 @@ export type Order = {
   employeeId: string | null;
   status: OrderStatus;
   dueAtUtc: string;
+  /** Set only once the order is Delivered. */
+  deliveredAtUtc: string | null;
   notes: string | null;
   createdAtUtc: string;
   items: OrderItem[];
@@ -109,8 +111,14 @@ export function setOrderItemFabric(
   return apiPut<Order>(`/api/v1/orders/${orderId}/items/${itemId}/fabric`, { fabricType, source, color, quantity }, token);
 }
 
-export function transitionOrderStatus(orderId: string, targetStatus: OrderStatus, token: string | null) {
-  return apiPut<Order>(`/api/v1/orders/${orderId}/status`, { targetStatus }, token);
+/** `deliveredAtUtc` is required when targetStatus is "Delivered", and ignored otherwise. */
+export function transitionOrderStatus(
+  orderId: string,
+  targetStatus: OrderStatus,
+  token: string | null,
+  deliveredAtUtc: string | null = null,
+) {
+  return apiPut<Order>(`/api/v1/orders/${orderId}/status`, { targetStatus, deliveredAtUtc }, token);
 }
 
 export function assignOrderEmployee(orderId: string, employeeId: string, token: string | null) {

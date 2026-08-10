@@ -5,4 +5,5 @@ using MathilensERP.Shared.Results;
 
 namespace MathilensERP.Application.Orders.Commands.TransitionStatus;
 
-public sealed record TransitionOrderStatusCommand(Guid OrderId, OrderStatus TargetStatus) : ICommand<Result<OrderDto>>;
+/// <summary><paramref name="DeliveredAtUtc"/> is required when — and only meaningful when — <paramref name="TargetStatus"/> is <see cref="OrderStatus.Delivered"/>.</summary>
+public sealed record TransitionOrderStatusCommand(Guid OrderId, OrderStatus TargetStatus, DateTime? DeliveredAtUtc = null) : ICommand<Result<OrderDto>>;

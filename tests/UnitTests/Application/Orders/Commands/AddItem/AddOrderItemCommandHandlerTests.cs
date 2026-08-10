@@ -42,7 +42,7 @@ public class AddOrderItemCommandHandlerTests
         var order = Order.Create(Guid.NewGuid(), DateTime.UtcNow, null);
         order.TransitionTo(OrderStatus.InProgress);
         order.TransitionTo(OrderStatus.ReadyForDelivery);
-        order.TransitionTo(OrderStatus.Delivered);
+        order.TransitionTo(OrderStatus.Delivered, DateTime.UtcNow);
         var repository = Substitute.For<IOrderRepository>();
         repository.GetByIdAsync(order.Id, Arg.Any<CancellationToken>()).Returns(order);
         var handler = new AddOrderItemCommandHandler(repository);

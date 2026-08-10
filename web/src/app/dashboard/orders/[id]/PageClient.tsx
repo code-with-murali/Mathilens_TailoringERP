@@ -42,6 +42,11 @@ const NEXT_STATUSES: Record<OrderStatus, OrderStatus[]> = {
 const fieldClassName =
   "rounded-md border border-border bg-surface px-3 py-2 text-sm outline-none transition-colors focus:border-primary focus:ring-2 focus:ring-primary/25";
 
+/** Today, in the yyyy-MM-dd that <input type="date"> speaks. */
+function todayIsoDate(): string {
+  return new Date().toISOString().slice(0, 10);
+}
+
 export default function OrderDetailPage() {
   const orderId = useRouteId();
   const router = useRouter();
@@ -50,6 +55,9 @@ export default function OrderDetailPage() {
   const [customer, setCustomer] = useState<Customer | null>(null);
   const [loadError, setLoadError] = useState<string | null>(null);
   const [isTransitioning, setIsTransitioning] = useState(false);
+
+  const [isConfirmingDelivery, setIsConfirmingDelivery] = useState(false);
+  const [deliveryDate, setDeliveryDate] = useState("");
 
   const [isEditingDetails, setIsEditingDetails] = useState(false);
   const [editCustomer, setEditCustomer] = useState<Customer | null>(null);
@@ -108,17 +116,31 @@ export default function OrderDetailPage() {
     load();
   }, [load]);
 
-  async function handleTransition(target: OrderStatus) {
+  async function handleTransition(target: OrderStatus, deliveredAtUtc: string | null = null) {
     setIsTransitioning(true);
     try {
-      await transitionOrderStatus(orderId, target, getAccessToken());
+      await transitionOrderStatus(orderId, target, getAccessToken(), deliveredAtUtc);
       showToast(`Order marked ${target}.`);
+      setIsConfirmingDelivery(false);
       await load();
     } catch (error) {
+      // The server refuses delivery while an invoice for this order still has a balance —
+      // its message names the outstanding amount, so surface it as-is.
       showToast(error instanceof ApiError ? error.message : "Unable to update the order status.", "error");
     } finally {
       setIsTransitioning(false);
     }
+  }
+
+  /** Delivery is the one transition that records a date, so it goes through a dialog rather than straight to the API. */
+  function startTransition(target: OrderStatus) {
+    if (target !== "Delivered") {
+      handleTransition(target);
+      return;
+    }
+
+    setDeliveryDate(todayIsoDate());
+    setIsConfirmingDelivery(true);
   }
 
   function openDetailsForm() {
@@ -421,6 +443,12 @@ export default function OrderDetailPage() {
               <dt className="text-foreground/70">Due date</dt>
               <dd className="font-medium">{new Date(order.dueAtUtc).toLocaleDateString()}</dd>
             </div>
+            {order.deliveredAtUtc && (
+              <div>
+                <dt className="text-foreground/70">Delivered on</dt>
+                <dd className="font-medium">{new Date(order.deliveredAtUtc).toLocaleDateString()}</dd>
+              </div>
+            )}
             <div>
               <dt className="text-foreground/70">Customer</dt>
               <dd className="font-medium">{customer?.fullName ?? "—"}</dd>
@@ -440,7 +468,7 @@ export default function OrderDetailPage() {
                 type="button"
                 variant={target === "Cancelled" ? "danger" : "primary"}
                 disabled={isTransitioning}
-                onClick={() => handleTransition(target)}
+                onClick={() => startTransition(target)}
               >
                 Mark as {target}
               </Button>
@@ -687,6 +715,32 @@ export default function OrderDetailPage() {
           </form>
         )}
       </div>
+
+      <ConfirmDialog
+        open={isConfirmingDelivery}
+        title="Mark as delivered"
+        description="Record when this order was handed over to the customer. Delivery is refused while any amount is still outstanding on it."
+        confirmLabel="Mark as delivered"
+        confirmingLabel="Marking…"
+        confirmVariant="primary"
+        confirmDisabled={deliveryDate === ""}
+        isConfirming={isTransitioning}
+        onConfirm={() => handleTransition("Delivered", new Date(`${deliveryDate}T00:00:00Z`).toISOString())}
+        onCancel={() => setIsConfirmingDelivery(false)}
+      >
+        <div className="flex flex-col gap-1">
+          <label htmlFor="deliveryDate" className="text-sm">
+            Delivery date
+          </label>
+          <input
+            id="deliveryDate"
+            type="date"
+            value={deliveryDate}
+            onChange={(e) => setDeliveryDate(e.target.value)}
+            className={fieldClassName}
+          />
+        </div>
+      </ConfirmDialog>
 
       <ConfirmDialog
         open={pendingRemoveItem !== null}

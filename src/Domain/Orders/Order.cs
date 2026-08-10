@@ -31,6 +31,9 @@ public sealed class Order : AuditableEntity
 
     public DateTime DueAtUtc { get; private set; }
 
+    /// <summary>When the garment actually changed hands. Null until the order reaches <see cref="OrderStatus.Delivered"/>.</summary>
+    public DateTime? DeliveredAtUtc { get; private set; }
+
     public string? Notes { get; private set; }
 
     /// <summary>
@@ -130,11 +133,22 @@ public sealed class Order : AuditableEntity
     /// <summary>Whether this order can move to <paramref name="target"/> from its current status. Callers should check this before calling <see cref="TransitionTo"/>.</summary>
     public bool CanTransitionTo(OrderStatus target) => AllowedTransitions[Status].Contains(target);
 
-    public void TransitionTo(OrderStatus target)
+    /// <summary>
+    /// Moves the order to <paramref name="target"/>. Delivering also records when the garment was
+    /// handed over — supplied by the caller rather than read off the clock, so a handover entered
+    /// late is still dated the day it happened.
+    /// </summary>
+    public void TransitionTo(OrderStatus target, DateTime? deliveredAtUtc = null)
     {
         if (!CanTransitionTo(target))
         {
             throw new InvalidOperationException($"Cannot transition an order from '{Status}' to '{target}'.");
+        }
+
+        if (target == OrderStatus.Delivered)
+        {
+            DeliveredAtUtc = deliveredAtUtc
+                ?? throw new ArgumentNullException(nameof(deliveredAtUtc), "Delivering an order requires the date it was handed over.");
         }
 
         Status = target;

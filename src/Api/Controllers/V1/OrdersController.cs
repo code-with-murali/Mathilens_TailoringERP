@@ -153,7 +153,10 @@ public sealed class OrdersController : ApiControllerBase
         return ToActionResult(result);
     }
 
-    /// <summary>Advances an order's status (02_DATABASE.md § 10.7 — an enforced lifecycle; invalid transitions return 409).</summary>
+    /// <summary>
+    /// Advances an order's status (02_DATABASE.md § 10.7 — an enforced lifecycle; invalid transitions return 409).
+    /// Delivering requires a delivery date, and is refused with 409 while any amount is still outstanding on the order.
+    /// </summary>
     [HttpPut("{id:guid}/status")]
     [ProducesResponseType(typeof(ApiResponse<OrderDto>), StatusCodes.Status200OK)]
     [ProducesResponseType(typeof(ApiErrorResponse), StatusCodes.Status400BadRequest)]
@@ -161,7 +164,7 @@ public sealed class OrdersController : ApiControllerBase
     [ProducesResponseType(typeof(ApiErrorResponse), StatusCodes.Status409Conflict)]
     public async Task<IActionResult> TransitionStatus(Guid id, [FromBody] TransitionOrderStatusRequest request, CancellationToken cancellationToken)
     {
-        var result = await _sender.Send(new TransitionOrderStatusCommand(id, request.TargetStatus), cancellationToken);
+        var result = await _sender.Send(new TransitionOrderStatusCommand(id, request.TargetStatus, request.DeliveredAtUtc), cancellationToken);
         return ToActionResult(result);
     }
 

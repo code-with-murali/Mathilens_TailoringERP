@@ -45,6 +45,12 @@ public class InvoiceRepository : IInvoiceRepository
     public Task<bool> ExistsBillableForOrderAsync(Guid orderId, CancellationToken cancellationToken) =>
         _dbContext.Invoices.AnyAsync(i => i.OrderId == orderId && i.Status != InvoiceStatus.Void, cancellationToken);
 
+    /// <summary>Sums the balance in the database rather than materializing the invoices — <see cref="Invoice.RemainingBalance"/> is computed, so it is spelled out here for the provider to translate.</summary>
+    public Task<decimal> GetOutstandingAmountForOrderAsync(Guid orderId, CancellationToken cancellationToken) =>
+        _dbContext.Invoices
+            .Where(i => i.OrderId == orderId && i.Status != InvoiceStatus.Void)
+            .SumAsync(i => i.TotalAmount - i.AmountPaid, cancellationToken);
+
     public void Add(Invoice invoice) => _dbContext.Invoices.Add(invoice);
 
     public Task SaveChangesAsync(CancellationToken cancellationToken) => _dbContext.SaveChangesAsync(cancellationToken);

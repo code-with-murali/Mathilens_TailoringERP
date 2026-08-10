@@ -35,6 +35,26 @@ public class ReportsEndpointsTests : IClassFixture<CustomWebApplicationFactory>
     }
 
     [Fact]
+    public async Task OrderCollections_WithoutBearerToken_ReturnsUnauthorized()
+    {
+        var response = await _client.GetAsync("/api/v1/reports/order-collections?fromUtc=2026-01-01&toUtc=2026-01-31");
+
+        Assert.Equal(HttpStatusCode.Unauthorized, response.StatusCode);
+    }
+
+    [Fact]
+    public async Task OrderCollections_WithToBeforeFrom_ReturnsValidationErrorEnvelope()
+    {
+        AuthenticateClient();
+
+        var response = await _client.GetAsync("/api/v1/reports/order-collections?fromUtc=2026-01-31&toUtc=2026-01-01");
+
+        Assert.Equal(HttpStatusCode.BadRequest, response.StatusCode);
+        var body = await response.Content.ReadFromJsonAsync<JsonElement>();
+        Assert.Equal("VALIDATION_ERROR", body.GetProperty("error").GetProperty("code").GetString());
+    }
+
+    [Fact]
     public async Task OrderStatusSummary_WithoutBearerToken_ReturnsUnauthorized()
     {
         var response = await _client.GetAsync("/api/v1/reports/order-status-summary?fromUtc=2026-01-01&toUtc=2026-01-31");

@@ -13,6 +13,13 @@ public interface IInvoiceRepository
     /// <summary>Whether any live (non-voided) invoice bills the given order — used to keep a billed order from being deleted.</summary>
     Task<bool> ExistsBillableForOrderAsync(Guid orderId, CancellationToken cancellationToken);
 
+    /// <summary>
+    /// What the customer still owes across every live (non-voided) invoice for the order — zero when
+    /// nothing is outstanding, including when the order was never invoiced. Used to keep an order with
+    /// a pending amount from being handed over.
+    /// </summary>
+    Task<decimal> GetOutstandingAmountForOrderAsync(Guid orderId, CancellationToken cancellationToken);
+
     void Add(Invoice invoice);
 
     Task SaveChangesAsync(CancellationToken cancellationToken);

@@ -12,6 +12,8 @@ public interface IReportRepository
 {
     Task<RevenueReportDto> GetRevenueAsync(DateTime fromUtc, DateTime toUtc, CancellationToken cancellationToken);
 
+    Task<OrderCollectionsReportDto> GetOrderCollectionsAsync(DateTime fromUtc, DateTime toUtc, CancellationToken cancellationToken);
+
     Task<IReadOnlyList<OrderStatusCountDto>> GetOrderStatusSummaryAsync(DateTime fromUtc, DateTime toUtc, CancellationToken cancellationToken);
 
     Task<PagedResult<OutstandingInvoiceDto>> GetOutstandingInvoicesAsync(int page, int pageSize, CancellationToken cancellationToken);

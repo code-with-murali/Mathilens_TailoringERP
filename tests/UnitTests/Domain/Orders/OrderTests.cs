@@ -131,6 +131,39 @@ public class OrderTests
     }
 
     [Fact]
+    public void TransitionTo_Delivered_RecordsTheDeliveryDate()
+    {
+        var order = Order.Create(Guid.NewGuid(), DateTime.UtcNow, null);
+        AdvanceTo(order, OrderStatus.ReadyForDelivery);
+        var deliveredAtUtc = new DateTime(2026, 8, 9, 0, 0, 0, DateTimeKind.Utc);
+
+        order.TransitionTo(OrderStatus.Delivered, deliveredAtUtc);
+
+        Assert.Equal(OrderStatus.Delivered, order.Status);
+        Assert.Equal(deliveredAtUtc, order.DeliveredAtUtc);
+    }
+
+    [Fact]
+    public void TransitionTo_DeliveredWithoutADate_Throws()
+    {
+        var order = Order.Create(Guid.NewGuid(), DateTime.UtcNow, null);
+        AdvanceTo(order, OrderStatus.ReadyForDelivery);
+
+        Assert.Throws<ArgumentNullException>(() => order.TransitionTo(OrderStatus.Delivered));
+        Assert.Equal(OrderStatus.ReadyForDelivery, order.Status);
+    }
+
+    [Fact]
+    public void TransitionTo_NonDelivered_LeavesTheDeliveryDateUnset()
+    {
+        var order = Order.Create(Guid.NewGuid(), DateTime.UtcNow, null);
+
+        order.TransitionTo(OrderStatus.InProgress);
+
+        Assert.Null(order.DeliveredAtUtc);
+    }
+
+    [Fact]
     public void IsOpen_IsFalseOnceDelivered()
     {
         var order = Order.Create(Guid.NewGuid(), DateTime.UtcNow, null);
@@ -287,6 +320,6 @@ public class OrderTests
             return;
         }
 
-        order.TransitionTo(OrderStatus.Delivered);
+        order.TransitionTo(OrderStatus.Delivered, DateTime.UtcNow);
     }
 }

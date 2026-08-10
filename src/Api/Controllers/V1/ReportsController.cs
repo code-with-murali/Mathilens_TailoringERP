@@ -2,6 +2,7 @@ using MathilensERP.Api.Common;
 using MathilensERP.Api.Contracts.Common;
 using MathilensERP.Application.Common.Mediator;
 using MathilensERP.Application.Reports;
+using MathilensERP.Application.Reports.Queries.OrderCollections;
 using MathilensERP.Application.Reports.Queries.OrderStatusSummary;
 using MathilensERP.Application.Reports.Queries.OutstandingInvoices;
 using MathilensERP.Application.Reports.Queries.Revenue;
@@ -31,6 +32,20 @@ public sealed class ReportsController : ApiControllerBase
     public async Task<IActionResult> Revenue([FromQuery] DateTime fromUtc, [FromQuery] DateTime toUtc, CancellationToken cancellationToken)
     {
         var result = await _sender.Send(new GetRevenueReportQuery(fromUtc, toUtc), cancellationToken);
+        return ToActionResult(result);
+    }
+
+    /// <summary>
+    /// The money position on orders booked within a date range — order value, delivered value,
+    /// collected, still pending, cancelled value and discounts given. Unlike <see cref="Revenue"/>
+    /// this counts order value rather than invoiced value, so work that was never billed is included.
+    /// </summary>
+    [HttpGet("order-collections")]
+    [ProducesResponseType(typeof(ApiResponse<OrderCollectionsReportDto>), StatusCodes.Status200OK)]
+    [ProducesResponseType(typeof(ApiErrorResponse), StatusCodes.Status400BadRequest)]
+    public async Task<IActionResult> OrderCollections([FromQuery] DateTime fromUtc, [FromQuery] DateTime toUtc, CancellationToken cancellationToken)
+    {
+        var result = await _sender.Send(new GetOrderCollectionsReportQuery(fromUtc, toUtc), cancellationToken);
         return ToActionResult(result);
     }
 
