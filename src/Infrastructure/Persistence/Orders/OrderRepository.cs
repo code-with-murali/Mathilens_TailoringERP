@@ -42,6 +42,20 @@ public class OrderRepository : IOrderRepository
         return new PagedResult<Order>(items, page, pageSize, totalCount);
     }
 
+    public Task<bool> ExistsForCustomerAsync(Guid customerId, CancellationToken cancellationToken) =>
+        _dbContext.Orders.AnyAsync(o => o.CustomerId == customerId, cancellationToken);
+
+    public Task<bool> ExistsForEmployeeAsync(Guid employeeId, CancellationToken cancellationToken) =>
+        _dbContext.Orders.AnyAsync(o => o.EmployeeId == employeeId, cancellationToken);
+
+    /// <summary>Joins through Customers on the phone number, so orders placed under a duplicate customer record are found too.</summary>
+    public async Task<IReadOnlyList<Order>> GetByCustomerPhoneAsync(string phoneNumber, Guid excludingOrderId, CancellationToken cancellationToken) =>
+        await Include(_dbContext.Orders)
+            .Where(o => o.Id != excludingOrderId
+                && _dbContext.Customers.Any(c => c.Id == o.CustomerId && c.PhoneNumber == phoneNumber))
+            .OrderByDescending(o => o.CreatedAtUtc)
+            .ToListAsync(cancellationToken);
+
     public void Add(Order order) => _dbContext.Orders.Add(order);
 
     public Task SaveChangesAsync(CancellationToken cancellationToken) => _dbContext.SaveChangesAsync(cancellationToken);

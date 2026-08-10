@@ -29,6 +29,20 @@ public class CustomerConfiguration : IEntityTypeConfiguration<Customer>
         builder.Property(c => c.Notes)
             .HasMaxLength(2000);
 
+        // Stored as their names, matching how every other enum in this schema is persisted —
+        // readable in the database and stable if the enum members are ever reordered.
+        builder.Property(c => c.Gender)
+            .HasConversion<string>()
+            .HasMaxLength(20);
+
+        builder.Property(c => c.Religion)
+            .HasConversion<string>()
+            .HasMaxLength(30);
+
+        builder.Property(c => c.DateOfBirth);
+
+        builder.Property(c => c.WeddingDate);
+
         builder.Property(c => c.CreatedBy).IsRequired();
         builder.Property(c => c.CreatedAtUtc).IsRequired();
 
@@ -36,6 +50,9 @@ public class CustomerConfiguration : IEntityTypeConfiguration<Customer>
         // lookup path, name is the primary search path.
         builder.HasIndex(c => c.PhoneNumber);
         builder.HasIndex(c => c.FullName);
+
+        // Religion is a filter on the customers list, so it is indexed like the other search paths.
+        builder.HasIndex(c => c.Religion);
 
         builder.Property<uint>("xmin").IsRowVersion();
     }

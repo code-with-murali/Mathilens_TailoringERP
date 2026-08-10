@@ -16,7 +16,16 @@ public sealed class CreateCustomerCommandHandler : ICommandHandler<CreateCustome
 
     public async Task<Result<CustomerDto>> Handle(CreateCustomerCommand command, CancellationToken cancellationToken)
     {
-        var customer = Customer.Create(command.FullName, command.PhoneNumber, command.Email, command.Address, command.Notes);
+        var customer = Customer.Create(
+            command.FullName,
+            command.PhoneNumber,
+            command.Email,
+            command.Address,
+            command.Notes,
+            command.Gender,
+            command.Religion,
+            command.DateOfBirth,
+            command.WeddingDate);
 
         _customerRepository.Add(customer);
         await _customerRepository.SaveChangesAsync(cancellationToken);

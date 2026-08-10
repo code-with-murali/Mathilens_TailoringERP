@@ -1,3 +1,5 @@
+using MathilensERP.Domain.Customers;
+
 namespace MathilensERP.Application.Customers;
 
 public sealed record CustomerDto(
@@ -7,4 +9,8 @@ public sealed record CustomerDto(
     string? Email,
     string? Address,
     string? Notes,
+    Gender? Gender,
+    Religion? Religion,
+    DateOnly? DateOfBirth,
+    DateOnly? WeddingDate,
     DateTime CreatedAtUtc);

@@ -22,7 +22,16 @@ public sealed class UpdateCustomerCommandHandler : ICommandHandler<UpdateCustome
                 Error.NotFound("Customer.NotFound", $"No customer was found with id '{command.Id}'."));
         }
 
-        customer.UpdateDetails(command.FullName, command.PhoneNumber, command.Email, command.Address, command.Notes);
+        customer.UpdateDetails(
+            command.FullName,
+            command.PhoneNumber,
+            command.Email,
+            command.Address,
+            command.Notes,
+            command.Gender,
+            command.Religion,
+            command.DateOfBirth,
+            command.WeddingDate);
         await _customerRepository.SaveChangesAsync(cancellationToken);
 
         return customer.ToDto();

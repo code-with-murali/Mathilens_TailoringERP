@@ -13,7 +13,7 @@ public interface ICustomerRepository
 {
     Task<Customer?> GetByIdAsync(Guid id, CancellationToken cancellationToken);
 
-    Task<PagedResult<Customer>> SearchAsync(string? searchTerm, int page, int pageSize, CancellationToken cancellationToken);
+    Task<PagedResult<Customer>> SearchAsync(string? searchTerm, Religion? religion, int page, int pageSize, CancellationToken cancellationToken);
 
     /// <summary>Every customer, unpaginated — for spreadsheet export, which has no page to scroll.</summary>
     Task<IReadOnlyList<Customer>> ListAllAsync(CancellationToken cancellationToken);

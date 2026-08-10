@@ -22,6 +22,16 @@ public sealed class Customer : AuditableEntity
 
     public string? Notes { get; private set; }
 
+    public Gender? Gender { get; private set; }
+
+    public Religion? Religion { get; private set; }
+
+    /// <summary>Date only — the shop greets customers on their birthday, it doesn't need the hour.</summary>
+    public DateOnly? DateOfBirth { get; private set; }
+
+    /// <summary>Wedding anniversary. Useful to a tailor: anniversaries drive occasion wear.</summary>
+    public DateOnly? WeddingDate { get; private set; }
+
     private Customer()
     {
         // Reserved for EF Core materialization.
@@ -32,22 +42,53 @@ public sealed class Customer : AuditableEntity
     {
     }
 
-    public static Customer Create(string fullName, string phoneNumber, string? email, string? address, string? notes)
+    public static Customer Create(
+        string fullName,
+        string phoneNumber,
+        string? email,
+        string? address,
+        string? notes,
+        Gender? gender = null,
+        Religion? religion = null,
+        DateOnly? dateOfBirth = null,
+        DateOnly? weddingDate = null)
     {
         var customer = new Customer(Guid.NewGuid());
-        customer.SetDetails(fullName, phoneNumber, email, address, notes);
+        customer.SetDetails(fullName, phoneNumber, email, address, notes, gender, religion, dateOfBirth, weddingDate);
         return customer;
     }
 
-    public void UpdateDetails(string fullName, string phoneNumber, string? email, string? address, string? notes) =>
-        SetDetails(fullName, phoneNumber, email, address, notes);
+    public void UpdateDetails(
+        string fullName,
+        string phoneNumber,
+        string? email,
+        string? address,
+        string? notes,
+        Gender? gender = null,
+        Religion? religion = null,
+        DateOnly? dateOfBirth = null,
+        DateOnly? weddingDate = null) =>
+        SetDetails(fullName, phoneNumber, email, address, notes, gender, religion, dateOfBirth, weddingDate);
 
-    private void SetDetails(string fullName, string phoneNumber, string? email, string? address, string? notes)
+    private void SetDetails(
+        string fullName,
+        string phoneNumber,
+        string? email,
+        string? address,
+        string? notes,
+        Gender? gender,
+        Religion? religion,
+        DateOnly? dateOfBirth,
+        DateOnly? weddingDate)
     {
         FullName = Guard.AgainstNullOrWhiteSpace(fullName, nameof(fullName));
         PhoneNumber = Guard.AgainstNullOrWhiteSpace(phoneNumber, nameof(phoneNumber));
         Email = email;
         Address = address;
         Notes = notes;
+        Gender = gender;
+        Religion = religion;
+        DateOfBirth = dateOfBirth;
+        WeddingDate = weddingDate;
     }
 }

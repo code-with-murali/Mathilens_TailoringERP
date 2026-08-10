@@ -13,6 +13,7 @@ using MathilensERP.Application.Orders.Commands.TransitionStatus;
 using MathilensERP.Application.Orders.Commands.Update;
 using MathilensERP.Application.Orders.Commands.UpdateItem;
 using MathilensERP.Application.Orders.Queries.GetById;
+using MathilensERP.Application.Orders.Queries.PreviousForCustomer;
 using MathilensERP.Application.Orders.Queries.Search;
 using MathilensERP.Domain.Orders;
 using MathilensERP.Shared.Constants;
@@ -85,6 +86,19 @@ public sealed class OrdersController : ApiControllerBase
     public async Task<IActionResult> GetById(Guid id, CancellationToken cancellationToken)
     {
         var result = await _sender.Send(new GetOrderByIdQuery(id), cancellationToken);
+        return ToActionResult(result);
+    }
+
+    /// <summary>
+    /// This customer's other orders, newest first — matched on their phone number, so history
+    /// entered under a duplicate customer record still appears.
+    /// </summary>
+    [HttpGet("{id:guid}/previous")]
+    [ProducesResponseType(typeof(ApiResponse<IReadOnlyList<OrderDto>>), StatusCodes.Status200OK)]
+    [ProducesResponseType(typeof(ApiErrorResponse), StatusCodes.Status404NotFound)]
+    public async Task<IActionResult> PreviousOrders(Guid id, CancellationToken cancellationToken)
+    {
+        var result = await _sender.Send(new GetPreviousOrdersQuery(id), cancellationToken);
         return ToActionResult(result);
     }
 

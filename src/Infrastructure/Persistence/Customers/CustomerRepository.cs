@@ -18,13 +18,18 @@ public class CustomerRepository : ICustomerRepository
     public Task<Customer?> GetByIdAsync(Guid id, CancellationToken cancellationToken) =>
         _dbContext.Customers.SingleOrDefaultAsync(c => c.Id == id, cancellationToken);
 
-    public async Task<PagedResult<Customer>> SearchAsync(string? searchTerm, int page, int pageSize, CancellationToken cancellationToken)
+    public async Task<PagedResult<Customer>> SearchAsync(string? searchTerm, Religion? religion, int page, int pageSize, CancellationToken cancellationToken)
     {
         var query = _dbContext.Customers.AsQueryable();
 
         if (!string.IsNullOrWhiteSpace(searchTerm))
         {
             query = query.Where(c => EF.Functions.ILike(c.FullName, $"%{searchTerm}%") || EF.Functions.ILike(c.PhoneNumber, $"%{searchTerm}%"));
+        }
+
+        if (religion is { } r)
+        {
+            query = query.Where(c => c.Religion == r);
         }
 
         var totalCount = await query.CountAsync(cancellationToken);

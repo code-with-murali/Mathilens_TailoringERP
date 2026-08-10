@@ -11,6 +11,7 @@ using MathilensERP.Application.Customers.Commands.Update;
 using MathilensERP.Application.Customers.Queries.GetById;
 using MathilensERP.Application.Customers.Queries.ListAll;
 using MathilensERP.Application.Customers.Queries.Search;
+using MathilensERP.Domain.Customers;
 using MathilensERP.Application.Common.Mediator;
 using MathilensERP.Shared.Constants;
 using MathilensERP.Shared.Results;
@@ -38,7 +39,16 @@ public sealed class CustomersController : ApiControllerBase
     [ProducesResponseType(typeof(ApiErrorResponse), StatusCodes.Status400BadRequest)]
     public async Task<IActionResult> Create([FromBody] CreateCustomerRequest request, CancellationToken cancellationToken)
     {
-        var command = new CreateCustomerCommand(request.FullName, request.PhoneNumber, request.Email, request.Address, request.Notes);
+        var command = new CreateCustomerCommand(
+            request.FullName,
+            request.PhoneNumber,
+            request.Email,
+            request.Address,
+            request.Notes,
+            request.Gender,
+            request.Religion,
+            request.DateOfBirth,
+            request.WeddingDate);
         var result = await _sender.Send(command, cancellationToken);
         return ToActionResult(result);
     }
@@ -53,17 +63,18 @@ public sealed class CustomersController : ApiControllerBase
         return ToActionResult(result);
     }
 
-    /// <summary>Searches customers by name/phone number, paginated (00_MASTER_SPEC.md § 8.3).</summary>
+    /// <summary>Searches customers by name/phone number and optionally narrows by religion, paginated (00_MASTER_SPEC.md § 8.3).</summary>
     [HttpGet]
     [ProducesResponseType(typeof(ApiResponse<IReadOnlyList<CustomerDto>>), StatusCodes.Status200OK)]
     [ProducesResponseType(typeof(ApiErrorResponse), StatusCodes.Status400BadRequest)]
     public async Task<IActionResult> Search(
         [FromQuery] string? search,
+        [FromQuery] Religion? religion,
         [FromQuery] int page = PaginationDefaults.DefaultPage,
         [FromQuery] int pageSize = PaginationDefaults.DefaultPageSize,
         CancellationToken cancellationToken = default)
     {
-        var result = await _sender.Send(new SearchCustomersQuery(search, page, pageSize), cancellationToken);
+        var result = await _sender.Send(new SearchCustomersQuery(search, religion, page, pageSize), cancellationToken);
         return ToPagedActionResult(result);
     }
 
@@ -135,7 +146,17 @@ public sealed class CustomersController : ApiControllerBase
     [ProducesResponseType(typeof(ApiErrorResponse), StatusCodes.Status404NotFound)]
     public async Task<IActionResult> Update(Guid id, [FromBody] UpdateCustomerRequest request, CancellationToken cancellationToken)
     {
-        var command = new UpdateCustomerCommand(id, request.FullName, request.PhoneNumber, request.Email, request.Address, request.Notes);
+        var command = new UpdateCustomerCommand(
+            id,
+            request.FullName,
+            request.PhoneNumber,
+            request.Email,
+            request.Address,
+            request.Notes,
+            request.Gender,
+            request.Religion,
+            request.DateOfBirth,
+            request.WeddingDate);
         var result = await _sender.Send(command, cancellationToken);
         return ToActionResult(result);
     }

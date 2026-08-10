@@ -9,7 +9,7 @@ public class SearchCustomersQueryValidatorTests
     [Fact]
     public void Validate_WithValidQuery_Passes()
     {
-        var result = _validator.Validate(new SearchCustomersQuery("Asha", 1, 20));
+        var result = _validator.Validate(new SearchCustomersQuery("Asha", null, 1, 20));
 
         Assert.True(result.IsValid);
     }
@@ -17,7 +17,7 @@ public class SearchCustomersQueryValidatorTests
     [Fact]
     public void Validate_WithPageBelowOne_Fails()
     {
-        var result = _validator.Validate(new SearchCustomersQuery(null, 0, 20));
+        var result = _validator.Validate(new SearchCustomersQuery(null, null, 0, 20));
 
         Assert.False(result.IsValid);
         Assert.Contains(result.Errors, e => e.PropertyName == nameof(SearchCustomersQuery.Page));
@@ -28,7 +28,7 @@ public class SearchCustomersQueryValidatorTests
     [InlineData(101)]
     public void Validate_WithPageSizeOutOfBounds_Fails(int pageSize)
     {
-        var result = _validator.Validate(new SearchCustomersQuery(null, 1, pageSize));
+        var result = _validator.Validate(new SearchCustomersQuery(null, null, 1, pageSize));
 
         Assert.False(result.IsValid);
         Assert.Contains(result.Errors, e => e.PropertyName == nameof(SearchCustomersQuery.PageSize));

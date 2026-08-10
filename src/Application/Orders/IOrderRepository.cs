@@ -10,6 +10,19 @@ public interface IOrderRepository
 
     Task<PagedResult<Order>> SearchAsync(Guid? customerId, OrderStatus? status, int page, int pageSize, CancellationToken cancellationToken);
 
+    /// <summary>Whether any live order was placed by this customer — used to keep a customer with order history from being deleted.</summary>
+    Task<bool> ExistsForCustomerAsync(Guid customerId, CancellationToken cancellationToken);
+
+    /// <summary>Whether any live order is assigned to this employee — used to keep an employee with work history from being deleted.</summary>
+    Task<bool> ExistsForEmployeeAsync(Guid employeeId, CancellationToken cancellationToken);
+
+    /// <summary>
+    /// Every live order placed by any customer sharing <paramref name="phoneNumber"/>, newest first,
+    /// excluding <paramref name="excludingOrderId"/>. Matched on the phone rather than the customer
+    /// id so a customer entered twice still shows one history.
+    /// </summary>
+    Task<IReadOnlyList<Order>> GetByCustomerPhoneAsync(string phoneNumber, Guid excludingOrderId, CancellationToken cancellationToken);
+
     void Add(Order order);
 
     Task SaveChangesAsync(CancellationToken cancellationToken);

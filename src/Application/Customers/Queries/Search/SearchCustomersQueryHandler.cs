@@ -16,7 +16,7 @@ public sealed class SearchCustomersQueryHandler : IQueryHandler<SearchCustomersQ
 
     public async Task<Result<PagedResult<CustomerDto>>> Handle(SearchCustomersQuery query, CancellationToken cancellationToken)
     {
-        var page = await _customerRepository.SearchAsync(query.SearchTerm, query.Page, query.PageSize, cancellationToken);
+        var page = await _customerRepository.SearchAsync(query.SearchTerm, query.Religion, query.Page, query.PageSize, cancellationToken);
 
         var items = page.Items.Select(c => c.ToDto()).ToList();
 
