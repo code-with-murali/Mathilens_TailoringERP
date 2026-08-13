@@ -76,11 +76,12 @@ const NAV_ITEMS: NavEntry[] = [
     icon: SettingsIcon,
     children: [
       { href: "/dashboard/settings/order-duration", label: "Order Duration", icon: ClockIcon, permission: PERMISSIONS.settingsView },
-      { href: "/dashboard/settings/measurement-templates", label: "Measurement Templates", icon: RulerIcon, permission: PERMISSIONS.settingsView },
+      { href: "/dashboard/settings/measurement-templates", label: "Measurement", icon: RulerIcon, permission: PERMISSIONS.settingsView },
       // No permission at all: Front Desk and Tailor hold no Settings.View, and the theme toggle no
       // longer sits in the header, so gating this would leave them unable to change it anywhere.
       { href: "/dashboard/settings/appearance", label: "Appearance", icon: ThemeIcon, permission: null },
-      { href: "/dashboard/settings/advanced", label: "Advanced", icon: TerminalIcon, permission: PERMISSIONS.settingsView, role: "Owner" },
+      // Advanced is off the menu — the raw settings store is not something the shop uses. The route
+      // still answers for the rare case a value needs changing before it has a proper editor.
     ],
   },
 ];
@@ -403,15 +404,6 @@ function ThemeIcon({ className }: IconProps) {
     <svg className={className} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
       <circle cx="12" cy="12" r="9" />
       <path d="M12 3a9 9 0 0 0 0 18Z" fill="currentColor" stroke="none" />
-    </svg>
-  );
-}
-
-function TerminalIcon({ className }: IconProps) {
-  return (
-    <svg className={className} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
-      <rect x="3" y="4" width="18" height="16" rx="2" />
-      <path d="m7 9 3 3-3 3M13 15h4" />
     </svg>
   );
 }

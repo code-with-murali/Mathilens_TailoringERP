@@ -25,13 +25,22 @@ export function StatusBadge({ label, tone }: StatusBadgeProps) {
   );
 }
 
+/**
+ * The one place an order status is turned into words.
+ *
+ * Title case throughout: the shop asked for "Ready For Delivery" specifically, and leaving its
+ * neighbour as "In progress" would have read as a mistake in the same dropdown.
+ */
 export const ORDER_STATUS_BADGE: Record<string, { label: string; tone: BadgeTone }> = {
   Received: { label: "Received", tone: "info" },
-  InProgress: { label: "In progress", tone: "warning" },
-  ReadyForDelivery: { label: "Ready for delivery", tone: "primary" },
+  InProgress: { label: "In Progress", tone: "warning" },
+  ReadyForDelivery: { label: "Ready For Delivery", tone: "primary" },
   Delivered: { label: "Delivered", tone: "success" },
   Cancelled: { label: "Cancelled", tone: "danger" },
 };
+
+/** The words for a status, falling back to the raw value so an unmapped one is visible, not blank. */
+export const orderStatusLabel = (status: string) => ORDER_STATUS_BADGE[status]?.label ?? status;
 
 export const INVOICE_STATUS_BADGE: Record<string, { label: string; tone: BadgeTone }> = {
   Unpaid: { label: "Unpaid", tone: "danger" },

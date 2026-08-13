@@ -4,7 +4,7 @@ import { useCallback, useEffect, useState } from "react";
 import Link from "next/link";
 import { Button } from "@/components/ui/Button";
 import { DEFAULT_PAGE_SIZE, Pagination } from "@/components/ui/Pagination";
-import { StatusBadge, ORDER_STATUS_BADGE } from "@/components/ui/StatusBadge";
+import { StatusBadge, ORDER_STATUS_BADGE, orderStatusLabel } from "@/components/ui/StatusBadge";
 import { ConfirmDialog } from "@/components/ui/ConfirmDialog";
 import { useToast } from "@/components/ui/ToastProvider";
 import { getAccessToken } from "@/lib/auth";
@@ -109,9 +109,11 @@ export default function OrdersPage() {
           className="max-w-xs rounded-md border border-border bg-surface px-3 py-2 text-sm outline-none transition-colors focus:border-primary focus:ring-2 focus:ring-primary/25"
         >
           <option value="">All Status</option>
+          {/* Through the shared label map, not the raw value: this dropdown was the one place the
+              enum leaked to the screen as "ReadyForDelivery". */}
           {ORDER_STATUSES.map((s) => (
             <option key={s} value={s}>
-              {s}
+              {orderStatusLabel(s)}
             </option>
           ))}
         </select>

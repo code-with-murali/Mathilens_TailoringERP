@@ -3,12 +3,11 @@
 import { useEffect, useState } from "react";
 import { getAccessToken } from "@/lib/auth";
 import { searchOrders, type OrderStatus } from "@/lib/api/orders";
+import { orderStatusLabel } from "@/components/ui/StatusBadge";
 
-const STATUS_TILES: { status: OrderStatus; label: string }[] = [
-  { status: "Received", label: "Received" },
-  { status: "InProgress", label: "In progress" },
-  { status: "ReadyForDelivery", label: "Ready for delivery" },
-];
+// Labels come from the shared map rather than being written again here, so a status renamed once is
+// renamed everywhere it appears.
+const STATUS_TILES: OrderStatus[] = ["Received", "InProgress", "ReadyForDelivery"];
 
 type Counts = Partial<Record<OrderStatus, number>>;
 
@@ -23,14 +22,14 @@ export function OrderStatusCounts() {
     let cancelled = false;
     const token = getAccessToken();
 
-    Promise.all(STATUS_TILES.map(({ status }) => searchOrders(null, status, 1, 1, token)))
+    Promise.all(STATUS_TILES.map((status) => searchOrders(null, status, 1, 1, token)))
       .then((results) => {
         if (cancelled) {
           return;
         }
         const next: Counts = {};
         results.forEach(({ meta }, index) => {
-          next[STATUS_TILES[index].status] = meta.totalCount;
+          next[STATUS_TILES[index]] = meta.totalCount;
         });
         setCounts(next);
       })
@@ -47,9 +46,9 @@ export function OrderStatusCounts() {
 
   return (
     <div className="grid grid-cols-1 gap-4 sm:grid-cols-3">
-      {STATUS_TILES.map(({ status, label }) => (
+      {STATUS_TILES.map((status) => (
         <div key={status} className="flex flex-col gap-1 rounded-lg border border-border bg-surface p-4">
-          <span className="text-sm text-foreground/70">{label}</span>
+          <span className="text-sm text-foreground/70">{orderStatusLabel(status)}</span>
           <span className="text-2xl font-semibold">{isLoading ? "—" : (counts[status] ?? 0)}</span>
         </div>
       ))}

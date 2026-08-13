@@ -29,6 +29,9 @@ export default function UsersPage() {
   const [page, setPage] = useState(1);
   const [pageSize, setPageSize] = useState(DEFAULT_PAGE_SIZE);
   const [roles, setRoles] = useState<string[]>([]);
+  // Role changes chosen but not yet saved, keyed by user id, plus which row is mid-save.
+  const [pendingRoles, setPendingRoles] = useState<Record<string, string>>({});
+  const [savingRoleFor, setSavingRoleFor] = useState<string | null>(null);
   const [isLoading, setIsLoading] = useState(true);
   const [loadError, setLoadError] = useState<string | null>(null);
 
@@ -95,15 +98,39 @@ export default function UsersPage() {
     }
   }
 
-  async function handleRoleChange(user: AppUser, nextRole: string) {
+  /**
+   * Choosing a role no longer applies it — the change is held until Save.
+   *
+   * A dropdown that writes on change gives no moment to notice you picked the wrong row, and this
+   * one grants and revokes access to the whole system. The Save button only appears once the
+   * selection actually differs from what is stored, so an unchanged row offers nothing to press.
+   */
+  function handleRoleSelect(user: AppUser, nextRole: string) {
+    setPendingRoles((pending) => ({ ...pending, [user.id]: nextRole }));
+  }
+
+  async function handleSaveRole(user: AppUser) {
+    const nextRole = pendingRoles[user.id];
+    if (!nextRole || nextRole === user.role) {
+      return;
+    }
+
+    setSavingRoleFor(user.id);
     try {
       await setUserRole(user.id, nextRole, getAccessToken());
       showToast(`${user.email} is now ${nextRole}.`);
+      setPendingRoles((pending) => {
+        const next = { ...pending };
+        delete next[user.id];
+        return next;
+      });
       await load();
     } catch (error) {
       // The server refuses to demote the last Owner — its message explains why, so show it as-is.
       showToast(error instanceof ApiError ? error.message : "Unable to change this user's role.", "error");
       await load();
+    } finally {
+      setSavingRoleFor(null);
     }
   }
 
@@ -251,19 +278,34 @@ export default function UsersPage() {
                 <td className="px-4 py-3">{user.email}</td>
                 <td className="px-4 py-3">
                   {canManage ? (
-                    <select
-                      value={user.role ?? ""}
-                      onChange={(e) => handleRoleChange(user, e.target.value)}
-                      className={fieldClassName}
-                      aria-label={`Role for ${user.email}`}
-                    >
-                      {user.role === null && <option value="">No role</option>}
-                      {roles.map((option) => (
-                        <option key={option} value={option}>
-                          {option}
-                        </option>
-                      ))}
-                    </select>
+                    <div className="flex items-center gap-2">
+                      <select
+                        value={pendingRoles[user.id] ?? user.role ?? ""}
+                        onChange={(e) => handleRoleSelect(user, e.target.value)}
+                        className={fieldClassName}
+                        aria-label={`Role for ${user.email}`}
+                      >
+                        {user.role === null && <option value="">No role</option>}
+                        {roles.map((option) => (
+                          <option key={option} value={option}>
+                            {option}
+                          </option>
+                        ))}
+                      </select>
+                      {/* Only once the selection differs from what is stored — an unchanged row has
+                          nothing to save, and a permanently visible button invites a stray click on
+                          the control that grants access to everything. */}
+                      {pendingRoles[user.id] !== undefined && pendingRoles[user.id] !== user.role && (
+                        <Button
+                          type="button"
+                          onClick={() => handleSaveRole(user)}
+                          disabled={savingRoleFor === user.id}
+                          className="shrink-0 px-3 py-1.5 text-xs"
+                        >
+                          {savingRoleFor === user.id ? "Saving…" : "Save"}
+                        </Button>
+                      )}
+                    </div>
                   ) : (
                     (user.role ?? "No role")
                   )}
