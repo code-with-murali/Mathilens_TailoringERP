@@ -2,6 +2,7 @@ using MathilensERP.Application.Customers;
 using MathilensERP.Application.Employees;
 using MathilensERP.Application.Orders;
 using MathilensERP.Application.Orders.Commands.Create;
+using MathilensERP.Application.Pricing;
 using MathilensERP.Domain.Customers;
 using MathilensERP.Domain.Employees;
 using MathilensERP.Domain.Measurements;
@@ -23,7 +24,8 @@ public class CreateOrderCommandHandlerTests
         customerRepository.GetByIdAsync(customer.Id, Arg.Any<CancellationToken>()).Returns(customer);
         var employeeRepository = Substitute.For<IEmployeeRepository>();
         var orderRepository = Substitute.For<IOrderRepository>();
-        var handler = new CreateOrderCommandHandler(orderRepository, customerRepository, employeeRepository);
+        var handler = new CreateOrderCommandHandler(
+            orderRepository, customerRepository, employeeRepository, Substitute.For<IClothPriceRepository>());
         var dueAtUtc = DateTime.UtcNow.AddDays(7);
 
         var result = await handler.Handle(new CreateOrderCommand(customer.Id, null, dueAtUtc, OneItem), CancellationToken.None);
@@ -44,7 +46,8 @@ public class CreateOrderCommandHandlerTests
         customerRepository.GetByIdAsync(Arg.Any<Guid>(), Arg.Any<CancellationToken>()).Returns((Customer?)null);
         var employeeRepository = Substitute.For<IEmployeeRepository>();
         var orderRepository = Substitute.For<IOrderRepository>();
-        var handler = new CreateOrderCommandHandler(orderRepository, customerRepository, employeeRepository);
+        var handler = new CreateOrderCommandHandler(
+            orderRepository, customerRepository, employeeRepository, Substitute.For<IClothPriceRepository>());
 
         var result = await handler.Handle(new CreateOrderCommand(Guid.NewGuid(), null, DateTime.UtcNow, OneItem), CancellationToken.None);
 
@@ -62,7 +65,8 @@ public class CreateOrderCommandHandlerTests
         var employeeRepository = Substitute.For<IEmployeeRepository>();
         employeeRepository.GetByIdAsync(Arg.Any<Guid>(), Arg.Any<CancellationToken>()).Returns((Employee?)null);
         var orderRepository = Substitute.For<IOrderRepository>();
-        var handler = new CreateOrderCommandHandler(orderRepository, customerRepository, employeeRepository);
+        var handler = new CreateOrderCommandHandler(
+            orderRepository, customerRepository, employeeRepository, Substitute.For<IClothPriceRepository>());
 
         var result = await handler.Handle(
             new CreateOrderCommand(customer.Id, Guid.NewGuid(), DateTime.UtcNow, OneItem), CancellationToken.None);

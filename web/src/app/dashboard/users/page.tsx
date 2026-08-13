@@ -3,11 +3,12 @@
 import { useCallback, useEffect, useState, type FormEvent } from "react";
 import { Button } from "@/components/ui/Button";
 import { Input } from "@/components/ui/Input";
+import { DEFAULT_PAGE_SIZE, Pagination } from "@/components/ui/Pagination";
 import { useToast } from "@/components/ui/ToastProvider";
 import { getAccessToken } from "@/lib/auth";
-import { ApiError } from "@/lib/api-client";
+import { ApiError, type PaginationMeta } from "@/lib/api-client";
 import { usePermissions } from "@/lib/use-permissions";
-import { listUsers, listRoles, createUser, setUserRole, PERMISSIONS, type AppUser } from "@/lib/api/users";
+import { listUsers, listRoles, createUser, setUserRole, resetUserPassword, PERMISSIONS, type AppUser } from "@/lib/api/users";
 
 const fieldClassName =
   "rounded-md border border-border bg-surface px-3 py-2 text-sm outline-none transition-colors focus:border-primary focus:ring-2 focus:ring-primary/25";
@@ -24,6 +25,9 @@ export default function UsersPage() {
   const { showToast } = useToast();
   const { can, isLoaded } = usePermissions();
   const [users, setUsers] = useState<AppUser[]>([]);
+  const [meta, setMeta] = useState<PaginationMeta | null>(null);
+  const [page, setPage] = useState(1);
+  const [pageSize, setPageSize] = useState(DEFAULT_PAGE_SIZE);
   const [roles, setRoles] = useState<string[]>([]);
   const [isLoading, setIsLoading] = useState(true);
   const [loadError, setLoadError] = useState<string | null>(null);
@@ -35,14 +39,24 @@ export default function UsersPage() {
   const [createError, setCreateError] = useState<string | null>(null);
   const [isCreating, setIsCreating] = useState(false);
 
+  // Reset targets one user at a time; holding the user here doubles as "the panel is open".
+  const [resetTarget, setResetTarget] = useState<AppUser | null>(null);
+  const [resetPassword, setResetPassword] = useState("");
+  const [resetError, setResetError] = useState<string | null>(null);
+  const [isResetting, setIsResetting] = useState(false);
+
   const canManage = can(PERMISSIONS.usersManage);
 
   const load = useCallback(async () => {
     setIsLoading(true);
     setLoadError(null);
     try {
-      const [userList, roleList] = await Promise.all([listUsers(getAccessToken()), listRoles(getAccessToken())]);
-      setUsers(userList);
+      const [userPage, roleList] = await Promise.all([
+        listUsers(page, pageSize, getAccessToken()),
+        listRoles(getAccessToken()),
+      ]);
+      setUsers(userPage.items);
+      setMeta(userPage.meta);
       setRoles(roleList);
       setRole((current) => current || roleList[roleList.length - 1] || "");
     } catch (error) {
@@ -50,7 +64,7 @@ export default function UsersPage() {
     } finally {
       setIsLoading(false);
     }
-  }, []);
+  }, [page, pageSize]);
 
   useEffect(() => {
     // eslint-disable-next-line react-hooks/set-state-in-effect
@@ -90,6 +104,33 @@ export default function UsersPage() {
       // The server refuses to demote the last Owner — its message explains why, so show it as-is.
       showToast(error instanceof ApiError ? error.message : "Unable to change this user's role.", "error");
       await load();
+    }
+  }
+
+  async function handleResetPassword(event: FormEvent<HTMLFormElement>) {
+    event.preventDefault();
+    setResetError(null);
+
+    if (!resetTarget) {
+      return;
+    }
+
+    if (!resetPassword.trim()) {
+      setResetError("Enter the new password.");
+      return;
+    }
+
+    setIsResetting(true);
+    try {
+      await resetUserPassword(resetTarget.id, resetPassword, getAccessToken());
+      showToast(`Password reset for ${resetTarget.email}. They have been signed out everywhere.`);
+      setResetTarget(null);
+      setResetPassword("");
+    } catch (error) {
+      // The server enforces the password policy and reports which rule failed — show it as-is.
+      setResetError(error instanceof ApiError ? error.message : "Unable to reset this password.");
+    } finally {
+      setIsResetting(false);
     }
   }
 
@@ -152,6 +193,44 @@ export default function UsersPage() {
         </form>
       )}
 
+      {resetTarget && (
+        <form onSubmit={handleResetPassword} className="flex max-w-xl flex-col gap-4 rounded-lg border border-border bg-surface p-6">
+          <div>
+            <h2 className="text-lg font-semibold">Reset password</h2>
+            <p className="mt-1 text-sm text-foreground/70">
+              Set a new password for <span className="font-medium text-foreground">{resetTarget.email}</span>. You do not
+              need their old one. They will be signed out on every device, so tell them the new password.
+            </p>
+          </div>
+          <Input
+            id="resetPassword"
+            label="New password"
+            type="password"
+            autoComplete="new-password"
+            value={resetPassword}
+            onChange={(e) => setResetPassword(e.target.value)}
+          />
+          <p className="text-sm text-foreground/60">At least 8 characters, with upper, lower, and a number.</p>
+          {resetError && (
+            <p role="alert" className="text-sm text-danger">
+              {resetError}
+            </p>
+          )}
+          <div className="flex justify-end gap-3">
+            <button
+              type="button"
+              onClick={() => setResetTarget(null)}
+              className="text-sm text-foreground/70 hover:text-foreground"
+            >
+              Cancel
+            </button>
+            <Button type="submit" disabled={isResetting}>
+              {isResetting ? "Resetting…" : "Reset password"}
+            </Button>
+          </div>
+        </form>
+      )}
+
       <div className="overflow-x-auto rounded-lg border border-border">
         <table className="w-full text-left text-sm">
           <thead className="border-b border-border bg-surface">
@@ -159,6 +238,11 @@ export default function UsersPage() {
               <th className="px-4 py-3 font-medium">Email</th>
               <th className="px-4 py-3 font-medium">Role</th>
               <th className="px-4 py-3 font-medium">What they can do</th>
+              {canManage && (
+                <th className="px-4 py-3 font-medium">
+                  <span className="sr-only">Actions</span>
+                </th>
+              )}
             </tr>
           </thead>
           <tbody>
@@ -185,11 +269,37 @@ export default function UsersPage() {
                   )}
                 </td>
                 <td className="px-4 py-3 text-foreground/70">{user.role ? ROLE_SUMMARY[user.role] ?? "—" : "Cannot use the system yet."}</td>
+                {canManage && (
+                  <td className="px-4 py-3 text-right">
+                    <button
+                      type="button"
+                      onClick={() => {
+                        setResetTarget(user);
+                        setResetPassword("");
+                        setResetError(null);
+                      }}
+                      className="whitespace-nowrap text-foreground/70 hover:text-foreground"
+                    >
+                      Reset password
+                    </button>
+                  </td>
+                )}
               </tr>
             ))}
           </tbody>
         </table>
       </div>
+
+      {meta && (
+        <Pagination
+          meta={meta}
+          onPageChange={setPage}
+          onPageSizeChange={(size) => {
+            setPageSize(size);
+            setPage(1);
+          }}
+        />
+      )}
     </div>
   );
 }

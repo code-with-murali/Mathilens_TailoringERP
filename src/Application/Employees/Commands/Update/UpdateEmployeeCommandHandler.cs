@@ -30,7 +30,14 @@ public sealed class UpdateEmployeeCommandHandler : ICommandHandler<UpdateEmploye
             return Result.Failure<EmployeeDto>(duplicate);
         }
 
-        employee.UpdateDetails(command.EmployeeCode, command.FullName, command.JobTitle, command.PhoneNumber, command.Email);
+        employee.UpdateDetails(
+            command.EmployeeCode,
+            command.FullName,
+            command.JobTitle,
+            command.PhoneNumber,
+            command.Email,
+            command.JoiningDate,
+            command.EmploymentType);
         await _employeeRepository.SaveChangesAsync(cancellationToken);
 
         return employee.ToDto();

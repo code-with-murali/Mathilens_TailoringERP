@@ -1,4 +1,4 @@
-import { apiGet, apiPost, apiPut } from "@/lib/api-client";
+import { apiDelete, apiGet, apiGetPaged, apiPost, apiPostNoContent, apiPut } from "@/lib/api-client";
 
 export type CurrentUser = {
   id: string;
@@ -24,6 +24,8 @@ export const PERMISSIONS = {
   whatsAppView: "WhatsApp.View",
   reportsView: "Reports.View",
   pricingView: "Pricing.View",
+  inventoryView: "Inventory.View",
+  inventoryManage: "Inventory.Manage",
   settingsView: "Settings.View",
   activityView: "Activity.View",
   usersView: "Users.View",
@@ -34,12 +36,18 @@ export function getCurrentUser(token: string | null) {
   return apiGet<CurrentUser>("/api/v1/users/me", token);
 }
 
-export function listUsers(token: string | null) {
-  return apiGet<AppUser[]>("/api/v1/users", token);
+export function listUsers(page: number, pageSize: number, token: string | null) {
+  const params = new URLSearchParams({ page: String(page), pageSize: String(pageSize) });
+  return apiGetPaged<AppUser>(`/api/v1/users?${params}`, token);
 }
 
 export function listRoles(token: string | null) {
   return apiGet<string[]>("/api/v1/users/roles", token);
+}
+
+/** Signs the user out everywhere as well as changing the password — see the API's ResetPassword. */
+export function resetUserPassword(id: string, newPassword: string, token: string | null) {
+  return apiPostNoContent(`/api/v1/users/${id}/password`, { newPassword }, token);
 }
 
 export function createUser(email: string, password: string, role: string, token: string | null) {
@@ -48,4 +56,30 @@ export function createUser(email: string, password: string, role: string, token:
 
 export function setUserRole(id: string, role: string, token: string | null) {
   return apiPut<void>(`/api/v1/users/${id}/role`, { role }, token);
+}
+
+/** One screen and the actions it defines — some screens are view-only and offer no Manage. */
+export type ScreenPermissions = { screen: string; permissions: { permission: string; action: string }[] };
+
+export type RolePermissions = {
+  role: string;
+  permissions: string[];
+  /** False for Owner, which always holds everything and cannot be edited. */
+  isEditable: boolean;
+  /** False while the role still matches its built-in set. */
+  isCustomised: boolean;
+};
+
+export type RolePermissionMatrix = { screens: ScreenPermissions[]; roles: RolePermissions[] };
+
+export function getRolePermissions(token: string | null) {
+  return apiGet<RolePermissionMatrix>("/api/v1/users/role-permissions", token);
+}
+
+export function setRolePermissions(role: string, permissions: string[], token: string | null) {
+  return apiPut<RolePermissions>(`/api/v1/users/role-permissions/${role}`, { permissions }, token);
+}
+
+export function resetRolePermissions(role: string, token: string | null) {
+  return apiDelete(`/api/v1/users/role-permissions/${role}`, token);
 }

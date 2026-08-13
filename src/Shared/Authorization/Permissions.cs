@@ -23,6 +23,7 @@ public static class Permissions
         public const string WhatsApp = nameof(WhatsApp);
         public const string Reports = nameof(Reports);
         public const string Pricing = nameof(Pricing);
+        public const string Inventory = nameof(Inventory);
         public const string Settings = nameof(Settings);
         public const string Activity = nameof(Activity);
         public const string Users = nameof(Users);
@@ -41,6 +42,8 @@ public static class Permissions
     public const string WhatsAppView = $"{Modules.WhatsApp}.{View}";
     public const string WhatsAppManage = $"{Modules.WhatsApp}.{Manage}";
     public const string ReportsView = $"{Modules.Reports}.{View}";
+    public const string InventoryView = $"{Modules.Inventory}.{View}";
+    public const string InventoryManage = $"{Modules.Inventory}.{Manage}";
     public const string PricingView = $"{Modules.Pricing}.{View}";
     public const string PricingManage = $"{Modules.Pricing}.{Manage}";
     public const string SettingsView = $"{Modules.Settings}.{View}";
@@ -60,6 +63,7 @@ public static class Permissions
         WhatsAppView, WhatsAppManage,
         ReportsView,
         PricingView, PricingManage,
+        InventoryView, InventoryManage,
         SettingsView, SettingsManage,
         ActivityView,
         UsersView, UsersManage,

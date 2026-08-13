@@ -28,6 +28,13 @@ public sealed class ActivityLog
     /// <summary>The command type behind the action, kept for tracing back to code when a log entry is disputed.</summary>
     public string RequestName { get; private set; } = string.Empty;
 
+    /// <summary>
+    /// The details the action carried, in words — "Full Name: Asha Rao, Phone Number: 98765 43210" —
+    /// so the trail says what changed, not merely that something did. Null for entries recorded
+    /// before this existed, and for actions whose command carried nothing worth repeating.
+    /// </summary>
+    public string? Description { get; private set; }
+
     public DateTime OccurredAtUtc { get; private set; }
 
     private ActivityLog()
@@ -35,7 +42,14 @@ public sealed class ActivityLog
         // Reserved for EF Core materialization.
     }
 
-    public static ActivityLog Record(Guid? userId, string? userName, string screen, string action, string requestName, DateTime occurredAtUtc) =>
+    public static ActivityLog Record(
+        Guid? userId,
+        string? userName,
+        string screen,
+        string action,
+        string requestName,
+        DateTime occurredAtUtc,
+        string? description = null) =>
         new()
         {
             Id = Guid.NewGuid(),
@@ -45,5 +59,6 @@ public sealed class ActivityLog
             Action = Guard.AgainstNullOrWhiteSpace(action, nameof(action)),
             RequestName = Guard.AgainstNullOrWhiteSpace(requestName, nameof(requestName)),
             OccurredAtUtc = occurredAtUtc,
+            Description = string.IsNullOrWhiteSpace(description) ? null : description,
         };
 }

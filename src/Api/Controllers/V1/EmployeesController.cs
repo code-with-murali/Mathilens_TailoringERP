@@ -7,9 +7,10 @@ using MathilensERP.Application.Common;
 using MathilensERP.Application.Common.Mediator;
 using MathilensERP.Application.Employees;
 using MathilensERP.Application.Employees.Commands.Create;
-using MathilensERP.Application.Employees.Commands.Delete;
 using MathilensERP.Application.Employees.Commands.Import;
 using MathilensERP.Application.Employees.Commands.Update;
+using MathilensERP.Application.Employees.Queries.OrderHistory;
+using MathilensERP.Application.Employees.Commands.Retire;
 using MathilensERP.Application.Employees.Queries.GetById;
 using MathilensERP.Application.Employees.Queries.ListAll;
 using MathilensERP.Application.Employees.Queries.Search;
@@ -87,7 +88,7 @@ public sealed class EmployeesController : ApiControllerBase
                 r.GetRequiredString(EmployeeSheet.EmployeeCode),
                 r.GetRequiredString(EmployeeSheet.FullName),
                 r.GetString(EmployeeSheet.JobTitle),
-                r.GetString(EmployeeSheet.PhoneNumber),
+                r.GetRequiredString(EmployeeSheet.PhoneNumber),
                 r.GetString(EmployeeSheet.Email)))
             .ToList());
 
@@ -102,7 +103,9 @@ public sealed class EmployeesController : ApiControllerBase
     [ProducesResponseType(typeof(ApiErrorResponse), StatusCodes.Status400BadRequest)]
     public async Task<IActionResult> Create([FromBody] CreateEmployeeRequest request, CancellationToken cancellationToken)
     {
-        var command = new CreateEmployeeCommand(request.EmployeeCode, request.FullName, request.JobTitle, request.PhoneNumber, request.Email);
+        var command = new CreateEmployeeCommand(
+            request.EmployeeCode, request.FullName, request.JobTitle, request.PhoneNumber, request.Email,
+            request.JoiningDate, request.EmploymentType);
         var result = await _sender.Send(command, cancellationToken);
         return ToActionResult(result);
     }
@@ -139,19 +142,44 @@ public sealed class EmployeesController : ApiControllerBase
     [ProducesResponseType(typeof(ApiErrorResponse), StatusCodes.Status404NotFound)]
     public async Task<IActionResult> Update(Guid id, [FromBody] UpdateEmployeeRequest request, CancellationToken cancellationToken)
     {
-        var command = new UpdateEmployeeCommand(id, request.EmployeeCode, request.FullName, request.JobTitle, request.PhoneNumber, request.Email);
+        var command = new UpdateEmployeeCommand(
+            id, request.EmployeeCode, request.FullName, request.JobTitle, request.PhoneNumber, request.Email,
+            request.JoiningDate, request.EmploymentType);
         var result = await _sender.Send(command, cancellationToken);
         return ToActionResult(result);
     }
 
-    /// <summary>Soft-deletes an employee.</summary>
-    [HttpDelete("{id:guid}")]
+    // Deliberately no delete endpoint. Staff leave, they do not stop having existed: their order
+    // history has to stay readable, and their code and phone stay theirs so an old job card still
+    // resolves to the right person. Retire below is the operation that ends someone's employment.
+
+    /// <summary>
+    /// Records that an employee has left, as of their last working day — or reverses it when
+    /// <c>lastWorkingDate</c> is null. Distinct from deleting: their order history stays, and so
+    /// does their code and phone number.
+    /// </summary>
+    [HttpPost("{id:guid}/retire")]
     [Authorize(Policy = Permissions.EmployeesManage)]
-    [ProducesResponseType(StatusCodes.Status204NoContent)]
+    [ProducesResponseType(typeof(ApiResponse<EmployeeDto>), StatusCodes.Status200OK)]
+    [ProducesResponseType(typeof(ApiErrorResponse), StatusCodes.Status400BadRequest)]
     [ProducesResponseType(typeof(ApiErrorResponse), StatusCodes.Status404NotFound)]
-    public async Task<IActionResult> Delete(Guid id, CancellationToken cancellationToken)
+    public async Task<IActionResult> Retire(Guid id, [FromBody] RetireEmployeeRequest request, CancellationToken cancellationToken)
     {
-        var result = await _sender.Send(new DeleteEmployeeCommand(id), cancellationToken);
+        var result = await _sender.Send(new RetireEmployeeCommand(id, request.LastWorkingDate), cancellationToken);
         return ToActionResult(result);
+    }
+
+    /// <summary>Every order assigned to this employee, newest first, paginated (00_MASTER_SPEC.md § 8.3).</summary>
+    [HttpGet("{id:guid}/orders")]
+    [ProducesResponseType(typeof(ApiResponse<IReadOnlyList<EmployeeOrderDto>>), StatusCodes.Status200OK)]
+    [ProducesResponseType(typeof(ApiErrorResponse), StatusCodes.Status404NotFound)]
+    public async Task<IActionResult> OrderHistory(
+        Guid id,
+        [FromQuery] int page = PaginationDefaults.DefaultPage,
+        [FromQuery] int pageSize = PaginationDefaults.DefaultPageSize,
+        CancellationToken cancellationToken = default)
+    {
+        var result = await _sender.Send(new GetEmployeeOrderHistoryQuery(id, page, pageSize), cancellationToken);
+        return ToPagedActionResult(result);
     }
 }

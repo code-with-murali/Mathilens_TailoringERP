@@ -1,5 +1,6 @@
 using MathilensERP.Application.Common.Interfaces;
 using MathilensERP.Shared.Authorization;
+using MathilensERP.Shared.Pagination;
 using MathilensERP.Shared.Results;
 using Microsoft.AspNetCore.Identity;
 using Microsoft.EntityFrameworkCore;
@@ -15,24 +16,35 @@ namespace MathilensERP.Infrastructure.Identity;
 public sealed class UserAdminService : IUserAdminService
 {
     private readonly UserManager<ApplicationUser> _userManager;
+    private readonly Persistence.ApplicationDbContext _dbContext;
 
-    public UserAdminService(UserManager<ApplicationUser> userManager)
+    public UserAdminService(UserManager<ApplicationUser> userManager, Persistence.ApplicationDbContext dbContext)
     {
         _userManager = userManager;
+        _dbContext = dbContext;
     }
 
-    public async Task<IReadOnlyList<AppUserDto>> ListUsersAsync(CancellationToken cancellationToken)
+    public async Task<PagedResult<AppUserDto>> ListUsersAsync(int page, int pageSize, CancellationToken cancellationToken)
     {
-        var users = await _userManager.Users.OrderBy(u => u.Email).ToListAsync(cancellationToken);
+        var query = _userManager.Users.OrderBy(u => u.Email);
 
-        var result = new List<AppUserDto>(users.Count);
+        var totalCount = await query.CountAsync(cancellationToken);
+
+        var users = await query
+            .Skip((page - 1) * pageSize)
+            .Take(pageSize)
+            .ToListAsync(cancellationToken);
+
+        // One role lookup per user on the page only — previously this ran for every user in the
+        // system on every load, which is what made paging worth doing here at all.
+        var items = new List<AppUserDto>(users.Count);
         foreach (var user in users)
         {
             var roles = await _userManager.GetRolesAsync(user);
-            result.Add(new AppUserDto(user.Id, user.Email ?? string.Empty, roles.FirstOrDefault()));
+            items.Add(new AppUserDto(user.Id, user.Email ?? string.Empty, roles.FirstOrDefault()));
         }
 
-        return result;
+        return new PagedResult<AppUserDto>(items, page, pageSize, totalCount);
     }
 
     public async Task<Result<AppUserDto>> CreateUserAsync(string email, string password, string role, CancellationToken cancellationToken)
@@ -89,6 +101,47 @@ public sealed class UserAdminService : IUserAdminService
 
         await _userManager.RemoveFromRolesAsync(user, currentRoles);
         await _userManager.AddToRoleAsync(user, role);
+
+        return Result.Success();
+    }
+
+    public async Task<Result> ResetPasswordAsync(Guid userId, string newPassword, CancellationToken cancellationToken)
+    {
+        var user = await _userManager.FindByIdAsync(userId.ToString());
+        if (user is null)
+        {
+            return Result.Failure(Error.NotFound("Users.NotFound", $"No user was found with id '{userId}'."));
+        }
+
+        // Generate-and-redeem rather than RemovePassword/AddPassword: it is one atomic operation
+        // that leaves the account with a password throughout, and it runs the configured policy.
+        var token = await _userManager.GeneratePasswordResetTokenAsync(user);
+        var reset = await _userManager.ResetPasswordAsync(user, token, newPassword);
+        if (!reset.Succeeded)
+        {
+            var details = reset.Errors.Select(e => new FieldError("newPassword", e.Description)).ToList();
+            return Result.Failure(Error.Validation("Users.ResetPasswordFailed", "This password could not be set.", details));
+        }
+
+        // A reset is often prompted by the account being in the wrong hands. Their existing
+        // sessions must not outlive it, so every refresh token they hold is revoked, and the
+        // security stamp is rolled so nothing minted from the old credentials survives.
+        await _userManager.UpdateSecurityStampAsync(user);
+
+        var now = DateTime.UtcNow;
+        var activeTokens = await _dbContext.RefreshTokens
+            .Where(t => t.UserId == userId && t.RevokedAtUtc == null)
+            .ToListAsync(cancellationToken);
+        foreach (var activeToken in activeTokens)
+        {
+            activeToken.Revoke(now);
+        }
+
+        await _dbContext.SaveChangesAsync(cancellationToken);
+
+        // Lockout from earlier failed attempts would otherwise persist past the fix.
+        await _userManager.ResetAccessFailedCountAsync(user);
+        await _userManager.SetLockoutEndDateAsync(user, null);
 
         return Result.Success();
     }

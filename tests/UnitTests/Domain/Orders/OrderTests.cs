@@ -115,11 +115,46 @@ public class OrderTests
     [Fact]
     public void TransitionTo_WithValidTransition_UpdatesStatus()
     {
-        var order = Order.Create(Guid.NewGuid(), DateTime.UtcNow, null);
+        var order = Order.Create(Guid.NewGuid(), DateTime.UtcNow, Guid.NewGuid());
 
         order.TransitionTo(OrderStatus.InProgress);
 
         Assert.Equal(OrderStatus.InProgress, order.Status);
+    }
+
+    [Fact]
+    public void TransitionTo_InProgressWithNoEmployeeAssigned_Throws()
+    {
+        var order = Order.Create(Guid.NewGuid(), DateTime.UtcNow, null);
+
+        // The lifecycle allows the move — it is the missing tailor that blocks it, so the order
+        // stays where it was rather than starting work nobody owns.
+        Assert.True(order.CanTransitionTo(OrderStatus.InProgress));
+        Assert.Throws<InvalidOperationException>(() => order.TransitionTo(OrderStatus.InProgress));
+        Assert.Equal(OrderStatus.Received, order.Status);
+        Assert.Null(order.WorkStartedAtUtc);
+    }
+
+    [Fact]
+    public void TransitionTo_InProgressAfterAssigningAnEmployee_Starts()
+    {
+        var order = Order.Create(Guid.NewGuid(), DateTime.UtcNow, null);
+        order.AssignEmployee(Guid.NewGuid());
+
+        order.TransitionTo(OrderStatus.InProgress);
+
+        Assert.Equal(OrderStatus.InProgress, order.Status);
+    }
+
+    [Fact]
+    public void TransitionTo_CancelledWithNoEmployeeAssigned_IsAllowed()
+    {
+        var order = Order.Create(Guid.NewGuid(), DateTime.UtcNow, null);
+
+        // Only starting work needs an owner. An order can always be abandoned.
+        order.TransitionTo(OrderStatus.Cancelled);
+
+        Assert.Equal(OrderStatus.Cancelled, order.Status);
     }
 
     [Fact]
@@ -156,7 +191,7 @@ public class OrderTests
     [Fact]
     public void TransitionTo_NonDelivered_LeavesTheDeliveryDateUnset()
     {
-        var order = Order.Create(Guid.NewGuid(), DateTime.UtcNow, null);
+        var order = Order.Create(Guid.NewGuid(), DateTime.UtcNow, Guid.NewGuid());
 
         order.TransitionTo(OrderStatus.InProgress);
 
@@ -306,6 +341,13 @@ public class OrderTests
         {
             order.TransitionTo(OrderStatus.Cancelled);
             return;
+        }
+
+        // Any order that legitimately reaches InProgress has a tailor holding it, so the helper
+        // supplies one. Tests about that rule itself assign (or withhold) the employee explicitly.
+        if (order.RequiresEmployeeToStartWork)
+        {
+            order.AssignEmployee(Guid.NewGuid());
         }
 
         order.TransitionTo(OrderStatus.InProgress);

@@ -7,6 +7,8 @@ export type ActivityLog = {
   screen: string;
   action: string;
   requestName: string;
+  /** What the action carried — "Full Name: Asha Rao, Phone Number: …". Null for older entries. */
+  description: string | null;
   occurredAtUtc: string;
 };
 

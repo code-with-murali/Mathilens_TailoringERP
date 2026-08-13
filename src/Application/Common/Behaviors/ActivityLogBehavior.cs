@@ -14,7 +14,8 @@ namespace MathilensERP.Application.Common.Behaviors;
 ///
 /// Only commands, and only successful ones: queries would swamp the log with reads nobody audits,
 /// and a command that returned a validation failure changed nothing, so logging it would describe
-/// an action that never happened.
+/// an action that never happened. Commands marked <see cref="IUnloggedCommand"/> are skipped for
+/// the same swamping reason — they are issued by the browser, not by a person.
 /// </summary>
 public sealed class ActivityLogBehavior<TRequest, TResponse> : IPipelineBehavior<TRequest, TResponse>
     where TResponse : Result
@@ -22,6 +23,8 @@ public sealed class ActivityLogBehavior<TRequest, TResponse> : IPipelineBehavior
     /// <summary>Computed once per closed generic rather than per request — the answer cannot change.</summary>
     private static readonly bool IsCommand = typeof(TRequest).GetInterfaces()
         .Any(i => i.IsGenericType && i.GetGenericTypeDefinition() == typeof(ICommand<>));
+
+    private static readonly bool IsExempt = typeof(IUnloggedCommand).IsAssignableFrom(typeof(TRequest));
 
     private readonly IActivityLogRepository _activityLogRepository;
     private readonly ICurrentUserService _currentUserService;
@@ -41,7 +44,7 @@ public sealed class ActivityLogBehavior<TRequest, TResponse> : IPipelineBehavior
     {
         var response = await next();
 
-        if (!IsCommand || response.IsFailure)
+        if (!IsCommand || IsExempt || response.IsFailure)
         {
             return response;
         }
@@ -54,7 +57,8 @@ public sealed class ActivityLogBehavior<TRequest, TResponse> : IPipelineBehavior
                 ActivityDescriptor.ScreenFor(typeof(TRequest)),
                 ActivityDescriptor.ActionFor(typeof(TRequest)),
                 typeof(TRequest).Name,
-                DateTime.UtcNow);
+                DateTime.UtcNow,
+                ActivityDescriptionBuilder.Describe(request));
 
             await _activityLogRepository.AddAsync(entry, cancellationToken);
         }

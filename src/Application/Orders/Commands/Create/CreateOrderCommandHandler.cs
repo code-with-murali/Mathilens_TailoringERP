@@ -2,6 +2,7 @@ using MathilensERP.Application.Common.Mediator;
 using MathilensERP.Application.Customers;
 using MathilensERP.Application.Employees;
 using MathilensERP.Application.Orders;
+using MathilensERP.Application.Pricing;
 using MathilensERP.Domain.Orders;
 using MathilensERP.Shared.Results;
 
@@ -12,12 +13,18 @@ public sealed class CreateOrderCommandHandler : ICommandHandler<CreateOrderComma
     private readonly IOrderRepository _orderRepository;
     private readonly ICustomerRepository _customerRepository;
     private readonly IEmployeeRepository _employeeRepository;
+    private readonly IClothPriceRepository _clothPriceRepository;
 
-    public CreateOrderCommandHandler(IOrderRepository orderRepository, ICustomerRepository customerRepository, IEmployeeRepository employeeRepository)
+    public CreateOrderCommandHandler(
+        IOrderRepository orderRepository,
+        ICustomerRepository customerRepository,
+        IEmployeeRepository employeeRepository,
+        IClothPriceRepository clothPriceRepository)
     {
         _orderRepository = orderRepository;
         _customerRepository = customerRepository;
         _employeeRepository = employeeRepository;
+        _clothPriceRepository = clothPriceRepository;
     }
 
     public async Task<Result<OrderDto>> Handle(CreateOrderCommand command, CancellationToken cancellationToken)
@@ -47,7 +54,22 @@ public sealed class CreateOrderCommandHandler : ICommandHandler<CreateOrderComma
 
             if (itemInput.Fabric is { } fabric)
             {
-                order.SetItemFabric(item.Id, fabric.FabricType, fabric.Source, fabric.Color, fabric.Quantity);
+                // Resolved here, not trusted from the request: the id decides whether this cloth
+                // comes off stock, so it has to come from the shop's own catalogue. An unmatched
+                // code is kept as typed rather than refused — the field has always taken free text.
+                var clothPrice = string.IsNullOrWhiteSpace(fabric.ClothCode)
+                    ? null
+                    : await _clothPriceRepository.GetByClothCodeAsync(fabric.ClothCode.Trim(), cancellationToken);
+
+                order.SetItemFabric(
+                    item.Id,
+                    fabric.FabricType,
+                    fabric.Source,
+                    fabric.Color,
+                    fabric.Quantity,
+                    clothPrice?.Id,
+                    fabric.ClothCode,
+                    fabric.Unit);
             }
         }
 

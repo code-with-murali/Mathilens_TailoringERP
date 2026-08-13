@@ -1,4 +1,5 @@
 using MathilensERP.Domain.Common;
+using MathilensERP.Domain.Inventory;
 using MathilensERP.Domain.Measurements;
 using MathilensERP.Shared.Guards;
 
@@ -55,6 +56,13 @@ public sealed class OrderItem : AuditableEntity
     }
 
     /// <summary>Sets (or replaces) this item's fabric details (02_DATABASE.md § 10.11).</summary>
-    internal void SetFabric(string fabricType, FabricSource source, string? color, decimal quantity) =>
-        Fabric = FabricDetails.Create(Id, fabricType, source, color, quantity);
+    internal void SetFabric(
+        string fabricType,
+        FabricSource source,
+        string? color,
+        decimal quantity,
+        Guid? clothPriceId = null,
+        string? clothCode = null,
+        ClothUnit unit = ClothUnit.Metres) =>
+        Fabric = FabricDetails.Create(Id, fabricType, source, color, quantity, clothPriceId, clothCode, unit);
 }

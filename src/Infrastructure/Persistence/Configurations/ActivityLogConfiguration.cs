@@ -29,6 +29,10 @@ public class ActivityLogConfiguration : IEntityTypeConfiguration<ActivityLog>
             .IsRequired()
             .HasMaxLength(200);
 
+        // Nullable: entries written before this column existed have none, and some commands carry
+        // nothing worth repeating. 2000 matches the builder's own truncation limit.
+        builder.Property(a => a.Description).HasMaxLength(2000);
+
         builder.Property(a => a.OccurredAtUtc).IsRequired();
 
         // The log is always read newest-first and filtered by these three, so each filter path is

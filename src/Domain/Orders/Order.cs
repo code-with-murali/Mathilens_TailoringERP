@@ -1,4 +1,5 @@
 using MathilensERP.Domain.Common;
+using MathilensERP.Domain.Inventory;
 using MathilensERP.Domain.Measurements;
 using MathilensERP.Shared.Guards;
 
@@ -34,6 +35,20 @@ public sealed class Order : AuditableEntity
     /// <summary>When the garment actually changed hands. Null until the order reaches <see cref="OrderStatus.Delivered"/>.</summary>
     public DateTime? DeliveredAtUtc { get; private set; }
 
+    /// <summary>
+    /// When the order moved to <see cref="OrderStatus.InProgress"/> — the point the assigned
+    /// tailor picked the work up. Null until it does. Stamped here rather than reconstructed from
+    /// the activity trail, which records who acted but is not a place to query workloads from.
+    /// </summary>
+    public DateTime? WorkStartedAtUtc { get; private set; }
+
+    /// <summary>
+    /// When the order moved to <see cref="OrderStatus.ReadyForDelivery"/> — the point the work
+    /// itself was finished, which is distinct from <see cref="DeliveredAtUtc"/>: a garment can sit
+    /// finished on the rack for days before the customer collects it.
+    /// </summary>
+    public DateTime? WorkCompletedAtUtc { get; private set; }
+
     public string? Notes { get; private set; }
 
     /// <summary>
@@ -46,6 +61,13 @@ public sealed class Order : AuditableEntity
 
     /// <summary>An order's details, items and fabric can only be changed while it's still open — not once delivered or cancelled.</summary>
     public bool IsOpen => Status is not (OrderStatus.Delivered or OrderStatus.Cancelled);
+
+    /// <summary>
+    /// Work cannot start on an unassigned order: <see cref="OrderStatus.InProgress"/> means a named
+    /// tailor picked it up, and <see cref="WorkStartedAtUtc"/> is stamped against them. Starting
+    /// without an assignment would record a start time nobody owns.
+    /// </summary>
+    public bool RequiresEmployeeToStartWork => EmployeeId is null;
 
     /// <summary>
     /// What this order's live items are worth — quantity × unit price. This is the order's own
@@ -128,11 +150,19 @@ public sealed class Order : AuditableEntity
     }
 
     /// <summary>Sets (or replaces) the fabric details for one of this order's items.</summary>
-    public void SetItemFabric(Guid orderItemId, string fabricType, FabricSource source, string? color, decimal quantity)
+    public void SetItemFabric(
+        Guid orderItemId,
+        string fabricType,
+        FabricSource source,
+        string? color,
+        decimal quantity,
+        Guid? clothPriceId = null,
+        string? clothCode = null,
+        ClothUnit unit = ClothUnit.Metres)
     {
         EnsureModifiable("set fabric on");
 
-        RequireItem(orderItemId).SetFabric(fabricType, source, color, quantity);
+        RequireItem(orderItemId).SetFabric(fabricType, source, color, quantity, clothPriceId, clothCode, unit);
     }
 
     public void AssignEmployee(Guid employeeId) => EmployeeId = Guard.AgainstEmpty(employeeId, nameof(employeeId));
@@ -145,17 +175,37 @@ public sealed class Order : AuditableEntity
     /// handed over — supplied by the caller rather than read off the clock, so a handover entered
     /// late is still dated the day it happened.
     /// </summary>
-    public void TransitionTo(OrderStatus target, DateTime? deliveredAtUtc = null)
+    public void TransitionTo(OrderStatus target, DateTime? deliveredAtUtc = null, DateTime? occurredAtUtc = null)
     {
         if (!CanTransitionTo(target))
         {
             throw new InvalidOperationException($"Cannot transition an order from '{Status}' to '{target}'.");
         }
 
+        // Deliberately not folded into CanTransitionTo: that answers whether the lifecycle allows
+        // the move, and callers use it to offer the next steps. An unassigned order's next step is
+        // still "start work" — it just needs a tailor named first, which is a different message.
+        if (target == OrderStatus.InProgress && RequiresEmployeeToStartWork)
+        {
+            throw new InvalidOperationException("Cannot start work on an order with no employee assigned.");
+        }
+
         if (target == OrderStatus.Delivered)
         {
             DeliveredAtUtc = deliveredAtUtc
                 ?? throw new ArgumentNullException(nameof(deliveredAtUtc), "Delivering an order requires the date it was handed over.");
+        }
+
+        // Stamped only on the first arrival at each state. The progression is forward-only, so in
+        // practice that is every arrival — but leaving the first one standing is the behaviour that
+        // stays correct if a backward transition is ever allowed.
+        if (target == OrderStatus.InProgress)
+        {
+            WorkStartedAtUtc ??= occurredAtUtc;
+        }
+        else if (target == OrderStatus.ReadyForDelivery)
+        {
+            WorkCompletedAtUtc ??= occurredAtUtc;
         }
 
         Status = target;

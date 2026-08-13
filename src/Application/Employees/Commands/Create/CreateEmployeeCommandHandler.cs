@@ -26,7 +26,14 @@ public sealed class CreateEmployeeCommandHandler : ICommandHandler<CreateEmploye
             return Result.Failure<EmployeeDto>(duplicate);
         }
 
-        var employee = Employee.Create(command.EmployeeCode, command.FullName, command.JobTitle, command.PhoneNumber, command.Email);
+        var employee = Employee.Create(
+            command.EmployeeCode,
+            command.FullName,
+            command.JobTitle,
+            command.PhoneNumber,
+            command.Email,
+            command.JoiningDate,
+            command.EmploymentType);
 
         _employeeRepository.Add(employee);
         await _employeeRepository.SaveChangesAsync(cancellationToken);

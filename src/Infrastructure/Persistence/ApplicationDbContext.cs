@@ -5,6 +5,7 @@ using MathilensERP.Domain.Billing;
 using MathilensERP.Domain.Customers;
 using MathilensERP.Domain.Employees;
 using MathilensERP.Domain.Identity;
+using MathilensERP.Domain.Inventory;
 using MathilensERP.Domain.Measurements;
 using MathilensERP.Domain.Orders;
 using MathilensERP.Domain.Pricing;
@@ -56,6 +57,8 @@ public class ApplicationDbContext : IdentityDbContext<ApplicationUser, Applicati
     public DbSet<Setting> Settings => Set<Setting>();
 
     public DbSet<ClothPrice> ClothPrices => Set<ClothPrice>();
+
+    public DbSet<ClothReceipt> ClothReceipts => Set<ClothReceipt>();
 
     public DbSet<ActivityLog> ActivityLogs => Set<ActivityLog>();
 

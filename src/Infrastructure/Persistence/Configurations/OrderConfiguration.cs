@@ -25,6 +25,8 @@ public class OrderConfiguration : IEntityTypeConfiguration<Order>
 
         // Null until the order is delivered.
         builder.Property(o => o.DeliveredAtUtc);
+        builder.Property(o => o.WorkStartedAtUtc);
+        builder.Property(o => o.WorkCompletedAtUtc);
 
         builder.Property(o => o.Notes).HasMaxLength(2000);
 

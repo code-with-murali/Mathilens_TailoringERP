@@ -101,7 +101,10 @@ builder.Services
 
 // One policy per permission, generated from the catalogue rather than listed by hand — a new
 // permission becomes enforceable the moment it is added to Permissions.All.
-builder.Services.AddSingleton<IAuthorizationHandler, PermissionAuthorizationHandler>();
+// Scoped, not singleton: the handler resolves permissions through IRolePermissionService, which
+// reaches the database (via a scoped DbContext) when its cache is cold. Registering the handler as
+// a singleton would capture that scoped dependency and fail at the first request.
+builder.Services.AddScoped<IAuthorizationHandler, PermissionAuthorizationHandler>();
 builder.Services.AddAuthorization(options =>
 {
     foreach (var permission in Permissions.All)

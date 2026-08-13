@@ -25,10 +25,24 @@ public class EmployeeConfiguration : IEntityTypeConfiguration<Employee>
             .HasMaxLength(100);
 
         builder.Property(e => e.PhoneNumber)
+            .IsRequired()
             .HasMaxLength(20);
 
         builder.Property(e => e.Email)
             .HasMaxLength(256);
+
+        builder.Property(e => e.JoiningDate).IsRequired();
+
+        // Stored as its name, matching how every other enum in this schema is persisted.
+        builder.Property(e => e.EmploymentType)
+            .IsRequired()
+            .HasConversion<string>()
+            .HasMaxLength(20);
+
+        builder.Property(e => e.LastWorkingDate);
+
+        // Assigning work means listing the people still employed, so that filter is indexed.
+        builder.HasIndex(e => e.LastWorkingDate);
 
         builder.Property(e => e.CreatedBy).IsRequired();
         builder.Property(e => e.CreatedAtUtc).IsRequired();
@@ -49,8 +63,7 @@ public class EmployeeConfiguration : IEntityTypeConfiguration<Employee>
         builder.HasIndex(e => e.IsDeleted);
 
         // The staff code and phone number each identify one person. Both are unique across live
-        // employees only — a soft-deleted record must not reserve a code or a number forever —
-        // and the phone filter also excludes NULL, since "no phone recorded" is not a clash.
+        // employees only — a soft-deleted record must not reserve a code or a number forever.
         // The application layer reports either collision as a friendly conflict; these indexes
         // are the backstop two simultaneous requests can't slip past.
         builder.HasIndex(e => e.EmployeeCode)
@@ -59,7 +72,7 @@ public class EmployeeConfiguration : IEntityTypeConfiguration<Employee>
 
         builder.HasIndex(e => e.PhoneNumber)
             .IsUnique()
-            .HasFilter("\"IsDeleted\" = false AND \"PhoneNumber\" IS NOT NULL");
+            .HasFilter("\"IsDeleted\" = false");
 
         builder.Property<uint>("xmin").IsRowVersion();
     }

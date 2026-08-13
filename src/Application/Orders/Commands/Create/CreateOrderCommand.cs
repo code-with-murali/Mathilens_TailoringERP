@@ -1,5 +1,6 @@
 using MathilensERP.Application.Common.Mediator;
 using MathilensERP.Application.Orders;
+using MathilensERP.Domain.Inventory;
 using MathilensERP.Domain.Measurements;
 using MathilensERP.Domain.Orders;
 using MathilensERP.Shared.Results;
@@ -15,4 +16,15 @@ public sealed record CreateOrderCommand(
 
 public sealed record CreateOrderItemInput(GarmentType GarmentType, int Quantity, decimal UnitPrice, CreateOrderItemFabricInput? Fabric);
 
-public sealed record CreateOrderItemFabricInput(string FabricType, FabricSource Source, string? Color, decimal Quantity);
+/// <param name="ClothCode">
+/// The cloth code staff typed. Resolved against the price list when the order is saved: a match
+/// links the fabric to that catalogue entry so stock falls by <paramref name="Quantity"/>, and no
+/// match is kept as free text, exactly as the field has always behaved.
+/// </param>
+public sealed record CreateOrderItemFabricInput(
+    string FabricType,
+    FabricSource Source,
+    string? Color,
+    decimal Quantity,
+    string? ClothCode = null,
+    ClothUnit Unit = ClothUnit.Metres);

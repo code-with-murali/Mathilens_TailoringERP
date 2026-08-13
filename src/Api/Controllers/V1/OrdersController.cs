@@ -49,7 +49,11 @@ public sealed class OrdersController : ApiControllerBase
                 i.GarmentType,
                 i.Quantity,
                 i.UnitPrice,
-                i.Fabric is null ? null : new CreateOrderItemFabricInput(i.Fabric.FabricType, i.Fabric.Source, i.Fabric.Color, i.Fabric.Quantity)))
+                i.Fabric is null
+                    ? null
+                    : new CreateOrderItemFabricInput(
+                        i.Fabric.FabricType, i.Fabric.Source, i.Fabric.Color, i.Fabric.Quantity,
+                        i.Fabric.ClothCode, i.Fabric.Unit)))
             .ToList();
 
         var command = new CreateOrderCommand(request.CustomerId, request.EmployeeId, request.DueAtUtc, items, request.Notes);

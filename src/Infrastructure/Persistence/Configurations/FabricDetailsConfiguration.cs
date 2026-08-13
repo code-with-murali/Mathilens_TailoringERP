@@ -30,6 +30,21 @@ public class FabricDetailsConfiguration : IEntityTypeConfiguration<FabricDetails
             .IsRequired()
             .HasPrecision(10, 2);
 
+        // Nullable: the cloth code field accepts any text, so fabric that matched no catalogue
+        // entry still records what was typed — it simply never reaches stock.
+        builder.Property(f => f.ClothPriceId);
+        builder.Property(f => f.ClothCode).HasMaxLength(50);
+
+        builder.Property(f => f.Unit)
+            .IsRequired()
+            .HasConversion<string>()
+            .HasMaxLength(20);
+
+        // Stock subtracts consumption per cloth, so that lookup is indexed. Filtered to the rows
+        // that can ever contribute — unmatched cloth codes are the common case for older orders.
+        builder.HasIndex(f => f.ClothPriceId)
+            .HasFilter("\"ClothPriceId\" IS NOT NULL");
+
         builder.Property(f => f.CreatedBy).IsRequired();
         builder.Property(f => f.CreatedAtUtc).IsRequired();
 

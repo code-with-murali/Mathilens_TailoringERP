@@ -9,9 +9,10 @@ namespace MathilensERP.Application.Orders.Commands.TransitionStatus;
 /// <summary>
 /// Order status transitions are validated against <see cref="Domain.Orders.Order.CanTransitionTo"/> here — never left to bubble up as an unhandled exception (01_ARCHITECTURE.md § 13 Exception Strategy).
 ///
-/// Delivery carries one extra rule the lifecycle itself cannot express: the garment does not leave
-/// the shop while money is still owed on it. That is a billing fact, so it is checked here — where
-/// both aggregates are reachable — rather than inside <see cref="Domain.Orders.Order"/>.
+/// Two transitions carry rules beyond the lifecycle graph. Work cannot start unassigned — that is
+/// the order's own invariant, so it lives in <see cref="Domain.Orders.Order"/> and is mirrored here
+/// as a Result. Delivery cannot happen while money is still owed — that is a billing fact spanning
+/// two aggregates, so it is only checked here, where both are reachable.
 /// </summary>
 public sealed class TransitionOrderStatusCommandHandler : ICommandHandler<TransitionOrderStatusCommand, Result<OrderDto>>
 {
@@ -38,6 +39,14 @@ public sealed class TransitionOrderStatusCommandHandler : ICommandHandler<Transi
                 "Order.InvalidStatusTransition", $"Cannot transition an order from '{order.Status}' to '{command.TargetStatus}'."));
         }
 
+        // Mirrors the aggregate's own invariant (Order.TransitionTo) as a Result rather than an
+        // exception, so the API answers 409 instead of 500 — see 01_ARCHITECTURE.md § 11.
+        if (command.TargetStatus == OrderStatus.InProgress && order.RequiresEmployeeToStartWork)
+        {
+            return Result.Failure<OrderDto>(Error.Conflict(
+                "Order.EmployeeRequired", "Assign an employee to this order before starting work on it."));
+        }
+
         if (command.TargetStatus == OrderStatus.Delivered)
         {
             var outstanding = await _invoiceRepository.GetOutstandingAmountForOrderAsync(command.OrderId, cancellationToken);
@@ -49,7 +58,10 @@ public sealed class TransitionOrderStatusCommandHandler : ICommandHandler<Transi
             }
         }
 
-        order.TransitionTo(command.TargetStatus, command.DeliveredAtUtc);
+        // The handler supplies the clock; the entity stays free of it. DeliveredAtUtc stays
+        // caller-supplied (a late-entered handover keeps the day it happened), while the work
+        // timestamps are the moment the status actually moved here.
+        order.TransitionTo(command.TargetStatus, command.DeliveredAtUtc, DateTime.UtcNow);
         await _orderRepository.SaveChangesAsync(cancellationToken);
 
         return order.ToDto();

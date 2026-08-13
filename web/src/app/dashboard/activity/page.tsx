@@ -15,6 +15,20 @@ const fieldClassName =
   "rounded-md border border-border bg-surface px-3 py-2 text-sm outline-none transition-colors focus:border-primary focus:ring-2 focus:ring-primary/25";
 
 /**
+ * The viewer's own zone, resolved once — the log stores UTC, but "when did this happen" only means
+ * anything in the reader's local time. Shown alongside the time (IST for a shop in India) so a
+ * reader never has to wonder which clock a row is quoting.
+ */
+const TIME_ZONE_LABEL = (() => {
+  try {
+    const parts = new Intl.DateTimeFormat(undefined, { timeZoneName: "short" }).formatToParts(new Date());
+    return parts.find((p) => p.type === "timeZoneName")?.value ?? "";
+  } catch {
+    return "";
+  }
+})();
+
+/**
  * A picked day covers the whole of that day. Sending the To date's midnight would exclude
  * everything that happened on it — the same trap the Reports page fell into.
  */
@@ -169,21 +183,30 @@ export default function ActivityLogPage() {
           <table className="w-full text-left text-sm">
             <thead className="border-b border-border bg-surface">
               <tr>
-                <th className="px-4 py-3 font-medium">When</th>
+                <th className="px-4 py-3 font-medium">Date</th>
+                <th className="px-4 py-3 font-medium">Time{TIME_ZONE_LABEL && ` (${TIME_ZONE_LABEL})`}</th>
                 <th className="px-4 py-3 font-medium">User</th>
                 <th className="px-4 py-3 font-medium">Screen</th>
                 <th className="px-4 py-3 font-medium">Action</th>
+                <th className="px-4 py-3 font-medium">Description</th>
               </tr>
             </thead>
             <tbody>
-              {logs.map((log) => (
-                <tr key={log.id} className="border-b border-border last:border-0">
-                  <td className="px-4 py-3 whitespace-nowrap">{new Date(log.occurredAtUtc).toLocaleString()}</td>
-                  <td className="px-4 py-3">{log.userName ?? "System"}</td>
-                  <td className="px-4 py-3">{log.screen}</td>
-                  <td className="px-4 py-3">{log.action}</td>
-                </tr>
-              ))}
+              {logs.map((log) => {
+                const occurred = new Date(log.occurredAtUtc);
+                return (
+                  <tr key={log.id} className="border-b border-border last:border-0 align-top">
+                    <td className="px-4 py-3 whitespace-nowrap">{occurred.toLocaleDateString()}</td>
+                    <td className="px-4 py-3 whitespace-nowrap">{occurred.toLocaleTimeString()}</td>
+                    <td className="px-4 py-3 whitespace-nowrap">{log.userName ?? "System"}</td>
+                    <td className="px-4 py-3 whitespace-nowrap">{log.screen}</td>
+                    <td className="px-4 py-3 whitespace-nowrap">{log.action}</td>
+                    {/* The widest column by far, so it is the one allowed to wrap. Entries recorded
+                        before descriptions existed simply have none. */}
+                    <td className="min-w-[18rem] px-4 py-3 text-foreground/80">{log.description ?? "—"}</td>
+                  </tr>
+                );
+              })}
             </tbody>
           </table>
         </div>

@@ -12,7 +12,7 @@ public class CreateEmployeeCommandHandlerTests
     {
         var repository = Substitute.For<IEmployeeRepository>();
         var handler = new CreateEmployeeCommandHandler(repository);
-        var command = new CreateEmployeeCommand("EMP-001", "Ravi Kumar", "Master Tailor", "+91 98765 43210", "ravi@example.com");
+        var command = new CreateEmployeeCommand("EMP-001", "Ravi Kumar", "Master Tailor", "+91 98765 43210", "ravi@example.com", new DateOnly(2024, 1, 15), EmploymentType.FullTime);
 
         var result = await handler.Handle(command, CancellationToken.None);
 
@@ -26,13 +26,13 @@ public class CreateEmployeeCommandHandlerTests
     [Fact]
     public async Task Handle_WithEmployeeCodeAlreadyUsed_ReturnsConflictAndSavesNothing()
     {
-        var existing = Employee.Create("EMP-001", "Ravi Kumar", null, null, null);
+        var existing = Employee.Create("EMP-001", "Ravi Kumar", null, "+91 98765 43210", null, new DateOnly(2024, 1, 15), EmploymentType.FullTime);
         var repository = Substitute.For<IEmployeeRepository>();
         repository.GetByEmployeeCodeAsync("EMP-001", Arg.Any<CancellationToken>()).Returns(existing);
         var handler = new CreateEmployeeCommandHandler(repository);
 
         var result = await handler.Handle(
-            new CreateEmployeeCommand("EMP-001", "Someone Else", null, null, null), CancellationToken.None);
+            new CreateEmployeeCommand("EMP-001", "Someone Else", null, "+91 98765 43210", null, new DateOnly(2024, 1, 15), EmploymentType.FullTime), CancellationToken.None);
 
         Assert.True(result.IsFailure);
         Assert.Equal("Employee.DuplicateEmployeeCode", result.Error.Code);
@@ -43,13 +43,13 @@ public class CreateEmployeeCommandHandlerTests
     [Fact]
     public async Task Handle_WithPhoneNumberAlreadyUsed_ReturnsConflictAndSavesNothing()
     {
-        var existing = Employee.Create("EMP-001", "Ravi Kumar", null, "+91 98765 43210", null);
+        var existing = Employee.Create("EMP-001", "Ravi Kumar", null, "+91 98765 43210", null, new DateOnly(2024, 1, 15), EmploymentType.FullTime);
         var repository = Substitute.For<IEmployeeRepository>();
         repository.GetByPhoneNumberAsync("+91 98765 43210", Arg.Any<CancellationToken>()).Returns(existing);
         var handler = new CreateEmployeeCommandHandler(repository);
 
         var result = await handler.Handle(
-            new CreateEmployeeCommand("EMP-002", "Someone Else", null, "+91 98765 43210", null), CancellationToken.None);
+            new CreateEmployeeCommand("EMP-002", "Someone Else", null, "+91 98765 43210", null, new DateOnly(2024, 1, 15), EmploymentType.FullTime), CancellationToken.None);
 
         Assert.True(result.IsFailure);
         Assert.Equal("Employee.DuplicatePhoneNumber", result.Error.Code);
@@ -57,18 +57,16 @@ public class CreateEmployeeCommandHandlerTests
     }
 
     [Fact]
-    public async Task Handle_WithNoPhoneNumber_DoesNotLookForAPhoneClash()
+    public async Task Handle_WithACodeAndPhoneNobodyElseHolds_Succeeds()
     {
         var repository = Substitute.For<IEmployeeRepository>();
         var handler = new CreateEmployeeCommandHandler(repository);
 
-        // "No phone recorded" is a state several employees may equally be in, so it must not be
-        // compared at all — otherwise the second phone-less employee could never be added.
         var result = await handler.Handle(
-            new CreateEmployeeCommand("EMP-002", "Meera S", null, null, null), CancellationToken.None);
+            new CreateEmployeeCommand("EMP-002", "Meera S", null, "+91 90000 00000", null, new DateOnly(2024, 1, 15), EmploymentType.FullTime), CancellationToken.None);
 
         Assert.True(result.IsSuccess);
-        await repository.DidNotReceive().GetByPhoneNumberAsync(Arg.Any<string>(), Arg.Any<CancellationToken>());
+        Assert.Equal("+91 90000 00000", result.Value.PhoneNumber);
         await repository.Received(1).SaveChangesAsync(Arg.Any<CancellationToken>());
     }
 }

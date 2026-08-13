@@ -86,7 +86,9 @@ export default function CustomersPage() {
         <div className="flex items-start gap-2">
           <ImportExportButtons resource="customers" label="customers" onImported={loadCustomers} />
           <Link href="/dashboard/customers/new">
-            <Button type="button">New Customer</Button>
+            {/* Label is just "New" — the page heading above already says Customers. The aria-label
+                keeps it unambiguous for a screen reader reading controls out of context. */}
+            <Button type="button" aria-label="New customer">New</Button>
           </Link>
         </div>
       </div>

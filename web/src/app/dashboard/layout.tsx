@@ -7,22 +7,83 @@ import { isAuthenticated, clearTokens } from "@/lib/auth";
 import { useBranding } from "@/lib/use-branding";
 import { usePermissions } from "@/lib/use-permissions";
 import { PERMISSIONS } from "@/lib/api/users";
-import { ThemeToggle } from "@/components/theme-toggle";
 
-const NAV_ITEMS = [
+/**
+ * A single navigable screen.
+ *
+ * `permission: null` means everyone signed in may see it. `role` is a second, narrower gate for the
+ * few screens where no permission expresses the rule — Advanced settings is Owner-only because the
+ * permission that would cover it, Settings.Manage, is also held by Managers.
+ */
+type NavLeaf = {
+  href: string;
+  label: string;
+  icon: (props: IconProps) => React.ReactElement;
+  permission: string | null;
+  role?: string;
+};
+
+/** A heading that expands to reveal its children. Groups never navigate anywhere themselves. */
+type NavGroup = {
+  label: string;
+  icon: (props: IconProps) => React.ReactElement;
+  children: NavLeaf[];
+};
+
+type NavEntry = NavLeaf | NavGroup;
+
+const isGroup = (entry: NavEntry): entry is NavGroup => "children" in entry;
+
+/**
+ * The nav, in the order the shop asked for.
+ *
+ * Branding is deliberately absent. The feature is not removed — the shop name, logo and colour it
+ * stores are still applied on every screen and on invoices, and /dashboard/branding still answers —
+ * it is simply not on offer yet, so it is not in the menu.
+ */
+const NAV_ITEMS: NavEntry[] = [
   { href: "/dashboard", label: "Dashboard", icon: DashboardIcon, permission: null },
-  { href: "/dashboard/customers", label: "Customers", icon: CustomersIcon, permission: PERMISSIONS.customersView },
-  { href: "/dashboard/employees", label: "Employees", icon: EmployeesIcon, permission: PERMISSIONS.employeesView },
   { href: "/dashboard/orders", label: "Orders", icon: OrdersIcon, permission: PERMISSIONS.ordersView },
+  { href: "/dashboard/customers", label: "Customers", icon: CustomersIcon, permission: PERMISSIONS.customersView },
   { href: "/dashboard/invoices", label: "Invoices", icon: InvoicesIcon, permission: PERMISSIONS.invoicesView },
-  { href: "/dashboard/whatsapp", label: "WhatsApp", icon: WhatsAppIcon, permission: PERMISSIONS.whatsAppView },
+  {
+    label: "Inventory",
+    icon: InventoryIcon,
+    children: [
+      { href: "/dashboard/price-detail", label: "Price Details", icon: PriceDetailIcon, permission: PERMISSIONS.pricingView },
+      // "Cloth Receipts", not "Inventory": a child sharing its parent's name told the reader nothing,
+      // and recording what arrived is what the screen actually does.
+      { href: "/dashboard/inventory", label: "Cloth Receipts", icon: ReceiptIcon, permission: PERMISSIONS.inventoryView },
+      { href: "/dashboard/stock", label: "Stock Details", icon: StockIcon, permission: PERMISSIONS.inventoryView },
+    ],
+  },
   { href: "/dashboard/reports", label: "Reports", icon: ReportsIcon, permission: PERMISSIONS.reportsView },
-  { href: "/dashboard/price-detail", label: "Price Detail", icon: PriceDetailIcon, permission: PERMISSIONS.pricingView },
-  { href: "/dashboard/activity", label: "Activity Log", icon: ActivityIcon, permission: PERMISSIONS.activityView },
-  { href: "/dashboard/users", label: "Users", icon: UsersIcon, permission: PERMISSIONS.usersView },
-  { href: "/dashboard/branding", label: "Branding", icon: BrandingIcon, permission: PERMISSIONS.settingsView },
-  { href: "/dashboard/settings", label: "Settings", icon: SettingsIcon, permission: PERMISSIONS.settingsView },
-] as const;
+  { href: "/dashboard/whatsapp", label: "WhatsApp", icon: WhatsAppIcon, permission: PERMISSIONS.whatsAppView },
+  {
+    label: "User Management",
+    icon: UsersIcon,
+    children: [
+      { href: "/dashboard/employees", label: "Employees", icon: EmployeesIcon, permission: PERMISSIONS.employeesView },
+      { href: "/dashboard/users", label: "Users", icon: UsersIcon, permission: PERMISSIONS.usersView },
+      // Users.Manage, matching the API: the role-permission endpoints are guarded by it so that a
+      // Manager holding Settings.Manage cannot grant themselves the right to hand out access.
+      { href: "/dashboard/user-rights", label: "User Rights", icon: ShieldIcon, permission: PERMISSIONS.usersManage },
+      { href: "/dashboard/activity", label: "Activity Log", icon: ActivityIcon, permission: PERMISSIONS.activityView },
+    ],
+  },
+  {
+    label: "Settings",
+    icon: SettingsIcon,
+    children: [
+      { href: "/dashboard/settings/order-duration", label: "Order Duration", icon: ClockIcon, permission: PERMISSIONS.settingsView },
+      { href: "/dashboard/settings/measurement-templates", label: "Measurement Templates", icon: RulerIcon, permission: PERMISSIONS.settingsView },
+      // No permission at all: Front Desk and Tailor hold no Settings.View, and the theme toggle no
+      // longer sits in the header, so gating this would leave them unable to change it anywhere.
+      { href: "/dashboard/settings/appearance", label: "Appearance", icon: ThemeIcon, permission: null },
+      { href: "/dashboard/settings/advanced", label: "Advanced", icon: TerminalIcon, permission: PERMISSIONS.settingsView, role: "Owner" },
+    ],
+  },
+];
 
 /**
  * The dashboard shell: left nav rail + header + content area (00_MASTER_SPEC.md § 9.6 Page
@@ -39,10 +100,14 @@ export default function DashboardLayout({ children }: LayoutProps<"/dashboard">)
   // mobile or collapse the desktop rail by default — both wrong.
   const [isDrawerOpen, setIsDrawerOpen] = useState(false);
   const [isCollapsed, setIsCollapsed] = useState(false);
+  // Which groups the user has opened by hand. A group holding the current page is always shown open
+  // regardless, so this only records deliberate opening and closing — it starts empty rather than
+  // pre-seeded, which would fight the auto-open below on the very first render.
+  const [openGroups, setOpenGroups] = useState<Record<string, boolean>>({});
   // Also applies the shop's colour to the theme's CSS variables, which is why it lives in the
   // shell rather than on the Branding page — every screen inside gets it.
   const branding = useBranding();
-  const { isLoaded: permissionsLoaded, can } = usePermissions();
+  const { user, isLoaded: permissionsLoaded, can } = usePermissions();
 
   useEffect(() => {
     // Deliberately not `useSyncExternalStore`: this value has no valid server snapshot
@@ -67,43 +132,40 @@ export default function DashboardLayout({ children }: LayoutProps<"/dashboard">)
     return null;
   }
 
-  const navItems = permissionsLoaded
-    ? NAV_ITEMS.filter((item) => item.permission === null || can(item.permission))
+  const roles = user?.roles ?? [];
+  const allows = (leaf: NavLeaf) =>
+    (leaf.permission === null || can(leaf.permission)) &&
+    (leaf.role === undefined || roles.includes(leaf.role));
+
+  // A group survives only if at least one of its children does, so nobody is offered a heading that
+  // opens onto nothing. The children are filtered too, not just counted — a Manager's User
+  // Management holds Employees, Users and Activity Log, but not User Rights.
+  const navItems: NavEntry[] = permissionsLoaded
+    ? NAV_ITEMS.flatMap((entry): NavEntry[] => {
+        if (!isGroup(entry)) {
+          return allows(entry) ? [entry] : [];
+        }
+        const children = entry.children.filter(allows);
+        return children.length > 0 ? [{ ...entry, children }] : [];
+      })
     : [];
 
-  const activeLabel = NAV_ITEMS.find(({ href }) =>
-    href === "/dashboard" ? pathname === href : pathname?.startsWith(href),
-  )?.label ?? "Dashboard";
+  const isCurrent = (href: string) =>
+    href === "/dashboard" ? pathname === href : pathname?.startsWith(href) ?? false;
 
-  // The New Order page has its own immersive theme (a fixed dark skin, independent of the
-  // ThemeToggle) plus its own heading and "Back to orders" link — the shared breadcrumb and
-  // theme toggle would be redundant chrome there, and the theme toggle would visibly do nothing.
-  // The nav controls are *not* redundant though: without them that page is the one screen with
-  // no way to collapse the rail or open the drawer, so they are kept on their own slim bar.
-  const chromeless = pathname === "/dashboard/orders/new";
-
-  const navToggles = (
-    <div className="flex items-center gap-3">
-      {/* Two buttons rather than one, each shown at the size it belongs to — CSS decides
-          which, so neither needs to guess the viewport before the first paint. */}
-      <button
-        type="button"
-        onClick={() => setIsDrawerOpen(true)}
-        aria-label="Open navigation"
-        className="-ml-2 rounded-md p-2 text-foreground/65 transition-colors hover:bg-surface-hover hover:text-foreground lg:hidden"
-      >
-        <MenuIcon className="h-5 w-5" />
-      </button>
-      <button
-        type="button"
-        onClick={() => setIsCollapsed((collapsed) => !collapsed)}
-        aria-label={isCollapsed ? "Expand navigation" : "Collapse navigation"}
-        aria-pressed={isCollapsed}
-        className="-ml-2 hidden rounded-md p-2 text-foreground/65 transition-colors hover:bg-surface-hover hover:text-foreground lg:block"
-      >
-        <MenuIcon className="h-5 w-5" />
-      </button>
-    </div>
+  // Below lg the rail is off-canvas, so a control placed inside it would be unreachable precisely
+  // when it is needed — this button is the only way back to the nav, which is why it survives the
+  // header being gone. The desktop collapse toggle has no such problem and sits in the rail itself,
+  // next to the shop name.
+  const drawerToggle = (
+    <button
+      type="button"
+      onClick={() => setIsDrawerOpen(true)}
+      aria-label="Open navigation"
+      className="-ml-2 rounded-md p-2 text-foreground/65 transition-colors hover:bg-surface-hover hover:text-foreground lg:hidden"
+    >
+      <MenuIcon className="h-5 w-5" />
+    </button>
   );
 
   return (
@@ -122,43 +184,110 @@ export default function DashboardLayout({ children }: LayoutProps<"/dashboard">)
           isDrawerOpen ? "w-60 translate-x-0" : "w-60 -translate-x-full"
         } ${isCollapsed ? "lg:w-16" : "lg:w-60"}`}
       >
-        <Link
-          href="/dashboard"
-          className="flex items-center gap-2.5 whitespace-nowrap border-b border-border px-5 py-4 text-sm font-semibold"
+        {/* Brand row doubles as the collapse control's home. Collapsed, the rail is only 4rem wide
+            — too narrow for logo and button side by side — so the brand link steps aside and the
+            toggle centres, staying the one visible affordance for expanding again. */}
+        <div
+          className={`flex items-center gap-2 border-b border-border px-5 py-4 ${
+            isCollapsed ? "lg:justify-center lg:px-2" : ""
+          }`}
         >
-          {branding.logoUrl ? (
-            // eslint-disable-next-line @next/next/no-img-element -- an arbitrary shop-supplied URL can't be known to next/image at build time
-            <img src={branding.logoUrl} alt="" className="h-7 w-7 shrink-0 rounded-md object-contain" />
-          ) : (
-            <span className="flex h-7 w-7 shrink-0 items-center justify-center rounded-md bg-primary text-xs font-bold text-primary-foreground">
-              {(branding.shopName || "Mathilens").charAt(0).toUpperCase()}
-            </span>
-          )}
-          <span className={isCollapsed ? "lg:hidden" : ""}>{branding.shopName || "Mathilens ERP"}</span>
-        </Link>
-        <nav className="flex flex-1 flex-col gap-0.5 px-3 py-4 text-sm">
+          <Link
+            href="/dashboard"
+            className={`flex min-w-0 items-center gap-2.5 whitespace-nowrap text-sm font-semibold ${
+              isCollapsed ? "lg:hidden" : "flex-1"
+            }`}
+          >
+            {branding.logoUrl ? (
+              // eslint-disable-next-line @next/next/no-img-element -- an arbitrary shop-supplied URL can't be known to next/image at build time
+              <img src={branding.logoUrl} alt="" className="h-7 w-7 shrink-0 rounded-md object-contain" />
+            ) : (
+              <span className="flex h-7 w-7 shrink-0 items-center justify-center rounded-md bg-primary text-xs font-bold text-primary-foreground">
+                {(branding.shopName || "Mathilens").charAt(0).toUpperCase()}
+              </span>
+            )}
+            <span className={isCollapsed ? "lg:hidden" : ""}>{branding.shopName || "Mathilens ERP"}</span>
+          </Link>
+          <button
+            type="button"
+            onClick={() => setIsCollapsed((collapsed) => !collapsed)}
+            aria-label={isCollapsed ? "Expand navigation" : "Collapse navigation"}
+            aria-pressed={isCollapsed}
+            title={isCollapsed ? "Expand navigation" : "Collapse navigation"}
+            className="hidden shrink-0 rounded-md p-2 text-foreground/65 transition-colors hover:bg-surface-hover hover:text-foreground lg:block"
+          >
+            <MenuIcon className="h-5 w-5" />
+          </button>
+        </div>
+        <nav className="flex flex-1 flex-col gap-0.5 overflow-y-auto px-3 py-4 text-sm">
           {/* Nothing is shown until /me has answered — briefly rendering links the user turns out
               not to have would be worse than a moment of an empty rail. */}
-          {navItems.map(({ href, label, icon: Icon }) => {
-            const isActive =
-              href === "/dashboard" ? pathname === href : pathname?.startsWith(href);
+          {navItems.map((entry) => {
+            if (!isGroup(entry)) {
+              return (
+                <NavLink
+                  key={entry.href}
+                  leaf={entry}
+                  isActive={isCurrent(entry.href)}
+                  isCollapsed={isCollapsed}
+                  onNavigate={() => setIsDrawerOpen(false)}
+                />
+              );
+            }
+
+            const holdsCurrentPage = entry.children.some((child) => isCurrent(child.href));
+            // Open when it holds the page you are on, whatever you last clicked — otherwise landing
+            // on Stock Details by link would leave its own group shut around it.
+            const isOpen = openGroups[entry.label] ?? holdsCurrentPage;
+            const GroupIcon = entry.icon;
+
             return (
-              <Link
-                key={href}
-                href={href}
-                // Navigating on a phone should get the drawer out of the way, not leave it
-                // covering the page the user just asked for.
-                onClick={() => setIsDrawerOpen(false)}
-                title={isCollapsed ? label : undefined}
-                className={`flex items-center gap-3 rounded-md px-3 py-2 transition-colors ${
-                  isActive
-                    ? "bg-primary/10 font-medium text-primary"
-                    : "text-foreground/65 hover:bg-surface-hover hover:text-foreground"
-                }`}
-              >
-                <Icon className="h-4 w-4 shrink-0" />
-                <span className={isCollapsed ? "lg:hidden" : ""}>{label}</span>
-              </Link>
+              <div key={entry.label} className="flex flex-col gap-0.5">
+                <button
+                  type="button"
+                  onClick={() => {
+                    // Collapsed, the labels are hidden, so opening a group in place would reveal a
+                    // list of nameless icons. Expand the rail first and open the group with it.
+                    if (isCollapsed) {
+                      setIsCollapsed(false);
+                      setOpenGroups((open) => ({ ...open, [entry.label]: true }));
+                      return;
+                    }
+                    setOpenGroups((open) => ({ ...open, [entry.label]: !isOpen }));
+                  }}
+                  aria-expanded={isCollapsed ? false : isOpen}
+                  title={isCollapsed ? entry.label : undefined}
+                  className={`flex items-center gap-3 rounded-md px-3 py-2 text-left transition-colors ${
+                    holdsCurrentPage
+                      ? "font-medium text-foreground"
+                      : "text-foreground/65 hover:bg-surface-hover hover:text-foreground"
+                  }`}
+                >
+                  <GroupIcon className="h-4 w-4 shrink-0" />
+                  <span className={`flex-1 ${isCollapsed ? "lg:hidden" : ""}`}>{entry.label}</span>
+                  <ChevronIcon
+                    className={`h-3.5 w-3.5 shrink-0 transition-transform ${isOpen ? "rotate-90" : ""} ${
+                      isCollapsed ? "lg:hidden" : ""
+                    }`}
+                  />
+                </button>
+
+                {isOpen && !isCollapsed && (
+                  // Indented and ruled, so a child reads as belonging to the heading above it
+                  // rather than as another top-level entry that happens to be lower down.
+                  <div className="ml-5 flex flex-col gap-0.5 border-l border-border pl-2">
+                    {entry.children.map((child) => (
+                      <NavLink
+                        key={child.href}
+                        leaf={child}
+                        isActive={isCurrent(child.href)}
+                        isCollapsed={false}
+                        onNavigate={() => setIsDrawerOpen(false)}
+                      />
+                    ))}
+                  </div>
+                )}
+              </div>
             );
           })}
         </nav>
@@ -174,24 +303,118 @@ export default function DashboardLayout({ children }: LayoutProps<"/dashboard">)
         </div>
       </aside>
       <div className="flex min-h-full flex-1 flex-col">
-        {chromeless ? (
-          <div className="flex shrink-0 items-center px-6 pt-4 print:hidden">{navToggles}</div>
-        ) : (
-          <header className="sticky top-0 z-10 flex h-14 shrink-0 items-center justify-between border-b border-border bg-surface/80 px-6 backdrop-blur-sm print:hidden">
-            <div className="flex items-center gap-3">
-              {navToggles}
-              <span className="text-sm font-medium text-foreground/70">{activeLabel}</span>
-            </div>
-            <ThemeToggle />
-          </header>
-        )}
+        {/*
+          No header bar. It carried a breadcrumb repeating the heading each page already prints, and
+          an appearance toggle that now lives in Settings — the one control that could not go is the
+          drawer opener, so it stays on its own.
+
+          Small screens only: on a desktop the rail is always on-screen and carries its own collapse
+          toggle, so this would be an empty strip of padding above the page heading.
+        */}
+        <div className="flex shrink-0 items-center px-6 pt-4 print:hidden lg:hidden">{drawerToggle}</div>
         <main className="flex-1 px-6 py-6">{children}</main>
       </div>
     </div>
   );
 }
 
+/** One nav row. Shared by top-level entries and group children, which differ only in indentation. */
+function NavLink({
+  leaf,
+  isActive,
+  isCollapsed,
+  onNavigate,
+}: {
+  leaf: NavLeaf;
+  isActive: boolean;
+  isCollapsed: boolean;
+  onNavigate: () => void;
+}) {
+  const Icon = leaf.icon;
+  return (
+    <Link
+      href={leaf.href}
+      // Navigating on a phone should get the drawer out of the way, not leave it covering the page
+      // the user just asked for.
+      onClick={onNavigate}
+      title={isCollapsed ? leaf.label : undefined}
+      className={`flex items-center gap-3 rounded-md px-3 py-2 transition-colors ${
+        isActive
+          ? "bg-primary/10 font-medium text-primary"
+          : "text-foreground/65 hover:bg-surface-hover hover:text-foreground"
+      }`}
+    >
+      <Icon className="h-4 w-4 shrink-0" />
+      <span className={isCollapsed ? "lg:hidden" : ""}>{leaf.label}</span>
+    </Link>
+  );
+}
+
 type IconProps = { className?: string };
+
+function ChevronIcon({ className }: IconProps) {
+  return (
+    <svg className={className} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+      <path d="m9 18 6-6-6-6" />
+    </svg>
+  );
+}
+
+/** A docket — what a delivery of cloth is recorded on. */
+function ReceiptIcon({ className }: IconProps) {
+  return (
+    <svg className={className} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+      <path d="M5 3v18l2.5-1.6L10 21l2-1.6L14 21l2.5-1.6L19 21V3H5Z" />
+      <path d="M9 8h6M9 12h6" />
+    </svg>
+  );
+}
+
+function ShieldIcon({ className }: IconProps) {
+  return (
+    <svg className={className} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+      <path d="M12 3l7 3v6c0 4.4-3 7.9-7 9-4-1.1-7-4.6-7-9V6l7-3Z" />
+      <path d="m9 12 2 2 4-4" />
+    </svg>
+  );
+}
+
+function ClockIcon({ className }: IconProps) {
+  return (
+    <svg className={className} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+      <circle cx="12" cy="12" r="9" />
+      <path d="M12 7v5l3 2" />
+    </svg>
+  );
+}
+
+function RulerIcon({ className }: IconProps) {
+  return (
+    <svg className={className} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+      <rect x="2" y="8" width="20" height="8" rx="1.5" />
+      <path d="M7 8v3M12 8v4M17 8v3" />
+    </svg>
+  );
+}
+
+/** Half-lit disc — the usual shorthand for a light/dark choice. */
+function ThemeIcon({ className }: IconProps) {
+  return (
+    <svg className={className} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+      <circle cx="12" cy="12" r="9" />
+      <path d="M12 3a9 9 0 0 0 0 18Z" fill="currentColor" stroke="none" />
+    </svg>
+  );
+}
+
+function TerminalIcon({ className }: IconProps) {
+  return (
+    <svg className={className} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+      <rect x="3" y="4" width="18" height="16" rx="2" />
+      <path d="m7 9 3 3-3 3M13 15h4" />
+    </svg>
+  );
+}
 
 function UsersIcon({ className }: IconProps) {
   return (
@@ -199,17 +422,6 @@ function UsersIcon({ className }: IconProps) {
       <path d="M16 21v-2a4 4 0 0 0-4-4H6a4 4 0 0 0-4 4v2" />
       <circle cx="9" cy="7" r="4" />
       <path d="M22 21v-2a4 4 0 0 0-3-3.87M16 3.13a4 4 0 0 1 0 7.75" />
-    </svg>
-  );
-}
-
-function BrandingIcon({ className }: IconProps) {
-  return (
-    <svg className={className} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
-      <circle cx="13.5" cy="6.5" r="2.5" />
-      <circle cx="6.5" cy="12" r="2.5" />
-      <circle cx="17" cy="14" r="2.5" />
-      <path d="M12 22a10 10 0 1 1 10-10c0 2-1.5 3-3 3h-2a3 3 0 0 0-3 3 3 3 0 0 1-2 4Z" />
     </svg>
   );
 }
@@ -306,6 +518,30 @@ function PriceDetailIcon({ className }: IconProps) {
     <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" className={className}>
       <path d="M12 3h6a2 2 0 0 1 2 2v6l-9.3 9.3a1 1 0 0 1-1.4 0L3 14a1 1 0 0 1 0-1.4L12 3Z" />
       <circle cx="16.5" cy="7.5" r="1.5" />
+    </svg>
+  );
+}
+
+/** A stack of folded bolts of cloth — inventory here means what is on the shelf, not a warehouse. */
+function InventoryIcon({ className }: IconProps) {
+  return (
+    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className={className} aria-hidden="true">
+      <rect x="3" y="4" width="18" height="5" rx="1" />
+      <rect x="3" y="10" width="18" height="5" rx="1" />
+      <rect x="3" y="16" width="18" height="4" rx="1" />
+      <path d="M8 4v5M14 10v5" />
+    </svg>
+  );
+}
+
+/** Bars at differing heights — a quantity per item, which is what this screen is. */
+function StockIcon({ className }: IconProps) {
+  return (
+    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className={className} aria-hidden="true">
+      <path d="M3 21h18" />
+      <rect x="5" y="12" width="4" height="6" rx="1" />
+      <rect x="11" y="8" width="4" height="10" rx="1" />
+      <rect x="17" y="14" width="4" height="4" rx="1" />
     </svg>
   );
 }

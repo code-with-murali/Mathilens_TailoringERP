@@ -19,7 +19,7 @@ public sealed class SearchActivityLogsQueryHandler : IQueryHandler<SearchActivit
             query.FromUtc, query.ToUtc, query.UserId, query.Screen, query.Page, query.PageSize, cancellationToken);
 
         var items = page.Items
-            .Select(a => new ActivityLogDto(a.Id, a.UserId, a.UserName, a.Screen, a.Action, a.RequestName, a.OccurredAtUtc))
+            .Select(a => new ActivityLogDto(a.Id, a.UserId, a.UserName, a.Screen, a.Action, a.RequestName, a.Description, a.OccurredAtUtc))
             .ToList();
 
         return new PagedResult<ActivityLogDto>(items, page.Page, page.PageSize, page.TotalCount);

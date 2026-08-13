@@ -38,7 +38,16 @@ public sealed class ImportEmployeesCommandHandler : ICommandHandler<ImportEmploy
         foreach (var row in command.Rows)
         {
             // Reuses the create command's rules so the spreadsheet and the form can never drift apart.
-            var candidate = new CreateEmployeeCommand(row.EmployeeCode, row.FullName, row.JobTitle, row.PhoneNumber, row.Email);
+            //
+            // The sheet carries no joining date or employment type, so imported rows take today and
+            // Full time. Both are editable afterwards on the employee's own screen; the alternative
+            // — failing every row for a column the shop's existing sheets do not have — would make
+            // the importer useless for exactly the bulk load it exists for.
+            var joiningDate = DateOnly.FromDateTime(DateTime.UtcNow);
+            const EmploymentType employmentType = EmploymentType.FullTime;
+
+            var candidate = new CreateEmployeeCommand(
+                row.EmployeeCode, row.FullName, row.JobTitle, row.PhoneNumber, row.Email, joiningDate, employmentType);
             var validation = await _rowValidator.ValidateAsync(candidate, cancellationToken);
             if (!validation.IsValid)
             {
@@ -62,14 +71,19 @@ public sealed class ImportEmployeesCommandHandler : ICommandHandler<ImportEmploy
 
                 if (existing is null)
                 {
-                    var employee = Employee.Create(row.EmployeeCode, row.FullName, row.JobTitle, row.PhoneNumber, row.Email);
+                    var employee = Employee.Create(
+                        row.EmployeeCode, row.FullName, row.JobTitle, row.PhoneNumber, row.Email, joiningDate, employmentType);
                     _employeeRepository.Add(employee);
                     addedThisBatch[row.EmployeeCode.Trim()] = employee;
                     created++;
                 }
                 else
                 {
-                    existing.UpdateDetails(row.EmployeeCode, row.FullName, row.JobTitle, row.PhoneNumber, row.Email);
+                    // An existing employee keeps the joining date and employment type already on
+                    // file — the sheet does not carry them, so it must not overwrite them.
+                    existing.UpdateDetails(
+                        row.EmployeeCode, row.FullName, row.JobTitle, row.PhoneNumber, row.Email,
+                        existing.JoiningDate, existing.EmploymentType);
                     updated++;
                 }
             }

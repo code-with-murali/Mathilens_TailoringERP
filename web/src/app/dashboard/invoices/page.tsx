@@ -123,7 +123,7 @@ export default function InvoicesPage() {
             onChange={(e) => handleStatusChange(e.target.value)}
             className={`max-w-xs ${fieldClassName}`}
           >
-            <option value="">All statuses</option>
+            <option value="">All Status</option>
             {INVOICE_STATUSES.map((s) => (
               <option key={s} value={s}>
                 {s}

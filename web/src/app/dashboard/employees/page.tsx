@@ -5,13 +5,18 @@ import Link from "next/link";
 import { Button } from "@/components/ui/Button";
 import { Input } from "@/components/ui/Input";
 import { DEFAULT_PAGE_SIZE, Pagination } from "@/components/ui/Pagination";
-import { ConfirmDialog } from "@/components/ui/ConfirmDialog";
 import { ImportExportButtons } from "@/components/ui/ImportExportButtons";
 import { useToast } from "@/components/ui/ToastProvider";
 import { useDebouncedValue } from "@/lib/use-debounced-value";
 import { getAccessToken } from "@/lib/auth";
 import { ApiError, type PaginationMeta } from "@/lib/api-client";
-import { searchEmployees, deleteEmployee, type Employee } from "@/lib/api/employees";
+import { searchEmployees, retireEmployee, EMPLOYMENT_TYPE_LABELS, type Employee } from "@/lib/api/employees";
+
+/** yyyy-MM-dd off the local calendar — a last working day is a day in the shop, not a UTC instant. */
+function todayIsoDate(): string {
+  const now = new Date();
+  return `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, "0")}-${String(now.getDate()).padStart(2, "0")}`;
+}
 
 
 export default function EmployeesPage() {
@@ -24,8 +29,11 @@ export default function EmployeesPage() {
   const [meta, setMeta] = useState<PaginationMeta | null>(null);
   const [isLoading, setIsLoading] = useState(true);
   const [loadError, setLoadError] = useState<string | null>(null);
-  const [pendingDelete, setPendingDelete] = useState<Employee | null>(null);
-  const [isDeleting, setIsDeleting] = useState(false);
+  // Employees are retired, never deleted: their order history has to stay readable, and their
+  // code and phone stay theirs so an old job card still resolves to the right person.
+  const [pendingRetire, setPendingRetire] = useState<Employee | null>(null);
+  const [lastWorkingDate, setLastWorkingDate] = useState(todayIsoDate);
+  const [isRetiring, setIsRetiring] = useState(false);
 
   const loadEmployees = useCallback(async () => {
     setIsLoading(true);
@@ -53,21 +61,32 @@ export default function EmployeesPage() {
     setPage(1);
   }
 
-  async function handleConfirmDelete() {
-    if (!pendingDelete) {
+  async function handleConfirmRetire() {
+    if (!pendingRetire) {
       return;
     }
 
-    setIsDeleting(true);
+    setIsRetiring(true);
     try {
-      await deleteEmployee(pendingDelete.id, getAccessToken());
-      showToast("Employee deleted.");
-      setPendingDelete(null);
+      await retireEmployee(pendingRetire.id, lastWorkingDate, getAccessToken());
+      showToast(`${pendingRetire.fullName} retired.`);
+      setPendingRetire(null);
       await loadEmployees();
     } catch (error) {
-      showToast(error instanceof ApiError ? error.message : "Unable to delete this employee.", "error");
+      // The server refuses a date before their joining date — its message says so, show it as-is.
+      showToast(error instanceof ApiError ? error.message : "Unable to retire this employee.", "error");
     } finally {
-      setIsDeleting(false);
+      setIsRetiring(false);
+    }
+  }
+
+  async function handleReturnToWork(employee: Employee) {
+    try {
+      await retireEmployee(employee.id, null, getAccessToken());
+      showToast(`${employee.fullName} is back on the active roster.`);
+      await loadEmployees();
+    } catch (error) {
+      showToast(error instanceof ApiError ? error.message : "Unable to update this employee.", "error");
     }
   }
 
@@ -78,7 +97,9 @@ export default function EmployeesPage() {
         <div className="flex items-start gap-2">
           <ImportExportButtons resource="employees" label="employees" onImported={loadEmployees} />
           <Link href="/dashboard/employees/new">
-            <Button type="button">New Employee</Button>
+            {/* Label is just "New" — the page heading above already says Employees. The aria-label
+                keeps it unambiguous for a screen reader reading controls out of context. */}
+            <Button type="button" aria-label="New employee">New</Button>
           </Link>
         </div>
       </div>
@@ -108,6 +129,9 @@ export default function EmployeesPage() {
                 <th className="px-4 py-3 font-medium">Name</th>
                 <th className="px-4 py-3 font-medium">Job Title</th>
                 <th className="px-4 py-3 font-medium">Phone</th>
+                <th className="px-4 py-3 font-medium">Type</th>
+                <th className="px-4 py-3 font-medium">Joined</th>
+                <th className="px-4 py-3 font-medium">Status</th>
                 <th className="px-4 py-3 font-medium">
                   <span className="sr-only">Actions</span>
                 </th>
@@ -119,19 +143,48 @@ export default function EmployeesPage() {
                   <td className="px-4 py-3 font-mono">{employee.employeeCode}</td>
                   <td className="px-4 py-3">{employee.fullName}</td>
                   <td className="px-4 py-3">{employee.jobTitle ?? "—"}</td>
-                  <td className="px-4 py-3">{employee.phoneNumber ?? "—"}</td>
+                  <td className="px-4 py-3">{employee.phoneNumber}</td>
+                  <td className="px-4 py-3 whitespace-nowrap">{EMPLOYMENT_TYPE_LABELS[employee.employmentType]}</td>
+                  <td className="px-4 py-3 whitespace-nowrap">
+                    {new Date(`${employee.joiningDate}T00:00:00Z`).toLocaleDateString()}
+                  </td>
+                  <td className="px-4 py-3 whitespace-nowrap">
+                    {employee.isActive ? (
+                      <span className="text-success">Active</span>
+                    ) : (
+                      <span className="text-foreground/60">
+                        Retired {new Date(`${employee.lastWorkingDate}T00:00:00Z`).toLocaleDateString()}
+                      </span>
+                    )}
+                  </td>
                   <td className="px-4 py-3">
                     <div className="flex justify-end gap-3">
+                      <Link href={`/dashboard/employee/${employee.id}`} className="text-foreground/70 hover:text-foreground">
+                        View
+                      </Link>
                       <Link href={`/dashboard/employees/${employee.id}`} className="text-foreground/70 hover:text-foreground">
                         Edit
                       </Link>
-                      <button
-                        type="button"
-                        onClick={() => setPendingDelete(employee)}
-                        className="text-danger hover:text-danger-hover"
-                      >
-                        Delete
-                      </button>
+                      {employee.isActive ? (
+                        <button
+                          type="button"
+                          onClick={() => {
+                            setPendingRetire(employee);
+                            setLastWorkingDate(todayIsoDate());
+                          }}
+                          className="text-foreground/70 hover:text-foreground"
+                        >
+                          Retire
+                        </button>
+                      ) : (
+                        <button
+                          type="button"
+                          onClick={() => handleReturnToWork(employee)}
+                          className="text-foreground/70 hover:text-foreground"
+                        >
+                          Return to work
+                        </button>
+                      )}
                     </div>
                   </td>
                 </tr>
@@ -150,14 +203,45 @@ export default function EmployeesPage() {
           }}
         />}
 
-      <ConfirmDialog
-        open={pendingDelete !== null}
-        title="Delete employee"
-        description={pendingDelete ? `Are you sure you want to delete ${pendingDelete.fullName}? This cannot be undone.` : ""}
-        isConfirming={isDeleting}
-        onConfirm={handleConfirmDelete}
-        onCancel={() => setPendingDelete(null)}
-      />
+      {/* Retiring needs a date, which a plain confirm dialog cannot ask for. */}
+      {pendingRetire && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 p-4">
+          <div role="dialog" aria-modal="true" aria-labelledby="retireTitle" className="w-full max-w-md rounded-lg border border-border bg-surface p-6">
+            <h2 id="retireTitle" className="text-lg font-semibold">
+              Retire {pendingRetire.fullName}
+            </h2>
+            <p className="mt-1 text-sm text-foreground/70">
+              Records their last working day. Their record and order history stay — this only takes them off the list
+              for new work, and it can be undone.
+            </p>
+            <div className="mt-4 flex flex-col gap-1">
+              <label htmlFor="retireDate" className="text-sm font-medium">
+                Last working date
+              </label>
+              <input
+                id="retireDate"
+                type="date"
+                value={lastWorkingDate}
+                min={pendingRetire.joiningDate}
+                onChange={(e) => setLastWorkingDate(e.target.value)}
+                className="rounded-md border border-border bg-surface px-3 py-2 text-sm outline-none transition-colors focus:border-primary focus:ring-2 focus:ring-primary/25"
+              />
+            </div>
+            <div className="mt-6 flex justify-end gap-3">
+              <button
+                type="button"
+                onClick={() => setPendingRetire(null)}
+                className="text-sm text-foreground/70 hover:text-foreground"
+              >
+                Cancel
+              </button>
+              <Button type="button" onClick={handleConfirmRetire} disabled={isRetiring}>
+                {isRetiring ? "Saving…" : "Retire"}
+              </Button>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 }

@@ -1,4 +1,6 @@
 using MathilensERP.Application.Activity;
+using MathilensERP.Application.Auth.Commands.Login;
+using MathilensERP.Application.Auth.Commands.RefreshAccessToken;
 using MathilensERP.Application.Common.Behaviors;
 using MathilensERP.Application.Common.Interfaces;
 using MathilensERP.Application.Customers;
@@ -71,6 +73,39 @@ public class ActivityLogBehaviorTests
             CancellationToken.None);
 
         await _repository.DidNotReceive().AddAsync(Arg.Any<ActivityLog>(), Arg.Any<CancellationToken>());
+    }
+
+    [Fact]
+    public async Task Handle_WithAnUnloggedCommand_RecordsNothing()
+    {
+        // The browser redeems a refresh token on its own whenever the access token lapses. Logging
+        // it filled the trail with entries no person performed, drowning the ones that matter.
+        var behavior = Behavior<RefreshAccessTokenCommand, Result<AuthTokensDto>>();
+
+        await behavior.Handle(
+            new RefreshAccessTokenCommand("a-refresh-token"),
+            () => Task.FromResult(Result.Success(new AuthTokensDto("access", "refresh", DateTime.UtcNow.AddMinutes(15)))),
+            CancellationToken.None);
+
+        await _repository.DidNotReceive().AddAsync(Arg.Any<ActivityLog>(), Arg.Any<CancellationToken>());
+    }
+
+    [Fact]
+    public async Task Handle_WithASignIn_StillRecordsIt()
+    {
+        _currentUserService.UserName.Returns("asha@shop.example");
+        var behavior = Behavior<LoginCommand, Result<AuthTokensDto>>();
+
+        await behavior.Handle(
+            new LoginCommand("asha@shop.example", "Passw0rd123"),
+            () => Task.FromResult(Result.Success(new AuthTokensDto("access", "refresh", DateTime.UtcNow.AddMinutes(15)))),
+            CancellationToken.None);
+
+        // Exempting the automatic refresh must not quietly exempt sign-in, which is a real event
+        // with a person behind it and the first thing anyone looks for in an audit trail.
+        await _repository.Received(1).AddAsync(
+            Arg.Is<ActivityLog>(a => a != null && a.Screen == "Auth" && a.Action == "Login"),
+            Arg.Any<CancellationToken>());
     }
 
     [Fact]

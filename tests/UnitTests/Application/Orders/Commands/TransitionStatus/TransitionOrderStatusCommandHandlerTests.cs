@@ -14,7 +14,7 @@ public class TransitionOrderStatusCommandHandlerTests
     [Fact]
     public async Task Handle_WithValidTransition_UpdatesStatus()
     {
-        var order = Order.Create(Guid.NewGuid(), DateTime.UtcNow, null);
+        var order = Order.Create(Guid.NewGuid(), DateTime.UtcNow, Guid.NewGuid());
         _orderRepository.GetByIdAsync(order.Id, Arg.Any<CancellationToken>()).Returns(order);
         var handler = new TransitionOrderStatusCommandHandler(_orderRepository, _invoiceRepository);
 
@@ -23,6 +23,22 @@ public class TransitionOrderStatusCommandHandlerTests
         Assert.True(result.IsSuccess);
         Assert.Equal(OrderStatus.InProgress, result.Value.Status);
         await _orderRepository.Received(1).SaveChangesAsync(Arg.Any<CancellationToken>());
+    }
+
+    [Fact]
+    public async Task Handle_StartingWorkWithNoEmployeeAssigned_ReturnsConflict()
+    {
+        var order = Order.Create(Guid.NewGuid(), DateTime.UtcNow, null);
+        _orderRepository.GetByIdAsync(order.Id, Arg.Any<CancellationToken>()).Returns(order);
+        var handler = new TransitionOrderStatusCommandHandler(_orderRepository, _invoiceRepository);
+
+        var result = await handler.Handle(new TransitionOrderStatusCommand(order.Id, OrderStatus.InProgress), CancellationToken.None);
+
+        // A Result, not the aggregate's exception — so the API answers 409 rather than 500.
+        Assert.True(result.IsFailure);
+        Assert.Equal("Order.EmployeeRequired", result.Error.Code);
+        Assert.Equal(OrderStatus.Received, order.Status);
+        await _orderRepository.DidNotReceive().SaveChangesAsync(Arg.Any<CancellationToken>());
     }
 
     [Fact]
@@ -102,7 +118,7 @@ public class TransitionOrderStatusCommandHandlerTests
 
     private static Order ReadyForDeliveryOrder()
     {
-        var order = Order.Create(Guid.NewGuid(), DateTime.UtcNow, null);
+        var order = Order.Create(Guid.NewGuid(), DateTime.UtcNow, Guid.NewGuid());
         order.TransitionTo(OrderStatus.InProgress);
         order.TransitionTo(OrderStatus.ReadyForDelivery);
         return order;

@@ -4,7 +4,12 @@ import { useState, type FormEvent } from "react";
 import { Button } from "@/components/ui/Button";
 import { Input } from "@/components/ui/Input";
 import { ApiError } from "@/lib/api-client";
-import type { EmployeeInput } from "@/lib/api/employees";
+import {
+  EMPLOYMENT_TYPES,
+  EMPLOYMENT_TYPE_LABELS,
+  type EmployeeInput,
+  type EmploymentType,
+} from "@/lib/api/employees";
 
 type EmployeeFormProps = {
   initialValues?: EmployeeInput;
@@ -12,7 +17,23 @@ type EmployeeFormProps = {
   onSubmit: (input: EmployeeInput) => Promise<void>;
 };
 
-const emptyValues: EmployeeInput = { employeeCode: "", fullName: "", jobTitle: null, phoneNumber: null, email: null };
+/** yyyy-MM-dd off the local calendar — a joining date is a day in the shop, not a UTC instant. */
+function todayIsoDate(): string {
+  const now = new Date();
+  const month = String(now.getMonth() + 1).padStart(2, "0");
+  const day = String(now.getDate()).padStart(2, "0");
+  return `${now.getFullYear()}-${month}-${day}`;
+}
+
+const emptyValues: EmployeeInput = {
+  employeeCode: "",
+  fullName: "",
+  jobTitle: null,
+  phoneNumber: "",
+  email: null,
+  joiningDate: todayIsoDate(),
+  employmentType: "FullTime",
+};
 
 /** Shared by the create and edit employee pages — preserves user input on validation failure (00_MASTER_SPEC.md § 9.5 Forms). */
 export function EmployeeForm({ initialValues = emptyValues, submitLabel, onSubmit }: EmployeeFormProps) {
@@ -21,6 +42,8 @@ export function EmployeeForm({ initialValues = emptyValues, submitLabel, onSubmi
   const [jobTitle, setJobTitle] = useState(initialValues.jobTitle ?? "");
   const [phoneNumber, setPhoneNumber] = useState(initialValues.phoneNumber ?? "");
   const [email, setEmail] = useState(initialValues.email ?? "");
+  const [joiningDate, setJoiningDate] = useState(initialValues.joiningDate);
+  const [employmentType, setEmploymentType] = useState<EmploymentType>(initialValues.employmentType);
   const [fieldErrors, setFieldErrors] = useState<Record<string, string>>({});
   const [formError, setFormError] = useState<string | null>(null);
   const [isSubmitting, setIsSubmitting] = useState(false);
@@ -36,8 +59,12 @@ export function EmployeeForm({ initialValues = emptyValues, submitLabel, onSubmi
         employeeCode,
         fullName,
         jobTitle: jobTitle.trim() === "" ? null : jobTitle,
-        phoneNumber: phoneNumber.trim() === "" ? null : phoneNumber,
+        // Mandatory, so it is sent as typed — blanking it is a validation error to report, not an
+        // "unanswered" null to store.
+        phoneNumber,
         email: email.trim() === "" ? null : email,
+        joiningDate,
+        employmentType,
       });
     } catch (error) {
       if (error instanceof ApiError) {
@@ -93,6 +120,38 @@ export function EmployeeForm({ initialValues = emptyValues, submitLabel, onSubmi
         onChange={(e) => setEmail(e.target.value)}
         error={fieldErrors.email}
       />
+      <div className="grid gap-4 sm:grid-cols-2">
+        <div className="flex flex-col gap-1">
+          <label htmlFor="joiningDate" className="text-sm font-medium">
+            Joining date
+          </label>
+          <input
+            id="joiningDate"
+            type="date"
+            value={joiningDate}
+            onChange={(e) => setJoiningDate(e.target.value)}
+            className="rounded-md border border-border bg-surface px-3 py-2 text-sm outline-none transition-colors focus:border-primary focus:ring-2 focus:ring-primary/25"
+          />
+          {fieldErrors.joiningdate && <p className="text-sm text-danger">{fieldErrors.joiningdate}</p>}
+        </div>
+        <div className="flex flex-col gap-1">
+          <label htmlFor="employmentType" className="text-sm font-medium">
+            Employment type
+          </label>
+          <select
+            id="employmentType"
+            value={employmentType}
+            onChange={(e) => setEmploymentType(e.target.value as EmploymentType)}
+            className="rounded-md border border-border bg-surface px-3 py-2 text-sm outline-none transition-colors focus:border-primary focus:ring-2 focus:ring-primary/25"
+          >
+            {EMPLOYMENT_TYPES.map((type) => (
+              <option key={type} value={type}>
+                {EMPLOYMENT_TYPE_LABELS[type]}
+              </option>
+            ))}
+          </select>
+        </div>
+      </div>
 
       {formError && (
         <p role="alert" className="text-sm text-danger">

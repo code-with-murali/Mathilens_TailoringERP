@@ -10,7 +10,7 @@ public class GetEmployeeByIdQueryHandlerTests
     [Fact]
     public async Task Handle_WithExistingEmployee_ReturnsDto()
     {
-        var employee = Employee.Create("EMP-001", "Ravi Kumar", null, null, null);
+        var employee = Employee.Create("EMP-001", "Ravi Kumar", null, "+91 98765 43210", null, new DateOnly(2024, 1, 15), EmploymentType.FullTime);
         var repository = Substitute.For<IEmployeeRepository>();
         repository.GetByIdAsync(employee.Id, Arg.Any<CancellationToken>()).Returns(employee);
         var handler = new GetEmployeeByIdQueryHandler(repository);

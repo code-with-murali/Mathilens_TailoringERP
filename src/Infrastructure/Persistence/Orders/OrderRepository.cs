@@ -48,6 +48,41 @@ public class OrderRepository : IOrderRepository
     public Task<bool> ExistsForEmployeeAsync(Guid employeeId, CancellationToken cancellationToken) =>
         _dbContext.Orders.AnyAsync(o => o.EmployeeId == employeeId, cancellationToken);
 
+    public async Task<PagedResult<(Order Order, string CustomerName)>> SearchByEmployeeAsync(
+        Guid employeeId,
+        int page,
+        int pageSize,
+        CancellationToken cancellationToken)
+    {
+        var query = Include(_dbContext.Orders).Where(o => o.EmployeeId == employeeId);
+
+        var totalCount = await query.CountAsync(cancellationToken);
+
+        // The customer name is joined in the same round trip rather than fetched per order —
+        // this list is read a page at a time and would otherwise be one query per row.
+        var rows = await query
+            .OrderByDescending(o => o.CreatedAtUtc)
+            .Skip((page - 1) * pageSize)
+            .Take(pageSize)
+            .Select(o => new
+            {
+                Order = o,
+                CustomerName = _dbContext.Customers
+                    .Where(c => c.Id == o.CustomerId)
+                    .Select(c => c.FullName)
+                    .FirstOrDefault(),
+            })
+            .ToListAsync(cancellationToken);
+
+        // A deleted customer leaves the order in the history rather than dropping it — the work
+        // still happened, and the tailor's record of it should not silently shrink.
+        var items = rows
+            .Select(row => (row.Order, CustomerName: row.CustomerName ?? "(customer removed)"))
+            .ToList();
+
+        return new PagedResult<(Order, string)>(items, page, pageSize, totalCount);
+    }
+
     /// <summary>Joins through Customers on the phone number, so orders placed under a duplicate customer record are found too.</summary>
     public async Task<IReadOnlyList<Order>> GetByCustomerPhoneAsync(string phoneNumber, Guid excludingOrderId, CancellationToken cancellationToken) =>
         await Include(_dbContext.Orders)

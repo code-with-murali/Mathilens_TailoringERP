@@ -3,18 +3,21 @@ using MathilensERP.Application.Billing;
 using MathilensERP.Application.Common.Interfaces;
 using MathilensERP.Application.Customers;
 using MathilensERP.Application.Employees;
+using MathilensERP.Application.Inventory;
 using MathilensERP.Application.Measurements;
 using MathilensERP.Application.Orders;
 using MathilensERP.Application.Pricing;
 using MathilensERP.Application.Reports;
 using MathilensERP.Application.Settings;
 using MathilensERP.Application.WhatsApp;
+using MathilensERP.Application.Authorization;
 using MathilensERP.Infrastructure.Identity;
 using MathilensERP.Infrastructure.Persistence;
 using MathilensERP.Infrastructure.Persistence.Activity;
 using MathilensERP.Infrastructure.Persistence.Billing;
 using MathilensERP.Infrastructure.Persistence.Customers;
 using MathilensERP.Infrastructure.Persistence.Employees;
+using MathilensERP.Infrastructure.Persistence.Inventory;
 using MathilensERP.Infrastructure.Persistence.Interceptors;
 using MathilensERP.Infrastructure.Persistence.Measurements;
 using MathilensERP.Infrastructure.Persistence.Orders;
@@ -82,6 +85,12 @@ public static class DependencyInjection
 
         services.AddScoped<IIdentityService, IdentityService>();
         services.AddScoped<IUserAdminService, UserAdminService>();
+
+        // The resolver itself lives in Application (it is plain policy over a repository port);
+        // supplying it a cache implementation is this layer's job. It sits on the authorization
+        // path of every request, so it must not read a settings row per call.
+        services.AddMemoryCache();
+        services.AddScoped<IRolePermissionService, RolePermissionService>();
         services.AddScoped<ICustomerRepository, CustomerRepository>();
         services.AddScoped<IMeasurementRepository, MeasurementRepository>();
         services.AddScoped<IEmployeeRepository, EmployeeRepository>();
@@ -90,6 +99,7 @@ public static class DependencyInjection
         services.AddScoped<IWhatsAppMessageRepository, WhatsAppMessageRepository>();
         services.AddScoped<ISettingRepository, SettingRepository>();
         services.AddScoped<IClothPriceRepository, ClothPriceRepository>();
+        services.AddScoped<IClothReceiptRepository, ClothReceiptRepository>();
         services.AddScoped<IActivityLogRepository, ActivityLogRepository>();
         services.AddScoped<IReportRepository, ReportRepository>();
 

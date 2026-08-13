@@ -447,6 +447,10 @@ export default function NewOrderPage() {
           source: row.fabricSource,
           color: row.fabricColor.trim() === "" ? null : row.fabricColor,
           quantity: fabricQuantity,
+          // Sent so shop-supplied cloth comes off stock. The server resolves it against the price
+          // list; an unmatched code is kept as typed and simply never reaches inventory.
+          clothCode: row.clothCode.trim() === "" ? null : row.clothCode.trim(),
+          unit: "Metres" as const,
         };
       }
 

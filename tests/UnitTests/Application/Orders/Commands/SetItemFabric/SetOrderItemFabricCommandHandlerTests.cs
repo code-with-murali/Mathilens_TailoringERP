@@ -1,5 +1,6 @@
 using MathilensERP.Application.Orders;
 using MathilensERP.Application.Orders.Commands.SetItemFabric;
+using MathilensERP.Application.Pricing;
 using MathilensERP.Domain.Measurements;
 using MathilensERP.Domain.Orders;
 using NSubstitute;
@@ -15,7 +16,7 @@ public class SetOrderItemFabricCommandHandlerTests
         var item = order.AddItem(GarmentType.Shirt, 1, 500m);
         var repository = Substitute.For<IOrderRepository>();
         repository.GetByIdAsync(order.Id, Arg.Any<CancellationToken>()).Returns(order);
-        var handler = new SetOrderItemFabricCommandHandler(repository);
+        var handler = new SetOrderItemFabricCommandHandler(repository, Substitute.For<IClothPriceRepository>());
         var command = new SetOrderItemFabricCommand(order.Id, item.Id, "Cotton", FabricSource.CustomerSupplied, "Red", 2m);
 
         var result = await handler.Handle(command, CancellationToken.None);
@@ -30,7 +31,7 @@ public class SetOrderItemFabricCommandHandlerTests
     {
         var repository = Substitute.For<IOrderRepository>();
         repository.GetByIdAsync(Arg.Any<Guid>(), Arg.Any<CancellationToken>()).Returns((Order?)null);
-        var handler = new SetOrderItemFabricCommandHandler(repository);
+        var handler = new SetOrderItemFabricCommandHandler(repository, Substitute.For<IClothPriceRepository>());
         var command = new SetOrderItemFabricCommand(Guid.NewGuid(), Guid.NewGuid(), "Cotton", FabricSource.ShopSupplied, null, 2m);
 
         var result = await handler.Handle(command, CancellationToken.None);
@@ -45,7 +46,7 @@ public class SetOrderItemFabricCommandHandlerTests
         var order = Order.Create(Guid.NewGuid(), DateTime.UtcNow, null);
         var repository = Substitute.For<IOrderRepository>();
         repository.GetByIdAsync(order.Id, Arg.Any<CancellationToken>()).Returns(order);
-        var handler = new SetOrderItemFabricCommandHandler(repository);
+        var handler = new SetOrderItemFabricCommandHandler(repository, Substitute.For<IClothPriceRepository>());
         var command = new SetOrderItemFabricCommand(order.Id, Guid.NewGuid(), "Cotton", FabricSource.ShopSupplied, null, 2m);
 
         var result = await handler.Handle(command, CancellationToken.None);

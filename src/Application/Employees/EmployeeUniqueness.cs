@@ -12,7 +12,7 @@ internal static class EmployeeUniqueness
     public static async Task<Error?> FindConflictAsync(
         IEmployeeRepository employeeRepository,
         string employeeCode,
-        string? phoneNumber,
+        string phoneNumber,
         Guid? excludeId,
         CancellationToken cancellationToken)
     {
@@ -28,7 +28,8 @@ internal static class EmployeeUniqueness
             }
         }
 
-        // A blank phone number means "not recorded", which several employees may equally share.
+        // Blank only reaches here from an import row the validator already rejected; there is
+        // nothing to compare, and the row's own error is the useful one.
         if (string.IsNullOrWhiteSpace(phoneNumber))
         {
             return null;

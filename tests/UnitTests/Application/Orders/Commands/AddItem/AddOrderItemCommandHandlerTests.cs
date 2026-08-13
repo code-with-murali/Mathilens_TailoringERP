@@ -39,7 +39,7 @@ public class AddOrderItemCommandHandlerTests
     [Fact]
     public async Task Handle_WithDeliveredOrder_ReturnsConflict()
     {
-        var order = Order.Create(Guid.NewGuid(), DateTime.UtcNow, null);
+        var order = Order.Create(Guid.NewGuid(), DateTime.UtcNow, Guid.NewGuid());
         order.TransitionTo(OrderStatus.InProgress);
         order.TransitionTo(OrderStatus.ReadyForDelivery);
         order.TransitionTo(OrderStatus.Delivered, DateTime.UtcNow);

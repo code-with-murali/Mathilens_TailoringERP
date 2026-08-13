@@ -14,5 +14,5 @@ public sealed record EmployeeImportRow(
     string EmployeeCode,
     string FullName,
     string? JobTitle,
-    string? PhoneNumber,
+    string PhoneNumber,
     string? Email);

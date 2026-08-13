@@ -17,6 +17,16 @@ public interface IOrderRepository
     Task<bool> ExistsForEmployeeAsync(Guid employeeId, CancellationToken cancellationToken);
 
     /// <summary>
+    /// The orders assigned to one employee, newest first — their work history. Includes the
+    /// customer name, which the history is read by rather than a customer id.
+    /// </summary>
+    Task<PagedResult<(Order Order, string CustomerName)>> SearchByEmployeeAsync(
+        Guid employeeId,
+        int page,
+        int pageSize,
+        CancellationToken cancellationToken);
+
+    /// <summary>
     /// Every live order placed by any customer sharing <paramref name="phoneNumber"/>, newest first,
     /// excluding <paramref name="excludingOrderId"/>. Matched on the phone rather than the customer
     /// id so a customer entered twice still shows one history.

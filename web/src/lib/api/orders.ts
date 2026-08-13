@@ -1,5 +1,6 @@
 import { apiDelete, apiDeleteFor, apiGet, apiGetPaged, apiPost, apiPut } from "@/lib/api-client";
 import type { GarmentType } from "./measurements";
+import type { ClothUnit } from "./inventory";
 
 export const ORDER_STATUSES = ["Received", "InProgress", "ReadyForDelivery", "Delivered", "Cancelled"] as const;
 export type OrderStatus = (typeof ORDER_STATUSES)[number];
@@ -45,7 +46,16 @@ export type Order = {
   items: OrderItem[];
 };
 
-export type CreateOrderItemFabricInput = { fabricType: string; source: FabricSource; color: string | null; quantity: number };
+/** `clothCode` is resolved against the price list server-side: a match links this fabric to that
+ * cloth so stock falls by `quantity`; anything else is kept as the free text it has always been. */
+export type CreateOrderItemFabricInput = {
+  fabricType: string;
+  source: FabricSource;
+  color: string | null;
+  quantity: number;
+  clothCode: string | null;
+  unit: ClothUnit;
+};
 export type CreateOrderItemInput = { garmentType: GarmentType; quantity: number; unitPrice: number; fabric: CreateOrderItemFabricInput | null };
 export type CreateOrderInput = {
   customerId: string;

@@ -11,7 +11,7 @@ import { useToast } from "@/components/ui/ToastProvider";
 import { getAccessToken } from "@/lib/auth";
 import { useRouteId } from "@/lib/use-route-id";
 import { ApiError } from "@/lib/api-client";
-import { searchEmployees, type Employee } from "@/lib/api/employees";
+import { getEmployee, searchEmployees, type Employee } from "@/lib/api/employees";
 import { getCustomer, searchCustomers, type Customer } from "@/lib/api/customers";
 import { GARMENT_TYPES, type GarmentType } from "@/lib/api/measurements";
 import { createInvoice } from "@/lib/api/billing";
@@ -54,6 +54,7 @@ export default function OrderDetailPage() {
   const { showToast } = useToast();
   const [order, setOrder] = useState<Order | null>(null);
   const [customer, setCustomer] = useState<Customer | null>(null);
+  const [assignedEmployee, setAssignedEmployee] = useState<Employee | null>(null);
   const [previousOrders, setPreviousOrders] = useState<Order[]>([]);
   const [loadError, setLoadError] = useState<string | null>(null);
   const [isTransitioning, setIsTransitioning] = useState(false);
@@ -106,6 +107,8 @@ export default function OrderDetailPage() {
       setOrder(data);
       // A missing customer shouldn't blank the whole page — the order is still workable.
       setCustomer(await getCustomer(data.customerId, token).catch(() => null));
+      // Named so staff can see who holds the order — and, when nobody does, why work can't start.
+      setAssignedEmployee(data.employeeId ? await getEmployee(data.employeeId, token).catch(() => null) : null);
       // Same reasoning for the history panel: it's context, not something to fail the page over.
       setPreviousOrders(await getPreviousOrders(orderId, token).catch(() => []));
     } catch (error) {
@@ -365,6 +368,9 @@ export default function OrderDetailPage() {
 
   const nextStatuses = NEXT_STATUSES[order.status];
   const canModifyItems = order.status !== "Delivered" && order.status !== "Cancelled";
+  // Work cannot start on an order nobody holds — the server refuses it, so the button says so
+  // first rather than letting the click come back as an error.
+  const needsEmployeeToStart = !order.employeeId;
 
   return (
     <div className="flex flex-col gap-6">
@@ -465,18 +471,25 @@ export default function OrderDetailPage() {
         )}
 
         {nextStatuses.length > 0 && !isEditingDetails && (
-          <div className="mt-4 flex gap-3">
-            {nextStatuses.map((target) => (
-              <Button
-                key={target}
-                type="button"
-                variant={target === "Cancelled" ? "danger" : "primary"}
-                disabled={isTransitioning}
-                onClick={() => startTransition(target)}
-              >
-                Mark as {target}
-              </Button>
-            ))}
+          <div className="mt-4 flex flex-col gap-2">
+            <div className="flex gap-3">
+              {nextStatuses.map((target) => (
+                <Button
+                  key={target}
+                  type="button"
+                  variant={target === "Cancelled" ? "danger" : "primary"}
+                  disabled={isTransitioning || (target === "InProgress" && needsEmployeeToStart)}
+                  onClick={() => startTransition(target)}
+                >
+                  Mark as {target}
+                </Button>
+              ))}
+            </div>
+            {nextStatuses.includes("InProgress") && needsEmployeeToStart && (
+              <p className="text-sm text-foreground/70">
+                Assign an employee below before starting work on this order.
+              </p>
+            )}
           </div>
         )}
       </div>
@@ -535,11 +548,17 @@ export default function OrderDetailPage() {
 
       <div className="rounded-lg border border-border bg-surface p-6">
         <h2 className="mb-3 text-lg font-semibold">Assigned Employee</h2>
+        {order.employeeId && !assignedEmployee && (
+          <p className="mb-2 text-sm text-foreground/70">Assigned, but the employee record could not be loaded.</p>
+        )}
         <SearchPicker
           id="assignEmployee"
           label=""
-          selectedLabel={null}
+          selectedLabel={assignedEmployee?.fullName ?? null}
           onSelect={handleAssignEmployee}
+          // Reveals the search box again. Local only — the order keeps its current employee until
+          // another is picked, since there is no way to leave an order unassigned once assigned.
+          onClear={() => setAssignedEmployee(null)}
           search={searchEmployees}
           getId={(e) => e.id}
           getLabel={(e) => e.fullName}

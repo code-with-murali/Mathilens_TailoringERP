@@ -64,6 +64,8 @@ export default function EditEmployeePage() {
           <EmployeeForm
             initialValues={{
               employeeCode: employee.employeeCode,
+              joiningDate: employee.joiningDate,
+              employmentType: employee.employmentType,
               fullName: employee.fullName,
               jobTitle: employee.jobTitle,
               phoneNumber: employee.phoneNumber,

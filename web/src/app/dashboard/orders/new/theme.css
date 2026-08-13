@@ -25,6 +25,9 @@
   --foreground: #f4f2ea;
   --surface: rgba(255, 255, 255, 0.055);
   --surface-hover: rgba(255, 255, 255, 0.09);
+  /* Opaque counterpart to --surface, for surfaces the page does not composite itself — see the
+     native dropdown rule below. Lifted slightly off --background so the list reads as a layer. */
+  --surface-solid: #16161f;
   --border: rgba(255, 255, 255, 0.14);
   --primary: #e8c77a;
   --primary-hover: #c9a24c;
@@ -100,6 +103,20 @@
 .orderNewSkin textarea:focus {
   border-color: var(--primary);
   box-shadow: 0 0 0 2px rgba(232, 199, 122, 0.25);
+}
+
+/* The open dropdown list (Garment, fabric Source) is rendered by the OS, not by this page, so it
+   inherits the select's *computed* colours rather than the skin around it. The select above is
+   deliberately near-transparent, which the platform resolves to a white popup, while the options
+   keep the skin's light --foreground — light text on white, effectively unreadable. Options need
+   an opaque colour pair of their own; --surface is translucent and cannot serve here.
+
+   Set on option/optgroup rather than the select itself so the closed control keeps its glass
+   well: giving the select an opaque background would flatten it against the panel. */
+.orderNewSkin select option,
+.orderNewSkin select optgroup {
+  background-color: var(--surface-solid);
+  color: var(--foreground);
 }
 
 .orderNewSkin input[type="checkbox"] {

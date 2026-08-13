@@ -7,6 +7,7 @@ public sealed record ActivityLogDto(
     string Screen,
     string Action,
     string RequestName,
+    string? Description,
     DateTime OccurredAtUtc);
 
 /// <summary>The values actually present in the log, so the filters only ever offer what will return something.</summary>

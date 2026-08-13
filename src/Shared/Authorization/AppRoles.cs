@@ -34,6 +34,7 @@ public static class AppRoles
         Permissions.WhatsAppView, Permissions.WhatsAppManage,
         Permissions.ReportsView,
         Permissions.PricingView, Permissions.PricingManage,
+        Permissions.InventoryView, Permissions.InventoryManage,
         Permissions.SettingsView, Permissions.SettingsManage,
         Permissions.ActivityView,
         Permissions.UsersView,
@@ -47,6 +48,7 @@ public static class AppRoles
         Permissions.InvoicesView, Permissions.InvoicesManage,
         Permissions.WhatsAppView, Permissions.WhatsAppManage,
         Permissions.PricingView,
+        Permissions.InventoryView,
     ];
 
     private static readonly IReadOnlyList<string> TailorPermissions =

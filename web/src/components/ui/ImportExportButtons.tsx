@@ -65,10 +65,10 @@ export function ImportExportButtons({ resource, label, onImported }: ImportExpor
     <div className="flex flex-col items-end gap-2">
       <div className="flex gap-2">
         <Button type="button" variant="secondary" onClick={handleExport} disabled={isExporting}>
-          {isExporting ? "Exporting…" : "Export Excel"}
+          {isExporting ? "Exporting…" : "Export"}
         </Button>
         <Button type="button" variant="secondary" onClick={() => fileInputRef.current?.click()} disabled={isImporting}>
-          {isImporting ? "Importing…" : "Import Excel"}
+          {isImporting ? "Importing…" : "Import"}
         </Button>
         <input
           ref={fileInputRef}

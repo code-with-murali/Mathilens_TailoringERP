@@ -1,5 +1,6 @@
 using MathilensERP.Application.Common.Mediator;
 using MathilensERP.Application.Orders;
+using MathilensERP.Domain.Inventory;
 using MathilensERP.Domain.Orders;
 using MathilensERP.Shared.Results;
 
@@ -11,4 +12,6 @@ public sealed record SetOrderItemFabricCommand(
     string FabricType,
     FabricSource Source,
     string? Color,
-    decimal Quantity) : ICommand<Result<OrderDto>>;
+    decimal Quantity,
+    string? ClothCode = null,
+    ClothUnit Unit = ClothUnit.Metres) : ICommand<Result<OrderDto>>;
