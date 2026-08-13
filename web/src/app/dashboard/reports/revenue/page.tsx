@@ -1,6 +1,7 @@
 "use client";
 
 import { useCallback, useEffect, useState } from "react";
+import { ExportButton } from "@/components/ui/ExportButton";
 import { getAccessToken } from "@/lib/auth";
 import { ApiError } from "@/lib/api-client";
 import { getRevenueReport, type RevenueReport } from "@/lib/api/reports";
@@ -35,12 +36,20 @@ export default function RevenueReportPage() {
 
   return (
     <div className="flex flex-col gap-6">
-      <div>
-        <h1 className="text-2xl font-semibold">Revenue</h1>
-        <p className="mt-1 text-sm text-foreground/70">
-          Invoices raised in this period — the billing position, which will differ from the order
-          value on Orders &amp; Collections.
-        </p>
+      <div className="flex items-start justify-between gap-4">
+        <div>
+          <h1 className="text-2xl font-semibold">Revenue</h1>
+          <p className="mt-1 text-sm text-foreground/70">
+            Invoices raised in this period — the billing position, which will differ from the order
+            value on Orders &amp; Collections.
+          </p>
+        </div>
+        {/* Carries the range on screen, so the file covers the same period. */}
+        <ExportButton
+          resource="reports"
+          label="this report"
+          query={{ report: "revenue", ...toUtcRange(fromDate, toDate) }}
+        />
       </div>
 
       <ReportRangeFilter range={range} />

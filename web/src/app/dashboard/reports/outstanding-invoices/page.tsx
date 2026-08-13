@@ -3,6 +3,7 @@
 import { useCallback, useEffect, useState } from "react";
 import { DEFAULT_PAGE_SIZE, Pagination } from "@/components/ui/Pagination";
 import { StatusBadge, INVOICE_STATUS_BADGE } from "@/components/ui/StatusBadge";
+import { ExportButton } from "@/components/ui/ExportButton";
 import { getAccessToken } from "@/lib/auth";
 import { ApiError, type PaginationMeta } from "@/lib/api-client";
 import { getOutstandingInvoicesReport, type OutstandingInvoice } from "@/lib/api/reports";
@@ -42,9 +43,13 @@ export default function OutstandingInvoicesReportPage() {
 
   return (
     <div className="flex flex-col gap-6">
-      <div>
-        <h1 className="text-2xl font-semibold">Outstanding Invoices</h1>
-        <p className="mt-1 text-sm text-foreground/70">Every invoice with a balance still to collect, oldest first.</p>
+      <div className="flex items-start justify-between gap-4">
+        <div>
+          <h1 className="text-2xl font-semibold">Outstanding Invoices</h1>
+          <p className="mt-1 text-sm text-foreground/70">Every invoice with a balance still to collect, oldest first.</p>
+        </div>
+        {/* No range to pass — this report deliberately has none. */}
+        <ExportButton resource="reports" label="outstanding invoices" query={{ report: "outstanding-invoices" }} />
       </div>
 
       {isLoading ? (

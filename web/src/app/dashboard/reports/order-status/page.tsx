@@ -1,6 +1,7 @@
 "use client";
 
 import { useCallback, useEffect, useState } from "react";
+import { ExportButton } from "@/components/ui/ExportButton";
 import { getAccessToken } from "@/lib/auth";
 import { ApiError } from "@/lib/api-client";
 import { getOrderStatusSummaryReport, type OrderStatusSummaryReport } from "@/lib/api/reports";
@@ -36,9 +37,17 @@ export default function OrderStatusReportPage() {
 
   return (
     <div className="flex flex-col gap-6">
-      <div>
-        <h1 className="text-2xl font-semibold">Orders by Status</h1>
-        <p className="mt-1 text-sm text-foreground/70">Where the period&apos;s orders currently stand.</p>
+      <div className="flex items-start justify-between gap-4">
+        <div>
+          <h1 className="text-2xl font-semibold">Orders by Status</h1>
+          <p className="mt-1 text-sm text-foreground/70">Where the period&apos;s orders currently stand.</p>
+        </div>
+        {/* Carries the range on screen, so the file covers the same period. */}
+        <ExportButton
+          resource="reports"
+          label="this report"
+          query={{ report: "order-status", ...toUtcRange(fromDate, toDate) }}
+        />
       </div>
 
       <ReportRangeFilter range={range} />
