@@ -1,12 +1,13 @@
 "use client";
 
-import { useState, type FormEvent } from "react";
+import { Suspense, useState, type FormEvent } from "react";
 import { useRouter } from "next/navigation";
 import { Button } from "@/components/ui/Button";
 import { apiPost, ApiError } from "@/lib/api-client";
 import { storeTokens, type AuthTokens } from "@/lib/auth";
 import { BandWeave } from "./LoginBackdrop";
 import { ResetCodeForm } from "./ResetCodeForm";
+import { SessionEndedNotice } from "./SessionEndedNotice";
 
 const fieldClassName =
   "w-full rounded-md border border-border bg-surface py-3 pl-4 pr-11 text-sm outline-none transition-colors placeholder:text-foreground/45 focus:border-primary focus:ring-2 focus:ring-primary/25";
@@ -132,6 +133,11 @@ export default function LoginPage() {
             />
           ) : (
             <>
+              {!redeemed && (
+                <Suspense fallback={null}>
+                  <SessionEndedNotice />
+                </Suspense>
+              )}
               {redeemed && (
                 <p className="mt-5 rounded-md border border-success/30 bg-success/10 px-3 py-2 text-sm text-success">
                   Password set. Sign in with it below.

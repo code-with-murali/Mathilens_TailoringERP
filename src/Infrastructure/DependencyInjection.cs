@@ -104,6 +104,7 @@ public static class DependencyInjection
         services.AddScoped<IActivityLogRepository, ActivityLogRepository>();
         services.AddScoped<IReportRepository, ReportRepository>();
         services.AddScoped<IOccasionRepository, OccasionRepository>();
+        services.AddScoped<IActiveSessionService, ActiveSessionService>();
 
         services.AddOptions<WhatsAppOptions>().Bind(configuration.GetSection(WhatsAppOptions.SectionName));
 

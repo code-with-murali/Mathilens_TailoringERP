@@ -121,6 +121,18 @@ async function fetchWithAuthRetry(path: string, init: RequestInit, token?: strin
     return response;
   }
 
+  // Signed in somewhere else. Refreshing would be pointless — the refresh token belongs to the
+  // superseded session too — and, more importantly, the user deserves to be told why they were
+  // thrown out rather than landing on the login screen with no explanation.
+  if (response.headers.get("X-Session-Ended") === "superseded") {
+    clearTokens();
+    if (typeof window !== "undefined") {
+      // eslint-disable-next-line @next/next/no-location-assign-relative-destination
+      window.location.href = "/login?ended=superseded";
+    }
+    return response;
+  }
+
   const newAccessToken = await refreshAccessTokenOnce();
   if (!newAccessToken) {
     clearTokens();

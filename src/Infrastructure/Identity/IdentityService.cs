@@ -27,19 +27,22 @@ public sealed class IdentityService : IIdentityService
     private readonly ApplicationDbContext _dbContext;
     private readonly JwtOptions _jwtOptions;
     private readonly IPasswordHasher<ApplicationUser> _passwordHasher;
+    private readonly IActiveSessionService _activeSessions;
 
     public IdentityService(
         UserManager<ApplicationUser> userManager,
         SignInManager<ApplicationUser> signInManager,
         ApplicationDbContext dbContext,
         IOptions<JwtOptions> jwtOptions,
-        IPasswordHasher<ApplicationUser> passwordHasher)
+        IPasswordHasher<ApplicationUser> passwordHasher,
+        IActiveSessionService activeSessions)
     {
         _userManager = userManager;
         _signInManager = signInManager;
         _dbContext = dbContext;
         _jwtOptions = jwtOptions.Value;
         _passwordHasher = passwordHasher;
+        _activeSessions = activeSessions;
     }
 
     public async Task<Result<AuthTokensDto>> LoginAsync(string email, string password, CancellationToken cancellationToken)
@@ -247,7 +250,14 @@ public sealed class IdentityService : IIdentityService
     {
         var now = DateTime.UtcNow;
         var roles = await _userManager.GetRolesAsync(user);
-        var accessToken = GenerateAccessToken(user, roles, now, out var accessTokenExpiresAtUtc);
+
+        // A refresh keeps the session it was issued under; only a fresh sign-in starts a new one.
+        // Rotating on refresh would have every screen quietly evict itself every quarter of an hour.
+        var sessionId = rotatedFrom is null
+            ? Guid.NewGuid().ToString("N")
+            : await CurrentSessionIdOfAsync(user) ?? Guid.NewGuid().ToString("N");
+
+        var accessToken = GenerateAccessToken(user, roles, now, sessionId, out var accessTokenExpiresAtUtc);
 
         var rawRefreshToken = GenerateRefreshTokenValue();
         var refreshTokenEntity = RefreshToken.Issue(
@@ -261,10 +271,14 @@ public sealed class IdentityService : IIdentityService
 
         await _dbContext.SaveChangesAsync(cancellationToken);
 
+        // After the tokens exist, so a failure here cannot leave a session recorded for a sign-in
+        // that never completed.
+        await _activeSessions.StartSessionAsync(user.Id, sessionId, cancellationToken);
+
         return new AuthTokensDto(accessToken, rawRefreshToken, accessTokenExpiresAtUtc);
     }
 
-    private string GenerateAccessToken(ApplicationUser user, IList<string> roles, DateTime nowUtc, out DateTime expiresAtUtc)
+    private string GenerateAccessToken(ApplicationUser user, IList<string> roles, DateTime nowUtc, string sessionId, out DateTime expiresAtUtc)
     {
         expiresAtUtc = nowUtc.AddMinutes(_jwtOptions.AccessTokenExpiryMinutes);
 
@@ -273,6 +287,10 @@ public sealed class IdentityService : IIdentityService
             new(ClaimTypes.NameIdentifier, user.Id.ToString()),
             new(ClaimTypes.Email, user.Email ?? string.Empty),
             new(JwtRegisteredClaimNames.Jti, Guid.NewGuid().ToString()),
+            // Which sign-in this token belongs to. Checked on every request against the account's
+            // current session, so signing in elsewhere invalidates this token at once rather than
+            // when it expires.
+            new(IActiveSessionService.SessionClaimType, sessionId),
         };
         claims.AddRange(roles.Select(role => new Claim(ClaimTypes.Role, role)));
 
@@ -289,6 +307,10 @@ public sealed class IdentityService : IIdentityService
 
         return new JwtSecurityTokenHandler().WriteToken(token);
     }
+
+    /// <summary>The session a refresh should continue, read straight from the store.</summary>
+    private Task<string?> CurrentSessionIdOfAsync(ApplicationUser user) =>
+        _userManager.GetAuthenticationTokenAsync(user, PasswordResetCodes.Provider, ActiveSessionService.TokenName);
 
     private static string GenerateRefreshTokenValue() => Convert.ToBase64String(RandomNumberGenerator.GetBytes(64));
 

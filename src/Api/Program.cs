@@ -15,6 +15,8 @@ using Microsoft.EntityFrameworkCore;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.IdentityModel.Tokens;
 using Microsoft.OpenApi;
+using System.Security.Claims;
+using MathilensERP.Application.Common.Interfaces;
 
 var builder = WebApplication.CreateBuilder(args);
 
@@ -96,6 +98,40 @@ builder.Services
             IssuerSigningKey = new SymmetricSecurityKey(Convert.FromBase64String(jwtSection["SigningKey"]!)),
             ValidateLifetime = true,
             ClockSkew = TimeSpan.FromSeconds(30),
+        };
+
+        // One signed-in place per account.
+        //
+        // A valid signature is no longer enough: the token also has to belong to the account's
+        // current session. Without this, signing in elsewhere could only revoke the refresh token,
+        // and the old screen would carry on working until its access token expired - up to fifteen
+        // minutes of two people using one login, which is exactly what the shop asked to prevent.
+        //
+        // The check is served from an in-process cache written through on every sign-in, so the
+        // ordinary request costs no database round trip and the cut-off is still immediate.
+        options.Events = new JwtBearerEvents
+        {
+            OnTokenValidated = async context =>
+            {
+                var principal = context.Principal;
+                var userIdClaim = principal?.FindFirstValue(ClaimTypes.NameIdentifier);
+                if (!Guid.TryParse(userIdClaim, out var userId))
+                {
+                    return;
+                }
+
+                var sessionId = principal?.FindFirstValue(IActiveSessionService.SessionClaimType);
+                var sessions = context.HttpContext.RequestServices.GetRequiredService<IActiveSessionService>();
+
+                if (!await sessions.IsCurrentAsync(userId, sessionId, context.HttpContext.RequestAborted))
+                {
+                    // A distinct reason on the challenge, so the browser can tell "signed in
+                    // elsewhere" apart from an ordinary expiry and say so instead of just bouncing
+                    // the user to the login screen with no explanation.
+                    context.Fail("session_superseded");
+                    context.HttpContext.Response.Headers["X-Session-Ended"] = "superseded";
+                }
+            },
         };
     });
 

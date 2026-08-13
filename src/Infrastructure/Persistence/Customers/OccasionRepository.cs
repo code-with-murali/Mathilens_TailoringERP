@@ -52,7 +52,7 @@ public sealed class OccasionRepository : IOccasionRepository
         var occurrences = candidates
             .Select(c =>
             {
-                var next = NextOccurrence(c.Source, today);
+                var next = AnnualOccurrence.Next(c.Source, today);
                 return new
                 {
                     c.Id,
@@ -90,9 +90,7 @@ public sealed class OccasionRepository : IOccasionRepository
                     o.Email,
                     o.OccasionOn,
                     o.DaysAway,
-                    // Unknown rather than zero when the stored year is a placeholder — a shop that
-                    // only knows the day and month should not be told the customer is turning 0.
-                    o.Source.Year > 1900 ? o.OccasionOn.Year - o.Source.Year : null,
+                    AnnualOccurrence.YearsCompleted(o.Source, o.OccasionOn),
                     contact is not null,
                     contact?.ContactedOn,
                     contact?.Remarks);
@@ -139,21 +137,4 @@ public sealed class OccasionRepository : IOccasionRepository
         await _db.SaveChangesAsync(cancellationToken);
     }
 
-    /// <summary>
-    /// This year's occurrence of a day and month, or next year's if it has already gone by.
-    ///
-    /// 29 February is folded onto the 28th in a common year rather than skipped — a shop calling
-    /// its customers wants the reminder every year, not three years in four.
-    /// </summary>
-    private static DateOnly NextOccurrence(DateOnly source, DateOnly today)
-    {
-        var thisYear = OnYear(source, today.Year);
-        return thisYear.DayNumber >= today.DayNumber ? thisYear : OnYear(source, today.Year + 1);
-    }
-
-    private static DateOnly OnYear(DateOnly source, int year)
-    {
-        var day = Math.Min(source.Day, DateTime.DaysInMonth(year, source.Month));
-        return new DateOnly(year, source.Month, day);
-    }
 }
