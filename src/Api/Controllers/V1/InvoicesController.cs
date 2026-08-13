@@ -52,20 +52,39 @@ public sealed class InvoicesController : ApiControllerBase
         return ToActionResult(result);
     }
 
-    /// <summary>Searches invoices by customer and/or status, paginated (00_MASTER_SPEC.md § 8.3).</summary>
+    /// <summary>
+    /// Searches invoices by customer, status and/or the date the invoice was raised, paginated
+    /// (00_MASTER_SPEC.md § 8.3). <paramref name="from"/>/<paramref name="to"/> are UTC instants
+    /// bounding a half-open range — the caller decides which instants its local "today" spans.
+    /// </summary>
     [HttpGet]
     [ProducesResponseType(typeof(ApiResponse<IReadOnlyList<InvoiceDto>>), StatusCodes.Status200OK)]
     [ProducesResponseType(typeof(ApiErrorResponse), StatusCodes.Status400BadRequest)]
     public async Task<IActionResult> Search(
         [FromQuery] Guid? customerId,
         [FromQuery] InvoiceStatus? status,
+        [FromQuery] DateTime? from,
+        [FromQuery] DateTime? to,
         [FromQuery] int page = PaginationDefaults.DefaultPage,
         [FromQuery] int pageSize = PaginationDefaults.DefaultPageSize,
         CancellationToken cancellationToken = default)
     {
-        var result = await _sender.Send(new SearchInvoicesQuery(customerId, status, page, pageSize), cancellationToken);
+        // Npgsql stores these columns as timestamptz, which rejects a DateTime that isn't tagged
+        // UTC. Model binding hands back Unspecified/Local depending on how the client formatted
+        // the value, so the kind is normalized here rather than trusted.
+        var result = await _sender.Send(
+            new SearchInvoicesQuery(customerId, status, ToUtc(from), ToUtc(to), page, pageSize),
+            cancellationToken);
         return ToPagedActionResult(result);
     }
+
+    private static DateTime? ToUtc(DateTime? value) => value switch
+    {
+        null => null,
+        { Kind: DateTimeKind.Utc } utc => utc,
+        { Kind: DateTimeKind.Local } local => local.ToUniversalTime(),
+        var unspecified => DateTime.SpecifyKind(unspecified.Value, DateTimeKind.Utc),
+    };
 
     /// <summary>Records a payment against an invoice, supporting partial and multiple payments.</summary>
     [HttpPost("{id:guid}/payments")]

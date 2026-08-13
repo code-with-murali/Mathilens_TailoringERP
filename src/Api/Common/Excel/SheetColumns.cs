@@ -20,12 +20,13 @@ public static class CustomerSheet
 public static class EmployeeSheet
 {
     public const string Id = "Id";
+    public const string EmployeeCode = "Employee Code";
     public const string FullName = "Full Name";
     public const string JobTitle = "Job Title";
     public const string PhoneNumber = "Phone Number";
     public const string Email = "Email";
 
-    public static readonly string[] Headers = [Id, FullName, JobTitle, PhoneNumber, Email];
+    public static readonly string[] Headers = [Id, EmployeeCode, FullName, JobTitle, PhoneNumber, Email];
 }
 
 /// <summary>The column headers of the cloth price import/export sheet.</summary>

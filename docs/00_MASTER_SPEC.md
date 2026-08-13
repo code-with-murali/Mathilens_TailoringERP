@@ -485,7 +485,7 @@ A fixed set of roles, each mapped to a set of permission claims. Authorization c
 
 ### 10.4 Password Policy
 
-Minimum length 12 characters, checked against a breached-password list where feasible. Passwords are hashed with ASP.NET Core Identity's default hasher — never reversible encryption. Account lockout after a defined number of failed attempts.
+Minimum length 8 characters, checked against a breached-password list where feasible. Passwords are hashed with ASP.NET Core Identity's default hasher — never reversible encryption. Account lockout after a defined number of failed attempts.
 
 ### 10.5 Encryption
 

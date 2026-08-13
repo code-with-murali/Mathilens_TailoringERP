@@ -12,10 +12,11 @@ type EmployeeFormProps = {
   onSubmit: (input: EmployeeInput) => Promise<void>;
 };
 
-const emptyValues: EmployeeInput = { fullName: "", jobTitle: null, phoneNumber: null, email: null };
+const emptyValues: EmployeeInput = { employeeCode: "", fullName: "", jobTitle: null, phoneNumber: null, email: null };
 
 /** Shared by the create and edit employee pages — preserves user input on validation failure (00_MASTER_SPEC.md § 9.5 Forms). */
 export function EmployeeForm({ initialValues = emptyValues, submitLabel, onSubmit }: EmployeeFormProps) {
+  const [employeeCode, setEmployeeCode] = useState(initialValues.employeeCode);
   const [fullName, setFullName] = useState(initialValues.fullName);
   const [jobTitle, setJobTitle] = useState(initialValues.jobTitle ?? "");
   const [phoneNumber, setPhoneNumber] = useState(initialValues.phoneNumber ?? "");
@@ -32,6 +33,7 @@ export function EmployeeForm({ initialValues = emptyValues, submitLabel, onSubmi
 
     try {
       await onSubmit({
+        employeeCode,
         fullName,
         jobTitle: jobTitle.trim() === "" ? null : jobTitle,
         phoneNumber: phoneNumber.trim() === "" ? null : phoneNumber,
@@ -53,6 +55,14 @@ export function EmployeeForm({ initialValues = emptyValues, submitLabel, onSubmi
 
   return (
     <form onSubmit={handleSubmit} noValidate className="flex flex-col gap-4">
+      <Input
+        id="employeeCode"
+        label="Employee code"
+        placeholder="e.g. EMP-014"
+        value={employeeCode}
+        onChange={(e) => setEmployeeCode(e.target.value)}
+        error={fieldErrors.employeecode}
+      />
       <Input
         id="fullName"
         label="Full name"

@@ -16,7 +16,7 @@ public class DeleteEmployeeCommandHandlerTests
     [Fact]
     public async Task Handle_WithExistingEmployee_SoftDeletesAndSavesChanges()
     {
-        var employee = Employee.Create("Ravi Kumar", null, null, null);
+        var employee = Employee.Create("EMP-001", "Ravi Kumar", null, null, null);
         _employeeRepository.GetByIdAsync(employee.Id, Arg.Any<CancellationToken>()).Returns(employee);
         _orderRepository.ExistsForEmployeeAsync(employee.Id, Arg.Any<CancellationToken>()).Returns(false);
         var callerId = Guid.NewGuid();
@@ -47,7 +47,7 @@ public class DeleteEmployeeCommandHandlerTests
     [Fact]
     public async Task Handle_WithOrdersAssigned_RefusesAndLeavesTheEmployeeIntact()
     {
-        var employee = Employee.Create("Ravi Kumar", null, null, null);
+        var employee = Employee.Create("EMP-001", "Ravi Kumar", null, null, null);
         _employeeRepository.GetByIdAsync(employee.Id, Arg.Any<CancellationToken>()).Returns(employee);
         _orderRepository.ExistsForEmployeeAsync(employee.Id, Arg.Any<CancellationToken>()).Returns(true);
         var handler = new DeleteEmployeeCommandHandler(_employeeRepository, _orderRepository, _currentUserService);

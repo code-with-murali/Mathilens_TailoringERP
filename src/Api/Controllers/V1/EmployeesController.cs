@@ -47,7 +47,7 @@ public sealed class EmployeesController : ApiControllerBase
         var content = ExcelSheet.Write(
             "Employees",
             EmployeeSheet.Headers,
-            result.Value.Select(e => new object?[] { e.Id, e.FullName, e.JobTitle, e.PhoneNumber, e.Email }));
+            result.Value.Select(e => new object?[] { e.Id, e.EmployeeCode, e.FullName, e.JobTitle, e.PhoneNumber, e.Email }));
 
         return File(content, ExcelSheet.ContentType, "employees.xlsx");
     }
@@ -84,6 +84,7 @@ public sealed class EmployeesController : ApiControllerBase
             .Select(r => new EmployeeImportRow(
                 r.RowNumber,
                 r.GetGuid(EmployeeSheet.Id),
+                r.GetRequiredString(EmployeeSheet.EmployeeCode),
                 r.GetRequiredString(EmployeeSheet.FullName),
                 r.GetString(EmployeeSheet.JobTitle),
                 r.GetString(EmployeeSheet.PhoneNumber),
@@ -101,7 +102,7 @@ public sealed class EmployeesController : ApiControllerBase
     [ProducesResponseType(typeof(ApiErrorResponse), StatusCodes.Status400BadRequest)]
     public async Task<IActionResult> Create([FromBody] CreateEmployeeRequest request, CancellationToken cancellationToken)
     {
-        var command = new CreateEmployeeCommand(request.FullName, request.JobTitle, request.PhoneNumber, request.Email);
+        var command = new CreateEmployeeCommand(request.EmployeeCode, request.FullName, request.JobTitle, request.PhoneNumber, request.Email);
         var result = await _sender.Send(command, cancellationToken);
         return ToActionResult(result);
     }
@@ -138,7 +139,7 @@ public sealed class EmployeesController : ApiControllerBase
     [ProducesResponseType(typeof(ApiErrorResponse), StatusCodes.Status404NotFound)]
     public async Task<IActionResult> Update(Guid id, [FromBody] UpdateEmployeeRequest request, CancellationToken cancellationToken)
     {
-        var command = new UpdateEmployeeCommand(id, request.FullName, request.JobTitle, request.PhoneNumber, request.Email);
+        var command = new UpdateEmployeeCommand(id, request.EmployeeCode, request.FullName, request.JobTitle, request.PhoneNumber, request.Email);
         var result = await _sender.Send(command, cancellationToken);
         return ToActionResult(result);
     }

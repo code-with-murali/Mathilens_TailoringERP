@@ -63,6 +63,7 @@ export default function EditEmployeePage() {
         <div className="max-w-xl rounded-lg border border-border bg-surface p-6">
           <EmployeeForm
             initialValues={{
+              employeeCode: employee.employeeCode,
               fullName: employee.fullName,
               jobTitle: employee.jobTitle,
               phoneNumber: employee.phoneNumber,

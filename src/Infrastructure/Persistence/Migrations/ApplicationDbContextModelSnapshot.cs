@@ -247,7 +247,9 @@ namespace MathilensERP.Infrastructure.Persistence.Migrations
 
                     b.HasIndex("FullName");
 
-                    b.HasIndex("PhoneNumber");
+                    b.HasIndex("PhoneNumber")
+                        .IsUnique()
+                        .HasFilter("\"IsDeleted\" = false");
 
                     b.HasIndex("Religion");
 
@@ -274,6 +276,11 @@ namespace MathilensERP.Infrastructure.Persistence.Migrations
                     b.Property<string>("Email")
                         .HasMaxLength(256)
                         .HasColumnType("character varying(256)");
+
+                    b.Property<string>("EmployeeCode")
+                        .IsRequired()
+                        .HasMaxLength(30)
+                        .HasColumnType("character varying(30)");
 
                     b.Property<string>("FullName")
                         .IsRequired()
@@ -308,7 +315,15 @@ namespace MathilensERP.Infrastructure.Persistence.Migrations
 
                     b.HasKey("Id");
 
+                    b.HasIndex("EmployeeCode")
+                        .IsUnique()
+                        .HasFilter("\"IsDeleted\" = false");
+
                     b.HasIndex("IsDeleted");
+
+                    b.HasIndex("PhoneNumber")
+                        .IsUnique()
+                        .HasFilter("\"IsDeleted\" = false AND \"PhoneNumber\" IS NOT NULL");
 
                     b.HasIndex("UserId")
                         .IsUnique()

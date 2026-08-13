@@ -22,7 +22,15 @@ public sealed class UpdateEmployeeCommandHandler : ICommandHandler<UpdateEmploye
                 Error.NotFound("Employee.NotFound", $"No employee was found with id '{command.Id}'."));
         }
 
-        employee.UpdateDetails(command.FullName, command.JobTitle, command.PhoneNumber, command.Email);
+        // Same uniqueness rule as create — but this employee's own code and number aren't clashes.
+        var duplicate = await EmployeeUniqueness.FindConflictAsync(
+            _employeeRepository, command.EmployeeCode, command.PhoneNumber, command.Id, cancellationToken);
+        if (duplicate is not null)
+        {
+            return Result.Failure<EmployeeDto>(duplicate);
+        }
+
+        employee.UpdateDetails(command.EmployeeCode, command.FullName, command.JobTitle, command.PhoneNumber, command.Email);
         await _employeeRepository.SaveChangesAsync(cancellationToken);
 
         return employee.ToDto();

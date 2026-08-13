@@ -17,7 +17,14 @@ public class InvoiceRepository : IInvoiceRepository
     public Task<Invoice?> GetByIdAsync(Guid id, CancellationToken cancellationToken) =>
         _dbContext.Invoices.Include(i => i.Payments).SingleOrDefaultAsync(i => i.Id == id, cancellationToken);
 
-    public async Task<PagedResult<Invoice>> SearchAsync(Guid? customerId, InvoiceStatus? status, int page, int pageSize, CancellationToken cancellationToken)
+    public async Task<PagedResult<Invoice>> SearchAsync(
+        Guid? customerId,
+        InvoiceStatus? status,
+        DateTime? fromUtc,
+        DateTime? toUtc,
+        int page,
+        int pageSize,
+        CancellationToken cancellationToken)
     {
         var query = _dbContext.Invoices.Include(i => i.Payments).AsQueryable();
 
@@ -29,6 +36,18 @@ public class InvoiceRepository : IInvoiceRepository
         if (status is { } s)
         {
             query = query.Where(i => i.Status == s);
+        }
+
+        // Half-open [from, to): the caller passes the start of the day after the range it wants,
+        // so an invoice raised at 23:59:59.9 on the last day is still in it.
+        if (fromUtc is { } from)
+        {
+            query = query.Where(i => i.CreatedAtUtc >= from);
+        }
+
+        if (toUtc is { } to)
+        {
+            query = query.Where(i => i.CreatedAtUtc < to);
         }
 
         var totalCount = await query.CountAsync(cancellationToken);

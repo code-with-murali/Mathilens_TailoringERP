@@ -16,6 +16,18 @@ public sealed class CreateCustomerCommandHandler : ICommandHandler<CreateCustome
 
     public async Task<Result<CustomerDto>> Handle(CreateCustomerCommand command, CancellationToken cancellationToken)
     {
+        // The phone number identifies a customer at the counter and is what the WhatsApp module
+        // and spreadsheet import both correlate on — two customers sharing one would make all
+        // three ambiguous. Soft-deleted customers are outside the query filter, so a number
+        // belonging only to a deleted record is free to reuse.
+        var existing = await _customerRepository.GetByPhoneNumberAsync(command.PhoneNumber, cancellationToken);
+        if (existing is not null)
+        {
+            return Result.Failure<CustomerDto>(Error.Conflict(
+                "Customer.DuplicatePhoneNumber",
+                $"A customer with mobile number '{command.PhoneNumber}' already exists ({existing.FullName})."));
+        }
+
         var customer = Customer.Create(
             command.FullName,
             command.PhoneNumber,

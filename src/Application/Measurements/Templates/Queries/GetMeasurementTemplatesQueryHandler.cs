@@ -1,0 +1,57 @@
+using System.Text.Json;
+using MathilensERP.Application.Common.Mediator;
+using MathilensERP.Application.Settings;
+using MathilensERP.Domain.Measurements;
+using MathilensERP.Shared.Results;
+
+namespace MathilensERP.Application.Measurements.Templates.Queries;
+
+public sealed class GetMeasurementTemplatesQueryHandler
+    : IQueryHandler<GetMeasurementTemplatesQuery, Result<IReadOnlyList<MeasurementTemplateDto>>>
+{
+    private readonly ISettingRepository _settingRepository;
+
+    public GetMeasurementTemplatesQueryHandler(ISettingRepository settingRepository)
+    {
+        _settingRepository = settingRepository;
+    }
+
+    public async Task<Result<IReadOnlyList<MeasurementTemplateDto>>> Handle(
+        GetMeasurementTemplatesQuery query,
+        CancellationToken cancellationToken)
+    {
+        // One query for the whole family rather than one per garment type — this is read on every
+        // New Order screen, so it should cost a single round trip.
+        var stored = await _settingRepository.ListByKeyPrefixAsync(MeasurementTemplateKeys.Prefix, cancellationToken);
+        var storedByKey = stored.ToDictionary(s => s.Key, s => s.Value, StringComparer.Ordinal);
+
+        var templates = Enum.GetValues<GarmentType>()
+            .Select(garmentType =>
+            {
+                var points = storedByKey.TryGetValue(MeasurementTemplateKeys.For(garmentType), out var json)
+                    ? Parse(json)
+                    : null;
+
+                // A stored row that no longer parses (hand-edited in the database, say) falls back
+                // to the default rather than leaving that garment type unmeasurable.
+                return points is { Count: > 0 }
+                    ? new MeasurementTemplateDto(garmentType, points, IsCustomised: true)
+                    : new MeasurementTemplateDto(garmentType, MeasurementTemplateDefaults.For(garmentType), IsCustomised: false);
+            })
+            .ToList();
+
+        return Result.Success<IReadOnlyList<MeasurementTemplateDto>>(templates);
+    }
+
+    private static IReadOnlyList<string>? Parse(string json)
+    {
+        try
+        {
+            return JsonSerializer.Deserialize<List<string>>(json);
+        }
+        catch (JsonException)
+        {
+            return null;
+        }
+    }
+}

@@ -6,6 +6,10 @@ public sealed class CreateEmployeeCommandValidator : AbstractValidator<CreateEmp
 {
     public CreateEmployeeCommandValidator()
     {
+        RuleFor(x => x.EmployeeCode)
+            .NotEmpty()
+            .MaximumLength(30);
+
         RuleFor(x => x.FullName)
             .NotEmpty()
             .MaximumLength(200);

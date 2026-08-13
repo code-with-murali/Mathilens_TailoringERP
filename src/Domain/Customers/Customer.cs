@@ -82,7 +82,9 @@ public sealed class Customer : AuditableEntity
         DateOnly? weddingDate)
     {
         FullName = Guard.AgainstNullOrWhiteSpace(fullName, nameof(fullName));
-        PhoneNumber = Guard.AgainstNullOrWhiteSpace(phoneNumber, nameof(phoneNumber));
+        // Trimmed because the phone number is compared for uniqueness — a trailing space must
+        // not be what makes a second customer "different".
+        PhoneNumber = Guard.AgainstNullOrWhiteSpace(phoneNumber, nameof(phoneNumber)).Trim();
         Email = email;
         Address = address;
         Notes = notes;

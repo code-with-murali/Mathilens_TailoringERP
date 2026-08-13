@@ -91,7 +91,7 @@ export default function RegisterPage() {
             {fieldErrors.password ? (
               <p className="text-sm text-danger">{fieldErrors.password}</p>
             ) : (
-              <p className="text-sm text-foreground/60">At least 12 characters, with upper, lower, and a number.</p>
+              <p className="text-sm text-foreground/60">At least 8 characters, with upper, lower, and a number.</p>
             )}
           </div>
 

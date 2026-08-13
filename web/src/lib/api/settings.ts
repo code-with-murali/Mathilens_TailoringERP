@@ -19,6 +19,11 @@ export const DEFAULT_ORDER_DUE_DATE_DAYS_KEY = "Orders.DefaultDueDateDurationDay
 export const SHOP_NAME_KEY = "Shop.Name";
 export const SHOP_CONTACT_NUMBER_KEY = "Shop.ContactNumber";
 
+/** One key per garment type, holding its measurement points as a JSON array in display order.
+ * Written and read through the Measurements endpoints (see `@/lib/api/measurements`), not here —
+ * this prefix exists so the raw key/value list can hide rows that have their own editor. */
+export const MEASUREMENT_TEMPLATE_KEY_PREFIX = "Measurements.Template.";
+
 export function listSettings(page: number, pageSize: number, token: string | null) {
   const params = new URLSearchParams({ page: String(page), pageSize: String(pageSize) });
   return apiGetPaged<Setting>(`/api/v1/settings?${params}`, token);

@@ -9,7 +9,7 @@ public class UpdateEmployeeCommandValidatorTests
     [Fact]
     public void Validate_WithValidCommand_Passes()
     {
-        var result = _validator.Validate(new UpdateEmployeeCommand(Guid.NewGuid(), "Ravi Kumar", null, null, null));
+        var result = _validator.Validate(new UpdateEmployeeCommand(Guid.NewGuid(), "EMP-001", "Ravi Kumar", null, null, null));
 
         Assert.True(result.IsValid);
     }
@@ -17,7 +17,7 @@ public class UpdateEmployeeCommandValidatorTests
     [Fact]
     public void Validate_WithEmptyId_Fails()
     {
-        var result = _validator.Validate(new UpdateEmployeeCommand(Guid.Empty, "Ravi Kumar", null, null, null));
+        var result = _validator.Validate(new UpdateEmployeeCommand(Guid.Empty, "EMP-001", "Ravi Kumar", null, null, null));
 
         Assert.False(result.IsValid);
         Assert.Contains(result.Errors, e => e.PropertyName == nameof(UpdateEmployeeCommand.Id));
@@ -26,7 +26,7 @@ public class UpdateEmployeeCommandValidatorTests
     [Fact]
     public void Validate_WithBlankFullName_Fails()
     {
-        var result = _validator.Validate(new UpdateEmployeeCommand(Guid.NewGuid(), "", null, null, null));
+        var result = _validator.Validate(new UpdateEmployeeCommand(Guid.NewGuid(), "EMP-001", "", null, null, null));
 
         Assert.False(result.IsValid);
         Assert.Contains(result.Errors, e => e.PropertyName == nameof(UpdateEmployeeCommand.FullName));

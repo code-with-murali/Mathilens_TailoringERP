@@ -9,8 +9,8 @@ import { SearchPicker } from "@/components/ui/SearchPicker";
 import { ConfirmDialog } from "@/components/ui/ConfirmDialog";
 import { OrderItemsEditor, type ItemRow } from "@/components/orders/OrderItemsEditor";
 import { InvoicePrintModal } from "@/components/orders/InvoicePrintModal";
-import { getMeasurementFields } from "@/components/measurements/MeasurementValuesEditor";
 import { OrderStatusCounts } from "@/components/dashboard/OrderStatusCounts";
+import { useMeasurementFields } from "@/lib/use-measurement-templates";
 import { useToast } from "@/components/ui/ToastProvider";
 import { useDebouncedValue } from "@/lib/use-debounced-value";
 import { getAccessToken } from "@/lib/auth";
@@ -75,8 +75,10 @@ export default function NewOrderPage() {
   const activeMeasurement = activeMeasurementItem ? (customerMeasurements.find((m) => m.garmentType === activeMeasurementItem.garmentType) ?? null) : null;
 
   // Split into two side-by-side halves within one merged block (00_MASTER_SPEC.md § 9.6) rather
-  // than one long list.
-  const measurementFields = activeMeasurementItem ? getMeasurementFields(activeMeasurementItem.garmentType) : [];
+  // than one long list. The points themselves come from the shop's configured template
+  // (Settings › Measurement Templates), in its configured order.
+  const { fields: measurementFields, isLoading: isLoadingTemplate } =
+    useMeasurementFields(activeMeasurementItem?.garmentType ?? null);
   const measurementFieldsFirstHalf = measurementFields.slice(0, Math.ceil(measurementFields.length / 2));
   const measurementFieldsSecondHalf = measurementFields.slice(Math.ceil(measurementFields.length / 2));
 
@@ -623,10 +625,10 @@ export default function NewOrderPage() {
                   </div>
                   {!customer ? (
                     <p className="text-sm text-foreground/70">Select a customer to view or add their measurements.</p>
-                  ) : isLoadingMeasurements ? (
+                  ) : isLoadingMeasurements || isLoadingTemplate ? (
                     <p className="text-sm text-foreground/70">Loading measurements…</p>
                   ) : measurementFields.length === 0 ? (
-                    <p className="text-sm text-foreground/70">No measurement template configured for {activeMeasurementItem.garmentType} yet.</p>
+                    <p className="text-sm text-foreground/70">No measurement points configured for {activeMeasurementItem.garmentType} yet.</p>
                   ) : (
                     <div className="flex flex-col gap-4 sm:flex-row sm:gap-8">
                       <div className="flex flex-1 flex-col gap-2">

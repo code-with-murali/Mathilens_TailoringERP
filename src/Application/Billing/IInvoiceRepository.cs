@@ -8,7 +8,16 @@ public interface IInvoiceRepository
 {
     Task<Invoice?> GetByIdAsync(Guid id, CancellationToken cancellationToken);
 
-    Task<PagedResult<Invoice>> SearchAsync(Guid? customerId, InvoiceStatus? status, int page, int pageSize, CancellationToken cancellationToken);
+    /// <param name="fromUtc">Inclusive lower bound on <see cref="Domain.Common.AuditableEntity.CreatedAtUtc"/>; null for no lower bound.</param>
+    /// <param name="toUtc">Exclusive upper bound; null for no upper bound.</param>
+    Task<PagedResult<Invoice>> SearchAsync(
+        Guid? customerId,
+        InvoiceStatus? status,
+        DateTime? fromUtc,
+        DateTime? toUtc,
+        int page,
+        int pageSize,
+        CancellationToken cancellationToken);
 
     /// <summary>Whether any live (non-voided) invoice bills the given order — used to keep a billed order from being deleted.</summary>
     Task<bool> ExistsBillableForOrderAsync(Guid orderId, CancellationToken cancellationToken);

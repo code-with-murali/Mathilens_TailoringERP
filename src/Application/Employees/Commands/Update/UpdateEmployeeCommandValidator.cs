@@ -9,6 +9,10 @@ public sealed class UpdateEmployeeCommandValidator : AbstractValidator<UpdateEmp
         RuleFor(x => x.Id)
             .NotEmpty();
 
+        RuleFor(x => x.EmployeeCode)
+            .NotEmpty()
+            .MaximumLength(30);
+
         RuleFor(x => x.FullName)
             .NotEmpty()
             .MaximumLength(200);

@@ -76,9 +76,35 @@ export default function DashboardLayout({ children }: LayoutProps<"/dashboard">)
   )?.label ?? "Dashboard";
 
   // The New Order page has its own immersive theme (a fixed dark skin, independent of the
-  // ThemeToggle) plus its own heading and "Back to orders" link — the shared breadcrumb/theme
-  // toggle bar would be redundant chrome and the toggle would visibly do nothing there.
-  const hideHeader = pathname === "/dashboard/orders/new";
+  // ThemeToggle) plus its own heading and "Back to orders" link — the shared breadcrumb and
+  // theme toggle would be redundant chrome there, and the theme toggle would visibly do nothing.
+  // The nav controls are *not* redundant though: without them that page is the one screen with
+  // no way to collapse the rail or open the drawer, so they are kept on their own slim bar.
+  const chromeless = pathname === "/dashboard/orders/new";
+
+  const navToggles = (
+    <div className="flex items-center gap-3">
+      {/* Two buttons rather than one, each shown at the size it belongs to — CSS decides
+          which, so neither needs to guess the viewport before the first paint. */}
+      <button
+        type="button"
+        onClick={() => setIsDrawerOpen(true)}
+        aria-label="Open navigation"
+        className="-ml-2 rounded-md p-2 text-foreground/65 transition-colors hover:bg-surface-hover hover:text-foreground lg:hidden"
+      >
+        <MenuIcon className="h-5 w-5" />
+      </button>
+      <button
+        type="button"
+        onClick={() => setIsCollapsed((collapsed) => !collapsed)}
+        aria-label={isCollapsed ? "Expand navigation" : "Collapse navigation"}
+        aria-pressed={isCollapsed}
+        className="-ml-2 hidden rounded-md p-2 text-foreground/65 transition-colors hover:bg-surface-hover hover:text-foreground lg:block"
+      >
+        <MenuIcon className="h-5 w-5" />
+      </button>
+    </div>
+  );
 
   return (
     <div className="flex min-h-full flex-1">
@@ -148,28 +174,12 @@ export default function DashboardLayout({ children }: LayoutProps<"/dashboard">)
         </div>
       </aside>
       <div className="flex min-h-full flex-1 flex-col">
-        {!hideHeader && (
+        {chromeless ? (
+          <div className="flex shrink-0 items-center px-6 pt-4 print:hidden">{navToggles}</div>
+        ) : (
           <header className="sticky top-0 z-10 flex h-14 shrink-0 items-center justify-between border-b border-border bg-surface/80 px-6 backdrop-blur-sm print:hidden">
             <div className="flex items-center gap-3">
-              {/* Two buttons rather than one, each shown at the size it belongs to — CSS decides
-                  which, so neither needs to guess the viewport before the first paint. */}
-              <button
-                type="button"
-                onClick={() => setIsDrawerOpen(true)}
-                aria-label="Open navigation"
-                className="-ml-2 rounded-md p-2 text-foreground/65 transition-colors hover:bg-surface-hover hover:text-foreground lg:hidden"
-              >
-                <MenuIcon className="h-5 w-5" />
-              </button>
-              <button
-                type="button"
-                onClick={() => setIsCollapsed((collapsed) => !collapsed)}
-                aria-label={isCollapsed ? "Expand navigation" : "Collapse navigation"}
-                aria-pressed={isCollapsed}
-                className="-ml-2 hidden rounded-md p-2 text-foreground/65 transition-colors hover:bg-surface-hover hover:text-foreground lg:block"
-              >
-                <MenuIcon className="h-5 w-5" />
-              </button>
+              {navToggles}
               <span className="text-sm font-medium text-foreground/70">{activeLabel}</span>
             </div>
             <ThemeToggle />

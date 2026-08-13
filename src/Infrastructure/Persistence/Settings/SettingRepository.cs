@@ -32,6 +32,12 @@ public class SettingRepository : ISettingRepository
         return new PagedResult<Setting>(items, page, pageSize, totalCount);
     }
 
+    public async Task<IReadOnlyList<Setting>> ListByKeyPrefixAsync(string keyPrefix, CancellationToken cancellationToken) =>
+        await _dbContext.Settings
+            .Where(s => s.Key.StartsWith(keyPrefix))
+            .OrderBy(s => s.Key)
+            .ToListAsync(cancellationToken);
+
     public void Add(Setting setting) => _dbContext.Settings.Add(setting);
 
     public void Remove(Setting setting) => _dbContext.Settings.Remove(setting);

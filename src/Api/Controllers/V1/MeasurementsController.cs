@@ -9,6 +9,10 @@ using MathilensERP.Application.Measurements.Commands.UpdateValues;
 using MathilensERP.Application.Measurements.Queries.ByCustomer;
 using MathilensERP.Application.Measurements.Queries.GetById;
 using MathilensERP.Application.Measurements.Queries.History;
+using MathilensERP.Application.Measurements.Templates;
+using MathilensERP.Application.Measurements.Templates.Commands;
+using MathilensERP.Application.Measurements.Templates.Queries;
+using MathilensERP.Domain.Measurements;
 using MathilensERP.Shared.Constants;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
@@ -85,5 +89,42 @@ public sealed class MeasurementsController : ApiControllerBase
     {
         var result = await _sender.Send(new GetMeasurementHistoryQuery(id, page, pageSize), cancellationToken);
         return ToPagedActionResult(result);
+    }
+
+    /// <summary>
+    /// The measurement points to ask for, per garment type, in the shop's own order. Readable by
+    /// anyone who may take a measurement — front desk and tailor staff hold no Settings
+    /// permission, so this deliberately does not live under the Settings endpoints.
+    /// </summary>
+    [HttpGet("measurements/templates")]
+    [ProducesResponseType(typeof(ApiResponse<IReadOnlyList<MeasurementTemplateDto>>), StatusCodes.Status200OK)]
+    public async Task<IActionResult> GetTemplates(CancellationToken cancellationToken)
+    {
+        var result = await _sender.Send(new GetMeasurementTemplatesQuery(), cancellationToken);
+        return ToActionResult(result);
+    }
+
+    /// <summary>Replaces one garment type's measurement points and their order. Configuration, so it takes Settings.Manage.</summary>
+    [HttpPut("measurements/templates/{garmentType}")]
+    [Authorize(Policy = Permissions.SettingsManage)]
+    [ProducesResponseType(typeof(ApiResponse<MeasurementTemplateDto>), StatusCodes.Status200OK)]
+    [ProducesResponseType(typeof(ApiErrorResponse), StatusCodes.Status400BadRequest)]
+    public async Task<IActionResult> SetTemplate(
+        GarmentType garmentType,
+        [FromBody] SetMeasurementTemplateRequest request,
+        CancellationToken cancellationToken)
+    {
+        var result = await _sender.Send(new SetMeasurementTemplateCommand(garmentType, request.Points), cancellationToken);
+        return ToActionResult(result);
+    }
+
+    /// <summary>Restores a garment type to the built-in measurement points.</summary>
+    [HttpDelete("measurements/templates/{garmentType}")]
+    [Authorize(Policy = Permissions.SettingsManage)]
+    [ProducesResponseType(typeof(ApiResponse<MeasurementTemplateDto>), StatusCodes.Status200OK)]
+    public async Task<IActionResult> ResetTemplate(GarmentType garmentType, CancellationToken cancellationToken)
+    {
+        var result = await _sender.Send(new ResetMeasurementTemplateCommand(garmentType), cancellationToken);
+        return ToActionResult(result);
     }
 }

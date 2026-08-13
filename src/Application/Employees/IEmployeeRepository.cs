@@ -13,8 +13,11 @@ public interface IEmployeeRepository
     /// <summary>Every employee, unpaginated — for spreadsheet export, which has no page to scroll.</summary>
     Task<IReadOnlyList<Employee>> ListAllAsync(CancellationToken cancellationToken);
 
-    /// <summary>Exact match on the phone number, the natural key spreadsheet imports upsert against.</summary>
+    /// <summary>Exact match on the phone number, kept unique across live employees.</summary>
     Task<Employee?> GetByPhoneNumberAsync(string phoneNumber, CancellationToken cancellationToken);
+
+    /// <summary>Case-insensitive exact match on the shop's staff code — the natural key spreadsheet imports upsert against.</summary>
+    Task<Employee?> GetByEmployeeCodeAsync(string employeeCode, CancellationToken cancellationToken);
 
     void Add(Employee employee);
 

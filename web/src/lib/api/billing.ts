@@ -28,12 +28,16 @@ export type Invoice = {
   payments: Payment[];
 };
 
+/** A half-open [from, to) range of UTC instants. Either end may be null for "unbounded". */
+export type DateRange = { fromUtc: string | null; toUtc: string | null };
+
 export function searchInvoices(
   customerId: string | null,
   status: InvoiceStatus | null,
   page: number,
   pageSize: number,
   token: string | null,
+  range: DateRange = { fromUtc: null, toUtc: null },
 ) {
   const params = new URLSearchParams({ page: String(page), pageSize: String(pageSize) });
   if (customerId) {
@@ -41,6 +45,12 @@ export function searchInvoices(
   }
   if (status) {
     params.set("status", status);
+  }
+  if (range.fromUtc) {
+    params.set("from", range.fromUtc);
+  }
+  if (range.toUtc) {
+    params.set("to", range.toUtc);
   }
   return apiGetPaged<Invoice>(`/api/v1/invoices?${params}`, token);
 }

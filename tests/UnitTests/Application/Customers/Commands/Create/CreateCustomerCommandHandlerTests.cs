@@ -22,4 +22,23 @@ public class CreateCustomerCommandHandlerTests
         repository.Received(1).Add(Arg.Any<Customer>());
         await repository.Received(1).SaveChangesAsync(Arg.Any<CancellationToken>());
     }
+
+    [Fact]
+    public async Task Handle_WithPhoneNumberAlreadyUsed_ReturnsConflictAndSavesNothing()
+    {
+        var existing = Customer.Create("Asha Rao", "+91 98765 43210", null, null, null);
+        var repository = Substitute.For<ICustomerRepository>();
+        repository.GetByPhoneNumberAsync("+91 98765 43210", Arg.Any<CancellationToken>()).Returns(existing);
+        var handler = new CreateCustomerCommandHandler(repository);
+        var command = new CreateCustomerCommand("Someone Else", "+91 98765 43210", null, null, null);
+
+        var result = await handler.Handle(command, CancellationToken.None);
+
+        Assert.True(result.IsFailure);
+        Assert.Equal("Customer.DuplicatePhoneNumber", result.Error.Code);
+        // The clash names the customer holding the number, so staff can go straight to them.
+        Assert.Contains("Asha Rao", result.Error.Message);
+        repository.DidNotReceive().Add(Arg.Any<Customer>());
+        await repository.DidNotReceive().SaveChangesAsync(Arg.Any<CancellationToken>());
+    }
 }

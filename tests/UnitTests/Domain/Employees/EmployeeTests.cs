@@ -7,7 +7,7 @@ public class EmployeeTests
     [Fact]
     public void Create_WithValidInputs_SetsAllFields()
     {
-        var employee = Employee.Create("Ravi Kumar", "Master Tailor", "+91 98765 43210", "ravi@example.com");
+        var employee = Employee.Create("EMP-001", "Ravi Kumar", "Master Tailor", "+91 98765 43210", "ravi@example.com");
 
         Assert.NotEqual(Guid.Empty, employee.Id);
         Assert.Equal("Ravi Kumar", employee.FullName);
@@ -20,7 +20,7 @@ public class EmployeeTests
     [Fact]
     public void Create_WithOnlyRequiredFields_LeavesOptionalFieldsNull()
     {
-        var employee = Employee.Create("Ravi Kumar", null, null, null);
+        var employee = Employee.Create("EMP-001", "Ravi Kumar", null, null, null);
 
         Assert.Null(employee.JobTitle);
         Assert.Null(employee.PhoneNumber);
@@ -30,15 +30,15 @@ public class EmployeeTests
     [Fact]
     public void Create_WithBlankFullName_Throws()
     {
-        Assert.Throws<ArgumentException>(() => Employee.Create(" ", null, null, null));
+        Assert.Throws<ArgumentException>(() => Employee.Create("EMP-001", " ", null, null, null));
     }
 
     [Fact]
     public void UpdateDetails_ReplacesAllFields()
     {
-        var employee = Employee.Create("Ravi Kumar", "Tailor", null, null);
+        var employee = Employee.Create("EMP-001", "Ravi Kumar", "Tailor", null, null);
 
-        employee.UpdateDetails("Ravi K.", "Master Tailor", "+91 90000 00000", "ravi.k@example.com");
+        employee.UpdateDetails("EMP-001", "Ravi K.", "Master Tailor", "+91 90000 00000", "ravi.k@example.com");
 
         Assert.Equal("Ravi K.", employee.FullName);
         Assert.Equal("Master Tailor", employee.JobTitle);
@@ -49,8 +49,8 @@ public class EmployeeTests
     [Fact]
     public void UpdateDetails_WithBlankFullName_Throws()
     {
-        var employee = Employee.Create("Ravi Kumar", null, null, null);
+        var employee = Employee.Create("EMP-001", "Ravi Kumar", null, null, null);
 
-        Assert.Throws<ArgumentException>(() => employee.UpdateDetails(" ", null, null, null));
+        Assert.Throws<ArgumentException>(() => employee.UpdateDetails("EMP-001", " ", null, null, null));
     }
 }

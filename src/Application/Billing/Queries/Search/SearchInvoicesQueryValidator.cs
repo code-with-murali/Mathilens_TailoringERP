@@ -16,5 +16,10 @@ public sealed class SearchInvoicesQueryValidator : AbstractValidator<SearchInvoi
         RuleFor(x => x.Status)
             .IsInEnum()
             .When(x => x.Status.HasValue);
+
+        RuleFor(x => x.FromUtc)
+            .LessThanOrEqualTo(x => x.ToUtc!.Value)
+            .WithMessage("The 'from' date must not be after the 'to' date.")
+            .When(x => x.FromUtc.HasValue && x.ToUtc.HasValue);
     }
 }

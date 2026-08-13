@@ -14,6 +14,6 @@ public sealed class RegisterCommandValidator : AbstractValidator<RegisterCommand
         // ASP.NET Core Identity's CreateAsync — this just rejects the empty-field case early.
         RuleFor(x => x.Password)
             .NotEmpty()
-            .MinimumLength(12);
+            .MinimumLength(8);
     }
 }

@@ -48,7 +48,15 @@ public class CustomerConfiguration : IEntityTypeConfiguration<Customer>
 
         // 02_DATABASE.md § 10.3 Index Recommendations: phone is the primary shop-staff/WhatsApp
         // lookup path, name is the primary search path.
-        builder.HasIndex(c => c.PhoneNumber);
+        //
+        // Phone is additionally unique: it is the natural key staff, the WhatsApp module and the
+        // spreadsheet import all identify a customer by. The application layer reports the clash
+        // as a friendly conflict; this index is the backstop that two simultaneous requests can't
+        // slip past. Filtered on IsDeleted so a soft-deleted customer doesn't reserve a number
+        // forever — the same set of rows the global query filter considers live.
+        builder.HasIndex(c => c.PhoneNumber)
+            .IsUnique()
+            .HasFilter("\"IsDeleted\" = false");
         builder.HasIndex(c => c.FullName);
 
         // Religion is a filter on the customers list, so it is indexed like the other search paths.

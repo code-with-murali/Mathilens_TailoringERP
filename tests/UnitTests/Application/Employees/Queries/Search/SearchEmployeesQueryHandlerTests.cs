@@ -11,7 +11,7 @@ public class SearchEmployeesQueryHandlerTests
     [Fact]
     public async Task Handle_MapsPagedEmployeesToDtos()
     {
-        var employee = Employee.Create("Ravi Kumar", null, null, null);
+        var employee = Employee.Create("EMP-001", "Ravi Kumar", null, null, null);
         var repository = Substitute.For<IEmployeeRepository>();
         repository.SearchAsync("Ravi", 1, 20, Arg.Any<CancellationToken>())
             .Returns(new PagedResult<Employee>([employee], 1, 20, 1));

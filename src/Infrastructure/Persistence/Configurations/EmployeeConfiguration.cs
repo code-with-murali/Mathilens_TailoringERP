@@ -13,6 +13,10 @@ public class EmployeeConfiguration : IEntityTypeConfiguration<Employee>
         builder.ToTable("Employees");
         builder.HasKey(e => e.Id);
 
+        builder.Property(e => e.EmployeeCode)
+            .IsRequired()
+            .HasMaxLength(30);
+
         builder.Property(e => e.FullName)
             .IsRequired()
             .HasMaxLength(200);
@@ -43,6 +47,19 @@ public class EmployeeConfiguration : IEntityTypeConfiguration<Employee>
 
         // 02_DATABASE.md § 10.6 Index Recommendations: active-staff lookups filter on IsDeleted.
         builder.HasIndex(e => e.IsDeleted);
+
+        // The staff code and phone number each identify one person. Both are unique across live
+        // employees only — a soft-deleted record must not reserve a code or a number forever —
+        // and the phone filter also excludes NULL, since "no phone recorded" is not a clash.
+        // The application layer reports either collision as a friendly conflict; these indexes
+        // are the backstop two simultaneous requests can't slip past.
+        builder.HasIndex(e => e.EmployeeCode)
+            .IsUnique()
+            .HasFilter("\"IsDeleted\" = false");
+
+        builder.HasIndex(e => e.PhoneNumber)
+            .IsUnique()
+            .HasFilter("\"IsDeleted\" = false AND \"PhoneNumber\" IS NOT NULL");
 
         builder.Property<uint>("xmin").IsRowVersion();
     }

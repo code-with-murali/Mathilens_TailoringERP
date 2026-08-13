@@ -7,6 +7,7 @@ import { DEFAULT_PAGE_SIZE, Pagination } from "@/components/ui/Pagination";
 import { ConfirmDialog } from "@/components/ui/ConfirmDialog";
 import { useToast } from "@/components/ui/ToastProvider";
 import { ThemeToggle } from "@/components/theme-toggle";
+import { MeasurementTemplatesSection } from "./MeasurementTemplatesSection";
 import { getAccessToken } from "@/lib/auth";
 import { ApiError, type PaginationMeta } from "@/lib/api-client";
 import {
@@ -15,6 +16,7 @@ import {
   deleteSetting,
   getSetting,
   DEFAULT_ORDER_DUE_DATE_DAYS_KEY,
+  MEASUREMENT_TEMPLATE_KEY_PREFIX,
   type Setting,
 } from "@/lib/api/settings";
 
@@ -47,7 +49,11 @@ export default function SettingsPage() {
     setLoadError(null);
     try {
       const { items, meta } = await listSettings(page, pageSize, getAccessToken());
-      setSettings(items.filter((s) => s.key !== DEFAULT_ORDER_DUE_DATE_DAYS_KEY));
+      // Keys that already have a purpose-built editor above are hidden from the raw key/value
+      // list — editing a measurement template as a line of JSON is a way to break it, not a feature.
+      setSettings(
+        items.filter((s) => s.key !== DEFAULT_ORDER_DUE_DATE_DAYS_KEY && !s.key.startsWith(MEASUREMENT_TEMPLATE_KEY_PREFIX)),
+      );
       setMeta(meta);
     } catch (error) {
       setLoadError(error instanceof ApiError ? error.message : "Unable to load settings.");
@@ -204,6 +210,8 @@ export default function SettingsPage() {
           </Button>
         </div>
       </form>
+
+      <MeasurementTemplatesSection />
 
       {formState && (
         <form onSubmit={handleSubmit} className="flex max-w-xl flex-col gap-4 rounded-lg border border-border bg-surface p-6">

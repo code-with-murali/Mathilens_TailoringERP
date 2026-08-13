@@ -15,7 +15,8 @@ public sealed class SearchInvoicesQueryHandler : IQueryHandler<SearchInvoicesQue
 
     public async Task<Result<PagedResult<InvoiceDto>>> Handle(SearchInvoicesQuery query, CancellationToken cancellationToken)
     {
-        var page = await _invoiceRepository.SearchAsync(query.CustomerId, query.Status, query.Page, query.PageSize, cancellationToken);
+        var page = await _invoiceRepository.SearchAsync(
+            query.CustomerId, query.Status, query.FromUtc, query.ToUtc, query.Page, query.PageSize, cancellationToken);
 
         var items = page.Items.Select(i => i.ToDto()).ToList();
 

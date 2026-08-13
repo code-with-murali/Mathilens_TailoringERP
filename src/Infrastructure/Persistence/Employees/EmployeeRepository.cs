@@ -25,6 +25,7 @@ public class EmployeeRepository : IEmployeeRepository
         {
             query = query.Where(e =>
                 EF.Functions.ILike(e.FullName, $"%{searchTerm}%") ||
+                EF.Functions.ILike(e.EmployeeCode, $"%{searchTerm}%") ||
                 (e.PhoneNumber != null && EF.Functions.ILike(e.PhoneNumber, $"%{searchTerm}%")));
         }
 
@@ -44,6 +45,9 @@ public class EmployeeRepository : IEmployeeRepository
 
     public Task<Employee?> GetByPhoneNumberAsync(string phoneNumber, CancellationToken cancellationToken) =>
         _dbContext.Employees.FirstOrDefaultAsync(e => e.PhoneNumber == phoneNumber, cancellationToken);
+
+    public Task<Employee?> GetByEmployeeCodeAsync(string employeeCode, CancellationToken cancellationToken) =>
+        _dbContext.Employees.FirstOrDefaultAsync(e => EF.Functions.ILike(e.EmployeeCode, employeeCode), cancellationToken);
 
     public void Add(Employee employee) => _dbContext.Employees.Add(employee);
 

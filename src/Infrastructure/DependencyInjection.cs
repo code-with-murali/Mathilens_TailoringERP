@@ -63,7 +63,7 @@ public static class DependencyInjection
             .AddIdentityCore<ApplicationUser>(options =>
             {
                 // 00_MASTER_SPEC.md § 10.4 Password Policy.
-                options.Password.RequiredLength = 12;
+                options.Password.RequiredLength = 8;
                 options.Password.RequireNonAlphanumeric = false;
                 options.Lockout.MaxFailedAccessAttempts = 5;
                 options.Lockout.DefaultLockoutTimeSpan = TimeSpan.FromMinutes(15);

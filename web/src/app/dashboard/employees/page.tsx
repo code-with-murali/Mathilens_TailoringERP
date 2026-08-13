@@ -85,7 +85,7 @@ export default function EmployeesPage() {
 
       <Input
         id="search"
-        label="Search by name or phone"
+        label="Search by name, code or phone"
         value={searchInput}
         onChange={(e) => handleSearchChange(e.target.value)}
         placeholder="Search employees…"
@@ -104,6 +104,7 @@ export default function EmployeesPage() {
           <table className="w-full text-left text-sm">
             <thead className="border-b border-border bg-surface">
               <tr>
+                <th className="px-4 py-3 font-medium">Code</th>
                 <th className="px-4 py-3 font-medium">Name</th>
                 <th className="px-4 py-3 font-medium">Job Title</th>
                 <th className="px-4 py-3 font-medium">Phone</th>
@@ -115,6 +116,7 @@ export default function EmployeesPage() {
             <tbody>
               {employees.map((employee) => (
                 <tr key={employee.id} className="border-b border-border last:border-0">
+                  <td className="px-4 py-3 font-mono">{employee.employeeCode}</td>
                   <td className="px-4 py-3">{employee.fullName}</td>
                   <td className="px-4 py-3">{employee.jobTitle ?? "—"}</td>
                   <td className="px-4 py-3">{employee.phoneNumber ?? "—"}</td>

@@ -22,6 +22,15 @@ public sealed class UpdateCustomerCommandHandler : ICommandHandler<UpdateCustome
                 Error.NotFound("Customer.NotFound", $"No customer was found with id '{command.Id}'."));
         }
 
+        // Same uniqueness rule as create — but the customer's own current number is not a clash.
+        var duplicate = await _customerRepository.GetByPhoneNumberAsync(command.PhoneNumber, cancellationToken);
+        if (duplicate is not null && duplicate.Id != command.Id)
+        {
+            return Result.Failure<CustomerDto>(Error.Conflict(
+                "Customer.DuplicatePhoneNumber",
+                $"A customer with mobile number '{command.PhoneNumber}' already exists ({duplicate.FullName})."));
+        }
+
         customer.UpdateDetails(
             command.FullName,
             command.PhoneNumber,

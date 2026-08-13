@@ -8,10 +8,12 @@ using MathilensERP.Shared.Results;
 namespace MathilensERP.Application.Employees.Commands.Import;
 
 /// <summary>
-/// Upserts a sheet of employees. Unlike customers, an employee's phone number is optional, so
-/// a row without one has no natural key to match on and is always treated as a new employee —
-/// re-importing such a file would duplicate them. Round-tripping through the export (which
-/// carries the Id column) is the reliable way to edit phone-less staff in bulk.
+/// Upserts a sheet of employees: a row is matched on its <c>Id</c> when the file came from an
+/// export, otherwise on the shop's employee code — which is required and unique, so every row
+/// has a natural key to upsert against.
+///
+/// Every row is attempted; invalid ones are collected against their spreadsheet row number
+/// rather than aborting the upload.
 /// </summary>
 public sealed class ImportEmployeesCommandHandler : ICommandHandler<ImportEmployeesCommand, Result<ImportResultDto>>
 {
@@ -36,7 +38,7 @@ public sealed class ImportEmployeesCommandHandler : ICommandHandler<ImportEmploy
         foreach (var row in command.Rows)
         {
             // Reuses the create command's rules so the spreadsheet and the form can never drift apart.
-            var candidate = new CreateEmployeeCommand(row.FullName, row.JobTitle, row.PhoneNumber, row.Email);
+            var candidate = new CreateEmployeeCommand(row.EmployeeCode, row.FullName, row.JobTitle, row.PhoneNumber, row.Email);
             var validation = await _rowValidator.ValidateAsync(candidate, cancellationToken);
             if (!validation.IsValid)
             {
@@ -48,20 +50,26 @@ public sealed class ImportEmployeesCommandHandler : ICommandHandler<ImportEmploy
             {
                 var existing = await FindExistingAsync(row, addedThisBatch, cancellationToken);
 
+                // A row whose phone number belongs to a *different* employee is a row error, not
+                // a silent overwrite of somebody else's contact details.
+                var conflict = await EmployeeUniqueness.FindConflictAsync(
+                    _employeeRepository, row.EmployeeCode, row.PhoneNumber, existing?.Id, cancellationToken);
+                if (conflict is not null)
+                {
+                    errors.Add(new ImportRowErrorDto(row.RowNumber, conflict.Message));
+                    continue;
+                }
+
                 if (existing is null)
                 {
-                    var employee = Employee.Create(row.FullName, row.JobTitle, row.PhoneNumber, row.Email);
+                    var employee = Employee.Create(row.EmployeeCode, row.FullName, row.JobTitle, row.PhoneNumber, row.Email);
                     _employeeRepository.Add(employee);
-                    if (!string.IsNullOrWhiteSpace(row.PhoneNumber))
-                    {
-                        addedThisBatch[row.PhoneNumber] = employee;
-                    }
-
+                    addedThisBatch[row.EmployeeCode.Trim()] = employee;
                     created++;
                 }
                 else
                 {
-                    existing.UpdateDetails(row.FullName, row.JobTitle, row.PhoneNumber, row.Email);
+                    existing.UpdateDetails(row.EmployeeCode, row.FullName, row.JobTitle, row.PhoneNumber, row.Email);
                     updated++;
                 }
             }
@@ -85,19 +93,20 @@ public sealed class ImportEmployeesCommandHandler : ICommandHandler<ImportEmploy
         CancellationToken cancellationToken)
     {
         // An id that no longer resolves (stale export, since-deleted record) falls through to
-        // the phone number rather than failing the row.
+        // the employee code rather than failing the row.
         if (row.Id is { } id && await _employeeRepository.GetByIdAsync(id, cancellationToken) is { } byId)
         {
             return byId;
         }
 
-        if (string.IsNullOrWhiteSpace(row.PhoneNumber))
+        var code = row.EmployeeCode?.Trim();
+        if (string.IsNullOrWhiteSpace(code))
         {
             return null;
         }
 
-        return addedThisBatch.TryGetValue(row.PhoneNumber, out var pending)
+        return addedThisBatch.TryGetValue(code, out var pending)
             ? pending
-            : await _employeeRepository.GetByPhoneNumberAsync(row.PhoneNumber, cancellationToken);
+            : await _employeeRepository.GetByEmployeeCodeAsync(code, cancellationToken);
     }
 }

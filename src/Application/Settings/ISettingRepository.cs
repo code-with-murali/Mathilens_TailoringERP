@@ -10,6 +10,13 @@ public interface ISettingRepository
 
     Task<PagedResult<Setting>> ListAsync(int page, int pageSize, CancellationToken cancellationToken);
 
+    /// <summary>
+    /// Every setting whose key starts with <paramref name="keyPrefix"/>, unpaginated — for the
+    /// small, bounded families of related keys some modules store (one row per garment type, and
+    /// so on), which are read together and would otherwise cost one round trip each.
+    /// </summary>
+    Task<IReadOnlyList<Setting>> ListByKeyPrefixAsync(string keyPrefix, CancellationToken cancellationToken);
+
     void Add(Setting setting);
 
     void Remove(Setting setting);

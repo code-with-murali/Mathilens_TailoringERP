@@ -13,7 +13,7 @@ public class AssignOrderEmployeeCommandHandlerTests
     public async Task Handle_WithExistingOrderAndEmployee_AssignsEmployee()
     {
         var order = Order.Create(Guid.NewGuid(), DateTime.UtcNow, null);
-        var employee = Employee.Create("Ravi Kumar", null, null, null);
+        var employee = Employee.Create("EMP-001", "Ravi Kumar", null, null, null);
         var orderRepository = Substitute.For<IOrderRepository>();
         orderRepository.GetByIdAsync(order.Id, Arg.Any<CancellationToken>()).Returns(order);
         var employeeRepository = Substitute.For<IEmployeeRepository>();

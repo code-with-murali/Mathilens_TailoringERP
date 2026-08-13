@@ -16,7 +16,17 @@ public sealed class CreateEmployeeCommandHandler : ICommandHandler<CreateEmploye
 
     public async Task<Result<EmployeeDto>> Handle(CreateEmployeeCommand command, CancellationToken cancellationToken)
     {
-        var employee = Employee.Create(command.FullName, command.JobTitle, command.PhoneNumber, command.Email);
+        // Both the staff code and the phone number identify one person, so either colliding is a
+        // conflict rather than a save. Soft-deleted employees sit outside the global query
+        // filter, so a code or number belonging only to a deleted record is free to reuse.
+        var duplicate = await EmployeeUniqueness.FindConflictAsync(
+            _employeeRepository, command.EmployeeCode, command.PhoneNumber, excludeId: null, cancellationToken);
+        if (duplicate is not null)
+        {
+            return Result.Failure<EmployeeDto>(duplicate);
+        }
+
+        var employee = Employee.Create(command.EmployeeCode, command.FullName, command.JobTitle, command.PhoneNumber, command.Email);
 
         _employeeRepository.Add(employee);
         await _employeeRepository.SaveChangesAsync(cancellationToken);
