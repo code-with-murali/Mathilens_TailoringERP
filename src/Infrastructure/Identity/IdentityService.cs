@@ -26,17 +26,20 @@ public sealed class IdentityService : IIdentityService
     private readonly SignInManager<ApplicationUser> _signInManager;
     private readonly ApplicationDbContext _dbContext;
     private readonly JwtOptions _jwtOptions;
+    private readonly IPasswordHasher<ApplicationUser> _passwordHasher;
 
     public IdentityService(
         UserManager<ApplicationUser> userManager,
         SignInManager<ApplicationUser> signInManager,
         ApplicationDbContext dbContext,
-        IOptions<JwtOptions> jwtOptions)
+        IOptions<JwtOptions> jwtOptions,
+        IPasswordHasher<ApplicationUser> passwordHasher)
     {
         _userManager = userManager;
         _signInManager = signInManager;
         _dbContext = dbContext;
         _jwtOptions = jwtOptions.Value;
+        _passwordHasher = passwordHasher;
     }
 
     public async Task<Result<AuthTokensDto>> LoginAsync(string email, string password, CancellationToken cancellationToken)
@@ -137,6 +140,104 @@ public sealed class IdentityService : IIdentityService
         foreach (var token in activeTokens)
         {
             token.Revoke(nowUtc);
+        }
+
+        await _dbContext.SaveChangesAsync(cancellationToken);
+    }
+
+    public async Task<Result<AuthTokensDto>> ChangePasswordAsync(Guid userId, string currentPassword, string newPassword, CancellationToken cancellationToken)
+    {
+        var user = await _userManager.FindByIdAsync(userId.ToString());
+        if (user is null)
+        {
+            return Result.Failure<AuthTokensDto>(Error.NotFound("Users.NotFound", "This account no longer exists."));
+        }
+
+        var changed = await _userManager.ChangePasswordAsync(user, currentPassword, newPassword);
+        if (!changed.Succeeded)
+        {
+            // Identity reports a wrong current password and a policy failure the same way. Both are
+            // shown to a caller who has already proved who they are, so there is nothing to protect
+            // here — the field is named so the form can put the message where it belongs.
+            var details = changed.Errors
+                .Select(e => new FieldError(
+                    e.Code.Contains("Password", StringComparison.Ordinal) && e.Code.Contains("Mismatch", StringComparison.Ordinal)
+                        ? "currentPassword"
+                        : "newPassword",
+                    e.Description))
+                .ToList();
+            return Result.Failure<AuthTokensDto>(Error.Validation("Users.ChangePasswordFailed", "This password could not be changed.", details));
+        }
+
+        // Everything else signed in with the old password stops here. The caller is handed a fresh
+        // pair so the screen they are standing at keeps working — without that, changing your own
+        // password would sign you out of it within the access token's lifetime.
+        await _userManager.UpdateSecurityStampAsync(user);
+        await RevokeRefreshTokensAsync(user.Id, cancellationToken);
+
+        return Result.Success(await IssueTokensAsync(user, cancellationToken));
+    }
+
+    public async Task<Result> RedeemResetCodeAsync(string email, string code, string newPassword, CancellationToken cancellationToken)
+    {
+        // One failure for every way this can go wrong: unknown email, no code outstanding, expired,
+        // or simply wrong. Distinguishing them would turn this unauthenticated endpoint into a way
+        // to discover which addresses have accounts, and which of those are mid-reset.
+        var invalid = Result.Failure(Error.Validation(
+            "Auth.ResetCodeInvalid",
+            "That code is not valid. Ask the shop owner for a new one.",
+            [new FieldError("code", "This code is not valid, or it has expired.")]));
+
+        var user = await _userManager.FindByEmailAsync(email);
+        if (user is null)
+        {
+            return invalid;
+        }
+
+        var storedHash = await _userManager.GetAuthenticationTokenAsync(user, PasswordResetCodes.Provider, PasswordResetCodes.CodeHashName);
+        var expiresRaw = await _userManager.GetAuthenticationTokenAsync(user, PasswordResetCodes.Provider, PasswordResetCodes.ExpiresName);
+
+        if (string.IsNullOrEmpty(storedHash)
+            || !DateTime.TryParse(expiresRaw, null, System.Globalization.DateTimeStyles.RoundtripKind, out var expiresAtUtc)
+            || expiresAtUtc <= DateTime.UtcNow
+            || !PasswordResetCodes.Verify(_passwordHasher, user, storedHash, code))
+        {
+            return invalid;
+        }
+
+        var resetToken = await _userManager.GeneratePasswordResetTokenAsync(user);
+        var reset = await _userManager.ResetPasswordAsync(user, resetToken, newPassword);
+        if (!reset.Succeeded)
+        {
+            // The password policy is the one thing worth reporting precisely: the caller holds a
+            // valid code, so this tells them nothing they did not already know about the account.
+            var details = reset.Errors.Select(e => new FieldError("newPassword", e.Description)).ToList();
+            return Result.Failure(Error.Validation("Auth.ResetPasswordFailed", "This password could not be set.", details));
+        }
+
+        // Single use. Clearing both parts means a code cannot be replayed even inside its lifetime.
+        await _userManager.RemoveAuthenticationTokenAsync(user, PasswordResetCodes.Provider, PasswordResetCodes.CodeHashName);
+        await _userManager.RemoveAuthenticationTokenAsync(user, PasswordResetCodes.Provider, PasswordResetCodes.ExpiresName);
+
+        await _userManager.UpdateSecurityStampAsync(user);
+        await RevokeRefreshTokensAsync(user.Id, cancellationToken);
+        await _userManager.ResetAccessFailedCountAsync(user);
+        await _userManager.SetLockoutEndDateAsync(user, null);
+
+        return Result.Success();
+    }
+
+    /// <summary>Ends every session the user currently holds.</summary>
+    private async Task RevokeRefreshTokensAsync(Guid userId, CancellationToken cancellationToken)
+    {
+        var now = DateTime.UtcNow;
+        var activeTokens = await _dbContext.RefreshTokens
+            .Where(t => t.UserId == userId && t.RevokedAtUtc == null)
+            .ToListAsync(cancellationToken);
+
+        foreach (var activeToken in activeTokens)
+        {
+            activeToken.Revoke(now);
         }
 
         await _dbContext.SaveChangesAsync(cancellationToken);

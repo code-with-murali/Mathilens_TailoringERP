@@ -32,7 +32,7 @@ public static partial class ActivityDescriptionBuilder
     /// automatically, so this errs toward redacting too much rather than too little.
     /// </summary>
     private static readonly string[] SecretNameFragments =
-        ["password", "token", "secret", "signingkey", "apikey", "credential", "otp", "pin", "hash"];
+        ["password", "token", "secret", "signingkey", "apikey", "credential", "otp", "pin", "hash", "resetcode"];
 
     public static string? Describe(object? request)
     {

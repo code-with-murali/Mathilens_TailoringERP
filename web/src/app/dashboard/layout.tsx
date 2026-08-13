@@ -91,6 +91,9 @@ const NAV_ITEMS: NavEntry[] = [
       // No permission at all: Front Desk and Tailor hold no Settings.View, and the theme toggle no
       // longer sits in the header, so gating this would leave them unable to change it anywhere.
       { href: "/dashboard/settings/appearance", label: "Appearance", icon: ThemeIcon, permission: null },
+      // Also permission-free: changing your own password is the one password action that is nobody
+      // else's business, and every role needs it.
+      { href: "/dashboard/settings/change-password", label: "Change Password", icon: KeyIcon, permission: null },
       // Advanced is off the menu — the raw settings store is not something the shop uses. The route
       // still answers for the rare case a value needs changing before it has a proper editor.
     ],
@@ -391,6 +394,15 @@ function RingsIcon({ className }: IconProps) {
     <svg className={className} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" aria-hidden="true">
       <circle cx="9" cy="14" r="6" />
       <circle cx="15" cy="14" r="6" />
+    </svg>
+  );
+}
+
+function KeyIcon({ className }: IconProps) {
+  return (
+    <svg className={className} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+      <circle cx="8" cy="12" r="4" />
+      <path d="M12 12h9M18 12v3M15.5 12v2" />
     </svg>
   );
 }

@@ -8,7 +8,7 @@ import { useToast } from "@/components/ui/ToastProvider";
 import { getAccessToken } from "@/lib/auth";
 import { ApiError, type PaginationMeta } from "@/lib/api-client";
 import { usePermissions } from "@/lib/use-permissions";
-import { listUsers, listRoles, createUser, setUserRole, resetUserPassword, PERMISSIONS, type AppUser } from "@/lib/api/users";
+import { listUsers, listRoles, createUser, setUserRole, resetUserPassword, issueResetCode, PERMISSIONS, type AppUser } from "@/lib/api/users";
 
 const fieldClassName =
   "rounded-md border border-border bg-surface px-3 py-2 text-sm outline-none transition-colors focus:border-primary focus:ring-2 focus:ring-primary/25";
@@ -47,6 +47,13 @@ export default function UsersPage() {
   const [resetPassword, setResetPassword] = useState("");
   const [resetError, setResetError] = useState<string | null>(null);
   const [isResetting, setIsResetting] = useState(false);
+
+  // The code issued for a user, held only to show it once. Nothing reads it back — the server keeps
+  // a hash, so if this is dismissed before it is written down, the only way on is a new code.
+  const [issuedFor, setIssuedFor] = useState<AppUser | null>(null);
+  const [issuedCode, setIssuedCode] = useState<string | null>(null);
+  const [issuedExpiry, setIssuedExpiry] = useState<string | null>(null);
+  const [isIssuing, setIsIssuing] = useState(false);
 
   const canManage = can(PERMISSIONS.usersManage);
 
@@ -134,6 +141,26 @@ export default function UsersPage() {
     }
   }
 
+  /**
+   * Issues a one-time code instead of setting a password on someone's behalf.
+   *
+   * The Owner reads it out and never learns what the user chooses. Their sessions end now rather
+   * than when the code is used, so an account in the wrong hands stops working immediately.
+   */
+  async function handleIssueCode(user: AppUser) {
+    setIsIssuing(true);
+    try {
+      const issued = await issueResetCode(user.id, getAccessToken());
+      setIssuedFor(user);
+      setIssuedCode(issued.code);
+      setIssuedExpiry(issued.expiresAtUtc);
+    } catch (error) {
+      showToast(error instanceof ApiError ? error.message : "Unable to issue a reset code.", "error");
+    } finally {
+      setIsIssuing(false);
+    }
+  }
+
   async function handleResetPassword(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
     setResetError(null);
@@ -180,6 +207,47 @@ export default function UsersPage() {
           </Button>
         )}
       </div>
+
+      {/*
+        Shown once and never again. Only a hash reaches the database, so this panel is the single
+        moment the plaintext exists anywhere — dismissing it before writing the code down means
+        issuing a new one, which is the correct trade for not storing a working credential.
+      */}
+      {issuedCode && issuedFor && (
+        <div className="flex max-w-xl flex-col gap-3 rounded-lg border border-primary/40 bg-primary/5 p-6">
+          <div>
+            <h2 className="text-lg font-semibold">Reset code for {issuedFor.email}</h2>
+            <p className="mt-1 text-sm text-foreground/70">
+              Give this to them in person. They enter it on the login screen under &ldquo;Have a reset
+              code?&rdquo; and choose their own password — you never need to know it.
+            </p>
+          </div>
+
+          <p className="select-all rounded-md border border-border bg-surface px-4 py-3 text-center font-mono text-2xl tracking-widest">
+            {issuedCode}
+          </p>
+
+          <p className="text-sm text-foreground/70">
+            Works once, and stops working{" "}
+            {issuedExpiry ? `at ${new Date(issuedExpiry).toLocaleString()}` : "after a day"}. They have been
+            signed out everywhere already.
+          </p>
+
+          <div className="flex justify-end">
+            <button
+              type="button"
+              onClick={() => {
+                setIssuedCode(null);
+                setIssuedFor(null);
+                setIssuedExpiry(null);
+              }}
+              className="text-sm text-foreground/70 hover:text-foreground"
+            >
+              I have written it down
+            </button>
+          </div>
+        </div>
+      )}
 
       {loadError && (
         <p role="alert" className="text-sm text-danger">
@@ -312,18 +380,30 @@ export default function UsersPage() {
                 </td>
                 <td className="px-4 py-3 text-foreground/70">{user.role ? ROLE_SUMMARY[user.role] ?? "—" : "Cannot use the system yet."}</td>
                 {canManage && (
-                  <td className="px-4 py-3 text-right">
-                    <button
-                      type="button"
-                      onClick={() => {
-                        setResetTarget(user);
-                        setResetPassword("");
-                        setResetError(null);
-                      }}
-                      className="whitespace-nowrap text-foreground/70 hover:text-foreground"
-                    >
-                      Reset password
-                    </button>
+                  <td className="px-4 py-3">
+                    <div className="flex justify-end gap-4">
+                      {/* First and named plainly, because it is the one to reach for: the Owner
+                          hands over a code and never learns the password that gets chosen. */}
+                      <button
+                        type="button"
+                        onClick={() => handleIssueCode(user)}
+                        disabled={isIssuing}
+                        className="whitespace-nowrap text-primary hover:underline disabled:opacity-50"
+                      >
+                        Send reset code
+                      </button>
+                      <button
+                        type="button"
+                        onClick={() => {
+                          setResetTarget(user);
+                          setResetPassword("");
+                          setResetError(null);
+                        }}
+                        className="whitespace-nowrap text-foreground/70 hover:text-foreground"
+                      >
+                        Set password
+                      </button>
+                    </div>
                   </td>
                 )}
               </tr>

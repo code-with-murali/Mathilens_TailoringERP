@@ -2,6 +2,8 @@ using System.Security.Claims;
 using MathilensERP.Api.Common;
 using MathilensERP.Api.Contracts.Common;
 using MathilensERP.Api.Contracts.Users;
+using MathilensERP.Application.Auth.Commands.ChangePassword;
+using MathilensERP.Application.Common.Mediator;
 using MathilensERP.Application.Authorization;
 using MathilensERP.Application.Common.Interfaces;
 using MathilensERP.Shared.Authorization;
@@ -19,11 +21,13 @@ public sealed class UsersController : ApiControllerBase
 {
     private readonly IUserAdminService _userAdminService;
     private readonly IRolePermissionService _rolePermissions;
+    private readonly ISender _sender;
 
-    public UsersController(IUserAdminService userAdminService, IRolePermissionService rolePermissions)
+    public UsersController(IUserAdminService userAdminService, IRolePermissionService rolePermissions, ISender sender)
     {
         _userAdminService = userAdminService;
         _rolePermissions = rolePermissions;
+        _sender = sender;
     }
 
     /// <summary>
@@ -123,6 +127,43 @@ public sealed class UsersController : ApiControllerBase
     /// access control, and a Manager holding Settings.Manage must not be able to grant themselves
     /// the right to hand out access.
     /// </summary>
+    /// <summary>
+    /// Issues a one-time code the user redeems to choose their own password.
+    ///
+    /// Preferred over setting a password on their behalf: the Owner hands the code over in person
+    /// and never learns what gets chosen. The plaintext comes back exactly once — only its hash is
+    /// stored, so reopening this screen cannot show it again.
+    /// </summary>
+    [HttpPost("{id:guid}/reset-code")]
+    [Authorize(Policy = Permissions.UsersManage)]
+    [ProducesResponseType(typeof(ApiResponse<PasswordResetCodeDto>), StatusCodes.Status200OK)]
+    [ProducesResponseType(typeof(ApiErrorResponse), StatusCodes.Status404NotFound)]
+    public async Task<IActionResult> IssueResetCode(Guid id, CancellationToken cancellationToken)
+    {
+        var result = await _userAdminService.IssueResetCodeAsync(id, cancellationToken);
+        return ToActionResult(result);
+    }
+
+    /// <summary>
+    /// Changes the caller's own password.
+    ///
+    /// Needs no permission beyond being signed in — this is the one password action that is nobody
+    /// else's business. Knowing the current password is what stands in for an Owner being present.
+    /// A fresh token pair comes back so the screen they did it on keeps working; every other
+    /// session ends.
+    /// </summary>
+    [HttpPost("me/password")]
+    [ProducesResponseType(typeof(ApiResponse<AuthTokensDto>), StatusCodes.Status200OK)]
+    [ProducesResponseType(typeof(ApiErrorResponse), StatusCodes.Status400BadRequest)]
+    public async Task<IActionResult> ChangeOwnPassword([FromBody] ChangeOwnPasswordRequest request, CancellationToken cancellationToken)
+    {
+        var result = await _sender.Send(
+            new ChangePasswordCommand(Guid.Parse(User.FindFirstValue(ClaimTypes.NameIdentifier)!), request.CurrentPassword, request.NewPassword),
+            cancellationToken);
+
+        return ToActionResult(result);
+    }
+
     [HttpPut("role-permissions/{role}")]
     [Authorize(Policy = Permissions.UsersManage)]
     [ProducesResponseType(typeof(ApiResponse<RolePermissionsDto>), StatusCodes.Status200OK)]

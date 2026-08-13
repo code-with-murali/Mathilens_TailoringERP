@@ -1,4 +1,5 @@
 import { apiDelete, apiGet, apiGetPaged, apiPost, apiPostNoContent, apiPut } from "@/lib/api-client";
+import type { AuthTokens } from "@/lib/auth";
 
 export type CurrentUser = {
   id: string;
@@ -82,4 +83,22 @@ export function setRolePermissions(role: string, permissions: string[], token: s
 
 export function resetRolePermissions(role: string, token: string | null) {
   return apiDelete(`/api/v1/users/role-permissions/${role}`, token);
+}
+
+/** The plaintext code and when it stops working. Returned once at issue and never retrievable again. */
+export type PasswordResetCode = { code: string; expiresAtUtc: string };
+
+/**
+ * Issues a one-time code for the user to redeem themselves.
+ *
+ * Preferred over resetUserPassword: the Owner hands the code over in person and never learns the
+ * password that gets set. Their sessions end immediately, not when the code is used.
+ */
+export function issueResetCode(userId: string, token: string | null) {
+  return apiPost<PasswordResetCode>(`/api/v1/users/${userId}/reset-code`, {}, token);
+}
+
+/** Changes the caller's own password. Returns a fresh token pair so the current screen keeps working. */
+export function changeOwnPassword(currentPassword: string, newPassword: string, token: string | null) {
+  return apiPost<AuthTokens>("/api/v1/users/me/password", { currentPassword, newPassword }, token);
 }

@@ -6,6 +6,7 @@ import { Button } from "@/components/ui/Button";
 import { apiPost, ApiError } from "@/lib/api-client";
 import { storeTokens, type AuthTokens } from "@/lib/auth";
 import { BandWeave } from "./LoginBackdrop";
+import { ResetCodeForm } from "./ResetCodeForm";
 
 const fieldClassName =
   "w-full rounded-md border border-border bg-surface py-3 pl-4 pr-11 text-sm outline-none transition-colors placeholder:text-foreground/45 focus:border-primary focus:ring-2 focus:ring-primary/25";
@@ -18,6 +19,10 @@ export default function LoginPage() {
   const [fieldErrors, setFieldErrors] = useState<Record<string, string>>({});
   const [formError, setFormError] = useState<string | null>(null);
   const [isSubmitting, setIsSubmitting] = useState(false);
+  // Reached by link, never shown automatically — see ResetCodeForm for why an email address alone
+  // must not open a password-setting flow.
+  const [isRedeeming, setIsRedeeming] = useState(false);
+  const [redeemed, setRedeemed] = useState(false);
 
   async function handleSubmit(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
@@ -117,6 +122,21 @@ export default function LoginPage() {
           <h1 className="mt-6 text-center text-xl font-semibold">Sign In with your Email</h1>
           <span className="mx-auto mt-2 block h-0.5 w-24 rounded-full bg-primary/70" />
 
+          {isRedeeming ? (
+            <ResetCodeForm
+              onDone={() => {
+                setIsRedeeming(false);
+                setRedeemed(true);
+              }}
+              onCancel={() => setIsRedeeming(false)}
+            />
+          ) : (
+            <>
+              {redeemed && (
+                <p className="mt-5 rounded-md border border-success/30 bg-success/10 px-3 py-2 text-sm text-success">
+                  Password set. Sign in with it below.
+                </p>
+              )}
           <form onSubmit={handleSubmit} noValidate className="mt-7 flex flex-col gap-4">
             <div>
               {/* Labels are read out but not drawn: the reference puts the name in the field
@@ -202,6 +222,16 @@ export default function LoginPage() {
               {isSubmitting ? "Signing in…" : "Login"}
             </Button>
           </form>
+
+              <button
+                type="button"
+                onClick={() => setIsRedeeming(true)}
+                className="mt-5 w-full text-center text-sm text-primary hover:underline"
+              >
+                Have a reset code?
+              </button>
+            </>
+          )}
 
           {/*
             Nothing below the button by design. There is no "Forgot Password?", no "Sign in with

@@ -26,6 +26,22 @@ public interface IUserAdminService
     /// would let that carry on for as long as the tokens last.
     /// </summary>
     Task<Result> ResetPasswordAsync(Guid userId, string newPassword, CancellationToken cancellationToken);
+
+    /// <summary>
+    /// Issues a one-time code the user redeems to choose their own password.
+    ///
+    /// Preferred over <see cref="ResetPasswordAsync"/>: the Owner hands the code over in person and
+    /// never learns the password that gets set. The plaintext is returned exactly once, because only
+    /// its hash is stored — reopening the screen cannot show it again, and nor can the database.
+    ///
+    /// Their existing sessions are revoked immediately, not when the code is redeemed. A reset is
+    /// often prompted by an account being in the wrong hands, and waiting would leave whoever has it
+    /// signed in for as long as they avoid using the code.
+    /// </summary>
+    Task<Result<PasswordResetCodeDto>> IssueResetCodeAsync(Guid userId, CancellationToken cancellationToken);
 }
 
 public sealed record AppUserDto(Guid Id, string Email, string? Role);
+
+/// <summary>The plaintext code and when it stops working. Shown once and never retrievable again.</summary>
+public sealed record PasswordResetCodeDto(string Code, DateTime ExpiresAtUtc);

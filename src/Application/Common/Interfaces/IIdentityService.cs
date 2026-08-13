@@ -24,4 +24,23 @@ public interface IIdentityService
     /// every active refresh token for that user is revoked (00_MASTER_SPEC.md § 10.1).
     /// </summary>
     Task<Result<AuthTokensDto>> RefreshTokenAsync(string refreshToken, CancellationToken cancellationToken);
+
+    /// <summary>
+    /// Changes the caller's own password, proving they know the current one.
+    ///
+    /// Returns a fresh token pair rather than nothing: every other session is revoked, and without
+    /// re-issuing here the person who just changed their password would be signed out of the screen
+    /// they did it on within the access token's lifetime.
+    /// </summary>
+    Task<Result<AuthTokensDto>> ChangePasswordAsync(Guid userId, string currentPassword, string newPassword, CancellationToken cancellationToken);
+
+    /// <summary>
+    /// Redeems a one-time reset code and sets the password the user chose.
+    ///
+    /// Unauthenticated by necessity — the whole point is that they cannot sign in. The code is what
+    /// stands in for authentication, which is why it is single-use, time-limited, and never revealed
+    /// by any other endpoint. Failures are deliberately indistinguishable from one another: a
+    /// caller must not learn from the response whether an email exists.
+    /// </summary>
+    Task<Result> RedeemResetCodeAsync(string email, string code, string newPassword, CancellationToken cancellationToken);
 }

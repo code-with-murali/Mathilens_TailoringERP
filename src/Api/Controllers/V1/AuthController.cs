@@ -1,5 +1,6 @@
 using MathilensERP.Api.Common;
 using MathilensERP.Api.Contracts.Auth;
+using MathilensERP.Application.Auth.Commands.RedeemResetCode;
 using MathilensERP.Api.Contracts.Common;
 using MathilensERP.Application.Auth.Commands.Login;
 using MathilensERP.Application.Auth.Commands.RefreshAccessToken;
@@ -43,6 +44,26 @@ public sealed class AuthController : ApiControllerBase
     public async Task<IActionResult> Register([FromBody] RegisterRequest request, CancellationToken cancellationToken)
     {
         var result = await _sender.Send(new RegisterCommand(request.Email, request.Password), cancellationToken);
+        return ToActionResult(result);
+    }
+
+    /// <summary>
+    /// Redeems the one-time code an Owner issued, letting the user choose their own password.
+    ///
+    /// Deliberately unauthenticated — the caller cannot sign in, which is why they were given a
+    /// code. The code is what stands in for authentication, so it is single-use, expires, and every
+    /// way of failing returns the same message: this endpoint must not become a way to discover
+    /// which email addresses have accounts.
+    /// </summary>
+    [HttpPost("redeem-reset-code")]
+    [ProducesResponseType(typeof(ApiResponse<object>), StatusCodes.Status200OK)]
+    [ProducesResponseType(typeof(ApiErrorResponse), StatusCodes.Status400BadRequest)]
+    public async Task<IActionResult> RedeemResetCode([FromBody] RedeemResetCodeRequest request, CancellationToken cancellationToken)
+    {
+        var result = await _sender.Send(
+            new RedeemResetCodeCommand(request.Email, request.Code, request.NewPassword),
+            cancellationToken);
+
         return ToActionResult(result);
     }
 

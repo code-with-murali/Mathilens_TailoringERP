@@ -17,11 +17,14 @@ public sealed class UserAdminService : IUserAdminService
 {
     private readonly UserManager<ApplicationUser> _userManager;
     private readonly Persistence.ApplicationDbContext _dbContext;
+    private readonly IPasswordHasher<ApplicationUser> _passwordHasher;
 
-    public UserAdminService(UserManager<ApplicationUser> userManager, Persistence.ApplicationDbContext dbContext)
+    public UserAdminService(UserManager<ApplicationUser> userManager, Persistence.ApplicationDbContext dbContext,
+        IPasswordHasher<ApplicationUser> passwordHasher)
     {
         _userManager = userManager;
         _dbContext = dbContext;
+        _passwordHasher = passwordHasher;
     }
 
     public async Task<PagedResult<AppUserDto>> ListUsersAsync(int page, int pageSize, CancellationToken cancellationToken)
@@ -144,5 +147,52 @@ public sealed class UserAdminService : IUserAdminService
         await _userManager.SetLockoutEndDateAsync(user, null);
 
         return Result.Success();
+    }
+
+    public async Task<Result<PasswordResetCodeDto>> IssueResetCodeAsync(Guid userId, CancellationToken cancellationToken)
+    {
+        var user = await _userManager.FindByIdAsync(userId.ToString());
+        if (user is null)
+        {
+            return Result.Failure<PasswordResetCodeDto>(Error.NotFound("Users.NotFound", $"No user was found with id '{userId}'."));
+        }
+
+        var code = PasswordResetCodes.Generate();
+        var expiresAtUtc = DateTime.UtcNow.Add(PasswordResetCodes.Lifetime);
+
+        // Setting replaces any code already outstanding, so issuing a second one silently retires
+        // the first. Two live codes for one account would double the guessing surface for no gain.
+        await _userManager.SetAuthenticationTokenAsync(
+            user,
+            PasswordResetCodes.Provider,
+            PasswordResetCodes.CodeHashName,
+            PasswordResetCodes.Hash(_passwordHasher, user, code));
+
+        await _userManager.SetAuthenticationTokenAsync(
+            user,
+            PasswordResetCodes.Provider,
+            PasswordResetCodes.ExpiresName,
+            expiresAtUtc.ToString("O"));
+
+        // Sessions end now, not when the code is redeemed. Waiting would leave whoever currently
+        // holds the account signed in for as long as they simply avoid using the code.
+        await _userManager.UpdateSecurityStampAsync(user);
+
+        var now = DateTime.UtcNow;
+        var activeTokens = await _dbContext.RefreshTokens
+            .Where(t => t.UserId == userId && t.RevokedAtUtc == null)
+            .ToListAsync(cancellationToken);
+        foreach (var activeToken in activeTokens)
+        {
+            activeToken.Revoke(now);
+        }
+
+        await _dbContext.SaveChangesAsync(cancellationToken);
+
+        // A locked-out account cannot sign in even with the new password, so the lockout goes too.
+        await _userManager.ResetAccessFailedCountAsync(user);
+        await _userManager.SetLockoutEndDateAsync(user, null);
+
+        return Result.Success(new PasswordResetCodeDto(code, expiresAtUtc));
     }
 }

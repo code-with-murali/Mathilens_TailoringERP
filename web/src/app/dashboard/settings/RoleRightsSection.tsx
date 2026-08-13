@@ -17,6 +17,72 @@ import {
 const fieldClassName =
   "rounded-md border border-border bg-surface px-3 py-2 text-sm outline-none transition-colors focus:border-primary focus:ring-2 focus:ring-primary/25";
 
+/** The screen names the shop uses, where the permission module name is not what appears in the menu. */
+const SCREEN_LABELS: Record<string, string> = {
+  WhatsApp: "WhatsApp",
+  Pricing: "Price Details",
+  Inventory: "Inventory",
+  Activity: "Activity Log",
+  Users: "Users",
+  Settings: "Settings",
+  Measurements: "Measurements",
+};
+
+/**
+ * What each tick actually permits, spelled out.
+ *
+ * "Manage" on its own does not say whether it includes deleting, or assigning, or taking payment —
+ * and an Owner handing out access is entitled to know before they tick it.
+ */
+const SCREEN_ACTIONS: Record<string, { view: string; manage?: string }> = {
+  Customers: {
+    view: "See customers and their history",
+    manage: "Add, edit and delete customers",
+  },
+  Measurements: {
+    view: "See measurements and past versions",
+    manage: "Record and correct measurements",
+  },
+  Employees: {
+    view: "See staff records and their order history",
+    manage: "Add and edit staff, and retire them",
+  },
+  Orders: {
+    view: "See orders and where they stand",
+    manage: "Create and edit orders, assign staff, change status",
+  },
+  Invoices: {
+    view: "See invoices and what is owed",
+    manage: "Raise invoices, take payments, apply discounts",
+  },
+  WhatsApp: {
+    view: "See messages sent to customers",
+    manage: "Send messages",
+  },
+  Reports: {
+    view: "Open every report, including birthdays and anniversaries",
+  },
+  Pricing: {
+    view: "See the cloth price list",
+    manage: "Add and change prices",
+  },
+  Inventory: {
+    view: "See cloth receipts and stock levels",
+    manage: "Record cloth arriving",
+  },
+  Settings: {
+    view: "Open settings screens",
+    manage: "Change order duration and measurement templates",
+  },
+  Activity: {
+    view: "See who did what, and when",
+  },
+  Users: {
+    view: "See who can sign in and their roles",
+    manage: "Create users, set roles, reset passwords, change these rights",
+  },
+};
+
 /**
  * Which screens a role may see, and whether it may change anything on them.
  *
@@ -71,10 +137,30 @@ export function RoleRightsSection() {
   const isDirty =
     current !== undefined && JSON.stringify([...selected].sort()) !== JSON.stringify([...current.permissions].sort());
 
+  /**
+   * Toggling one box can move the other, because the two are not independent.
+   *
+   * Manage without View is a role that may change things on a screen it cannot open — the menu
+   * hides it, every list is unreachable, and the rights table still claims they can edit. So
+   * ticking Manage ticks View, and clearing View clears Manage with it. View is the base right;
+   * Manage is something added on top of it.
+   */
   function toggle(permission: string) {
-    setSelected((previous) =>
-      previous.includes(permission) ? previous.filter((p) => p !== permission) : [...previous, permission],
-    );
+    const [screen, action] = permission.split(".");
+    const view = `${screen}.View`;
+    const manage = `${screen}.Manage`;
+
+    setSelected((previous) => {
+      const has = previous.includes(permission);
+      const without = previous.filter((p) => p !== permission);
+
+      if (has) {
+        return action === "View" ? without.filter((p) => p !== manage) : without;
+      }
+
+      const added = [...previous, permission];
+      return action === "Manage" && !added.includes(view) ? [...added, view] : added;
+    });
   }
 
   async function handleSave() {
@@ -160,7 +246,7 @@ export function RoleRightsSection() {
             <table className="w-full text-left text-sm">
               <thead className="border-b border-border bg-background/40">
                 <tr>
-                  <th className="px-4 py-2 font-medium">Screen</th>
+                  <th className="w-40 px-4 py-2 font-medium">Screen</th>
                   <th className="px-4 py-2 font-medium">View</th>
                   <th className="px-4 py-2 font-medium">Manage</th>
                 </tr>
@@ -169,22 +255,31 @@ export function RoleRightsSection() {
                 {matrix.screens.map((screen) => {
                   const view = screen.permissions.find((p) => p.action === "View");
                   const manage = screen.permissions.find((p) => p.action === "Manage");
+                  const actions = SCREEN_ACTIONS[screen.screen];
                   return (
-                    <tr key={screen.screen} className="border-b border-border last:border-0">
-                      <td className="px-4 py-2">{screen.screen}</td>
-                      {[view, manage].map((entry, index) => (
-                        <td key={index} className="px-4 py-2">
+                    <tr key={screen.screen} className="border-b border-border align-top last:border-0">
+                      <td className="px-4 py-3 font-medium">{SCREEN_LABELS[screen.screen] ?? screen.screen}</td>
+                      {([
+                        [view, actions?.view],
+                        [manage, actions?.manage],
+                      ] as const).map(([entry, described], index) => (
+                        <td key={index} className="px-4 py-3">
                           {/* A screen that defines no Manage action shows nothing rather than a
                               checkbox that could never mean anything. */}
                           {entry ? (
-                            <input
-                              type="checkbox"
-                              checked={selected.includes(entry.permission)}
-                              disabled={!isEditable || isSaving}
-                              onChange={() => toggle(entry.permission)}
-                              aria-label={`${entry.action} ${screen.screen}`}
-                              className="h-4 w-4 accent-primary disabled:cursor-not-allowed disabled:opacity-50"
-                            />
+                            <label className="flex cursor-pointer items-start gap-2">
+                              <input
+                                type="checkbox"
+                                checked={selected.includes(entry.permission)}
+                                disabled={!isEditable || isSaving}
+                                onChange={() => toggle(entry.permission)}
+                                aria-label={`${entry.action} ${screen.screen}`}
+                                className="mt-0.5 h-4 w-4 shrink-0 accent-primary disabled:cursor-not-allowed disabled:opacity-50"
+                              />
+                              {/* What the tick actually permits, in the shop's words. "Manage" alone
+                                  does not say whether it includes deleting. */}
+                              <span className="text-foreground/70">{described ?? entry.action}</span>
+                            </label>
                           ) : (
                             <span className="text-foreground/30">—</span>
                           )}

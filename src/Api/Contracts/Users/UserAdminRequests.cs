@@ -9,3 +9,6 @@ public sealed record ResetUserPasswordRequest(string NewPassword);
 
 /// <summary>The complete set the role should hold — sent whole, so unticking is expressible.</summary>
 public sealed record SetRolePermissionsRequest(IReadOnlyList<string> Permissions);
+
+/// <summary>Changing your own password: proving you know the current one is what stands in for an Owner being present.</summary>
+public sealed record ChangeOwnPasswordRequest(string CurrentPassword, string NewPassword);
