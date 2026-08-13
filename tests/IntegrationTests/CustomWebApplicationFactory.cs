@@ -1,6 +1,8 @@
 using Microsoft.AspNetCore.Hosting;
 using Microsoft.AspNetCore.Mvc.Testing;
 using Microsoft.Extensions.Configuration;
+using Microsoft.Extensions.DependencyInjection;
+using Microsoft.Extensions.Logging;
 
 namespace MathilensERP.IntegrationTests;
 
@@ -35,6 +37,17 @@ public class CustomWebApplicationFactory : WebApplicationFactory<Program>
                 ["Jwt:AccessTokenExpiryMinutes"] = "15",
                 ["Jwt:RefreshTokenExpiryDays"] = "30",
             });
+        });
+
+        // Without this, an unhandled exception inside the host is invisible: the test sees only the
+        // 500 the error middleware turned it into, and on a CI machine there is nothing else to
+        // read. Logging to the console puts the actual stack trace in the build output, where a
+        // failure that does not reproduce locally can still be diagnosed.
+        builder.ConfigureLogging(logging =>
+        {
+            logging.ClearProviders();
+            logging.AddSimpleConsole(o => o.SingleLine = false);
+            logging.SetMinimumLevel(LogLevel.Warning);
         });
     }
 }
