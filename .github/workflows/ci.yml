@@ -10,6 +10,27 @@ jobs:
   dotnet:
     name: .NET build & test
     runs-on: ubuntu-latest
+
+    # The integration tests boot the real API host, and authorization now resolves a role's
+    # permissions from the database on each request so that changing what a role may do takes
+    # effect immediately. Authorization runs before model validation, so every authenticated
+    # request touches the database — including the ones that only assert a 400 envelope, which
+    # used to fail fast without ever connecting. Postgres 18 to match production.
+    services:
+      postgres:
+        image: postgres:18
+        env:
+          POSTGRES_USER: postgres
+          POSTGRES_PASSWORD: postgres
+          POSTGRES_DB: mathilens_test
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd pg_isready
+          --health-interval 10s
+          --health-timeout 5s
+          --health-retries 5
+
     steps:
       - uses: actions/checkout@v4
 

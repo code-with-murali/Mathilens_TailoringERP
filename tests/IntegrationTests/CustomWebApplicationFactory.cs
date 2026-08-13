@@ -6,11 +6,18 @@ namespace MathilensERP.IntegrationTests;
 
 /// <summary>
 /// Boots the real Api host with test-safe configuration overrides, so tests never depend on
-/// (or risk touching) a developer's local appsettings.Development.json values. The connection
-/// string here is never actually connected to by the tests in this fixture — they exercise
-/// paths that fail fast before reaching the database (00_MASTER_SPEC.md § 12.3: every
-/// endpoint has at least one success- and error-path test; the DB-touching success paths are
-/// covered separately once a real PostgreSQL instance is available — see 03_ROADMAP.md).
+/// (or risk touching) a developer's local appsettings.Development.json values.
+///
+/// <para>
+/// This fixture needs a real PostgreSQL on the connection string below. It did not always: these
+/// tests were written to exercise paths that fail fast before reaching the database, and the
+/// connection string was never actually opened. Authorization now resolves a role's permissions
+/// from the database on each request — so that changing what a role may do takes effect on the
+/// next request rather than when every outstanding token expires — and authorization runs before
+/// model validation. Every authenticated request therefore touches the database, including the
+/// ones that only assert a 400 envelope. CI provisions Postgres as a service container; locally,
+/// a database named <c>mathilens_test</c> on the default port is what these expect.
+/// </para>
 /// </summary>
 public class CustomWebApplicationFactory : WebApplicationFactory<Program>
 {
