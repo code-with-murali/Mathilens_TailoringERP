@@ -1,6 +1,7 @@
 using MathilensERP.Api.Common;
 using MathilensERP.Shared.Authorization;
 using MathilensERP.Api.Common.Excel;
+using MathilensERP.Api.Common.Export;
 using MathilensERP.Api.Contracts.Common;
 using MathilensERP.Api.Contracts.Customers;
 using MathilensERP.Application.Common;
@@ -80,10 +81,16 @@ public sealed class CustomersController : ApiControllerBase
         return ToPagedActionResult(result);
     }
 
-    /// <summary>Downloads every customer as an .xlsx sheet. The Id column round-trips back through <see cref="Import"/> as the match key.</summary>
+    /// <summary>
+    /// Downloads every customer, as a spreadsheet or a PDF.
+    ///
+    /// The spreadsheet keeps its Id column because it round-trips back through <see cref="Import"/>
+    /// as the match key. The PDF drops it: nothing re-imports a PDF, and a column of GUIDs costs a
+    /// third of the page width on a document somebody is going to read.
+    /// </summary>
     [HttpGet("export")]
     [ProducesResponseType(typeof(FileContentResult), StatusCodes.Status200OK)]
-    public async Task<IActionResult> Export(CancellationToken cancellationToken)
+    public async Task<IActionResult> Export([FromQuery] ExportFormat format = ExportFormat.Xlsx, CancellationToken cancellationToken = default)
     {
         var result = await _sender.Send(new ListAllCustomersQuery(), cancellationToken);
         if (result.IsFailure)
@@ -91,12 +98,19 @@ public sealed class CustomersController : ApiControllerBase
             return ToActionResult(result);
         }
 
-        var content = ExcelSheet.Write(
-            "Customers",
-            CustomerSheet.Headers,
-            result.Value.Select(c => new object?[] { c.Id, c.FullName, c.PhoneNumber, c.Email, c.Address, c.Notes }));
-
-        return File(content, ExcelSheet.ContentType, "customers.xlsx");
+        return format == ExportFormat.Pdf
+            ? ExportResultFactory.Create(
+                format,
+                "Customers",
+                "customers",
+                ["Name", "Phone", "Email", "Address", "Notes"],
+                result.Value.Select(c => new object?[] { c.FullName, c.PhoneNumber, c.Email, c.Address, c.Notes }).ToList())
+            : ExportResultFactory.Create(
+                format,
+                "Customers",
+                "customers",
+                CustomerSheet.Headers,
+                result.Value.Select(c => new object?[] { c.Id, c.FullName, c.PhoneNumber, c.Email, c.Address, c.Notes }).ToList());
     }
 
     /// <summary>

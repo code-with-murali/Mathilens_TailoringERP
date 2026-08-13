@@ -1,5 +1,6 @@
 using MathilensERP.Api.Common;
 using MathilensERP.Api.Contracts.Common;
+using MathilensERP.Api.Common.Export;
 using MathilensERP.Api.Contracts.Occasions;
 using MathilensERP.Application.Common.Mediator;
 using MathilensERP.Application.Occasions;
@@ -34,6 +35,9 @@ public sealed class OccasionsController : ApiControllerBase
     private const int DefaultWindowDays = 30;
     private const int MaxWindowDays = 365;
 
+    /// <summary>An export takes the window whole. A shop's customer list is not big enough for this to be a concern.</summary>
+    private const int ExportPageSize = 5000;
+
     private readonly ISender _sender;
 
     public OccasionsController(ISender sender)
@@ -57,6 +61,62 @@ public sealed class OccasionsController : ApiControllerBase
 
         var result = await _sender.Send(new SearchOccasionsQuery(occasion, scope, window, page, pageSize), cancellationToken);
         return ToActionResult(result);
+    }
+
+    /// <summary>
+    /// The same list as <see cref="Search"/>, as a spreadsheet or a PDF.
+    ///
+    /// Takes the same filters, so what downloads matches what is on screen. Exporting the whole set
+    /// from a filtered view is a quiet way to hand somebody the wrong call sheet.
+    ///
+    /// Not paginated: an export of page one of a call list is of no use to anybody, so this takes
+    /// the window whole.
+    /// </summary>
+    [HttpGet("export")]
+    [ProducesResponseType(typeof(FileContentResult), StatusCodes.Status200OK)]
+    public async Task<IActionResult> Export(
+        [FromQuery] OccasionType occasion,
+        [FromQuery] OccasionScope scope = OccasionScope.Upcoming,
+        [FromQuery] int windowDays = DefaultWindowDays,
+        [FromQuery] ExportFormat format = ExportFormat.Xlsx,
+        CancellationToken cancellationToken = default)
+    {
+        var window = Math.Clamp(windowDays, 1, MaxWindowDays);
+
+        var result = await _sender.Send(
+            new SearchOccasionsQuery(occasion, scope, window, PaginationDefaults.DefaultPage, ExportPageSize),
+            cancellationToken);
+
+        if (result.IsFailure)
+        {
+            return ToActionResult(result);
+        }
+
+        var isBirthday = occasion == OccasionType.Birthday;
+        var title = isBirthday ? "Birthday Report" : "Wedding Report";
+        var subtitle = scope == OccasionScope.Upcoming
+            ? $"Still to call · next {window} days"
+            : $"Already contacted · last {window} days";
+
+        return ExportResultFactory.Create(
+            format,
+            title,
+            isBirthday ? "birthday-report" : "wedding-report",
+            ["Customer", "Phone", "Email", "Date", "Days away", isBirthday ? "Turning" : "Years", "Contacted", "Remarks"],
+            result.Value.Items
+                .Select(r => new object?[]
+                {
+                    r.FullName,
+                    r.PhoneNumber,
+                    r.Email,
+                    r.OccasionOn,
+                    r.DaysAway,
+                    r.YearsCompleted,
+                    r.ContactedOn,
+                    r.Remarks,
+                })
+                .ToList(),
+            subtitle);
     }
 
     /// <summary>Marks an occasion as followed up, or amends the remarks if it was already marked.</summary>

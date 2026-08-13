@@ -1,6 +1,7 @@
 using MathilensERP.Api.Common;
 using MathilensERP.Shared.Authorization;
 using MathilensERP.Api.Common.Excel;
+using MathilensERP.Api.Common.Export;
 using MathilensERP.Api.Contracts.Common;
 using MathilensERP.Api.Contracts.Employees;
 using MathilensERP.Application.Common;
@@ -37,7 +38,7 @@ public sealed class EmployeesController : ApiControllerBase
     /// <summary>Downloads every employee as an .xlsx sheet. The Id column round-trips back through <see cref="Import"/> as the match key.</summary>
     [HttpGet("export")]
     [ProducesResponseType(typeof(FileContentResult), StatusCodes.Status200OK)]
-    public async Task<IActionResult> Export(CancellationToken cancellationToken)
+    public async Task<IActionResult> Export([FromQuery] ExportFormat format = ExportFormat.Xlsx, CancellationToken cancellationToken = default)
     {
         var result = await _sender.Send(new ListAllEmployeesQuery(), cancellationToken);
         if (result.IsFailure)
@@ -45,12 +46,21 @@ public sealed class EmployeesController : ApiControllerBase
             return ToActionResult(result);
         }
 
-        var content = ExcelSheet.Write(
-            "Employees",
-            EmployeeSheet.Headers,
-            result.Value.Select(e => new object?[] { e.Id, e.EmployeeCode, e.FullName, e.JobTitle, e.PhoneNumber, e.Email }));
-
-        return File(content, ExcelSheet.ContentType, "employees.xlsx");
+        // The PDF drops the Id column: nothing re-imports a PDF, and a column of GUIDs costs page
+        // width on a document somebody is going to read.
+        return format == ExportFormat.Pdf
+            ? ExportResultFactory.Create(
+                format,
+                "Employees",
+                "employees",
+                ["Code", "Name", "Job title", "Phone", "Email"],
+                result.Value.Select(e => new object?[] { e.EmployeeCode, e.FullName, e.JobTitle, e.PhoneNumber, e.Email }).ToList())
+            : ExportResultFactory.Create(
+                format,
+                "Employees",
+                "employees",
+                EmployeeSheet.Headers,
+                result.Value.Select(e => new object?[] { e.Id, e.EmployeeCode, e.FullName, e.JobTitle, e.PhoneNumber, e.Email }).ToList());
     }
 
     /// <summary>

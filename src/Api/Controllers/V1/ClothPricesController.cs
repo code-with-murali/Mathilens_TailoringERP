@@ -1,6 +1,7 @@
 using MathilensERP.Api.Common;
 using MathilensERP.Shared.Authorization;
 using MathilensERP.Api.Common.Excel;
+using MathilensERP.Api.Common.Export;
 using MathilensERP.Api.Contracts.Common;
 using MathilensERP.Api.Contracts.Pricing;
 using MathilensERP.Application.Common;
@@ -36,7 +37,7 @@ public sealed class ClothPricesController : ApiControllerBase
     /// <summary>Downloads the whole price list as an .xlsx sheet. The Id column round-trips back through <see cref="Import"/> as the match key.</summary>
     [HttpGet("export")]
     [ProducesResponseType(typeof(FileContentResult), StatusCodes.Status200OK)]
-    public async Task<IActionResult> Export(CancellationToken cancellationToken)
+    public async Task<IActionResult> Export([FromQuery] ExportFormat format = ExportFormat.Xlsx, CancellationToken cancellationToken = default)
     {
         var result = await _sender.Send(new ListAllClothPricesQuery(), cancellationToken);
         if (result.IsFailure)
@@ -44,12 +45,19 @@ public sealed class ClothPricesController : ApiControllerBase
             return ToActionResult(result);
         }
 
-        var content = ExcelSheet.Write(
-            "Cloth Prices",
-            ClothPriceSheet.Headers,
-            result.Value.Select(c => new object?[] { c.Id, c.ClothCode, c.ClothName, c.CostPrice, c.SellingPrice }));
-
-        return File(content, ExcelSheet.ContentType, "cloth-prices.xlsx");
+        return format == ExportFormat.Pdf
+            ? ExportResultFactory.Create(
+                format,
+                "Cloth Prices",
+                "cloth-prices",
+                ["Code", "Name", "Cost price", "Selling price"],
+                result.Value.Select(c => new object?[] { c.ClothCode, c.ClothName, c.CostPrice, c.SellingPrice }).ToList())
+            : ExportResultFactory.Create(
+                format,
+                "Cloth Prices",
+                "cloth-prices",
+                ClothPriceSheet.Headers,
+                result.Value.Select(c => new object?[] { c.Id, c.ClothCode, c.ClothName, c.CostPrice, c.SellingPrice }).ToList());
     }
 
     /// <summary>

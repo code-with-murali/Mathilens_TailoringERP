@@ -9,9 +9,23 @@ export type ImportResult = {
   errors: { rowNumber: number; message: string }[];
 };
 
-/** Downloads a module's .xlsx export and hands it to the browser under the server's filename. */
-export async function downloadExport(resource: string, token: string | null): Promise<void> {
-  const { blob, filename } = await apiGetFile(`/api/v1/${resource}/export`, token);
+/** Which file the Export button should produce. */
+export type ExportFormat = "xlsx" | "pdf";
+
+/**
+ * Downloads a module's export in the chosen format, under the server's filename.
+ *
+ * The filename carries the date, so a folder of exports taken over a month sorts sensibly instead
+ * of becoming a pile of same-named files with browser-appended numbers.
+ */
+export async function downloadExport(
+  resource: string,
+  format: ExportFormat,
+  token: string | null,
+  query?: Record<string, string>,
+): Promise<void> {
+  const params = new URLSearchParams({ format, ...query });
+  const { blob, filename } = await apiGetFile(`/api/v1/${resource}/export?${params}`, token);
   saveBlob(blob, filename);
 }
 

@@ -2,6 +2,7 @@
 
 import { useCallback, useEffect, useState } from "react";
 import { Button } from "@/components/ui/Button";
+import { ExportButton } from "@/components/ui/ExportButton";
 import { DEFAULT_PAGE_SIZE, Pagination } from "@/components/ui/Pagination";
 import { useToast } from "@/components/ui/ToastProvider";
 import { getAccessToken } from "@/lib/auth";
@@ -132,9 +133,18 @@ export function OccasionReport({
 
   return (
     <div className="flex flex-col gap-6">
-      <div>
-        <h1 className="text-2xl font-semibold">{title}</h1>
-        <p className="mt-1 text-sm text-foreground/70">{description}</p>
+      <div className="flex items-start justify-between gap-4">
+        <div>
+          <h1 className="text-2xl font-semibold">{title}</h1>
+          <p className="mt-1 text-sm text-foreground/70">{description}</p>
+        </div>
+        {/* Carries the current filters, so the file matches what is on screen rather than the
+            unfiltered set — handing somebody the wrong call sheet is worse than no call sheet. */}
+        <ExportButton
+          resource="occasions"
+          label="this report"
+          query={{ occasion, scope, windowDays: String(windowDays) }}
+        />
       </div>
 
       <div className="flex flex-wrap items-end gap-4">

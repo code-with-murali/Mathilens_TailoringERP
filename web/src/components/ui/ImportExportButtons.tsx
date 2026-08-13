@@ -5,7 +5,8 @@ import { Button } from "@/components/ui/Button";
 import { useToast } from "@/components/ui/ToastProvider";
 import { getAccessToken } from "@/lib/auth";
 import { ApiError } from "@/lib/api-client";
-import { downloadExport, summarizeImport, uploadImport, type ImportResult } from "@/lib/api/import-export";
+import { summarizeImport, uploadImport, type ImportResult } from "@/lib/api/import-export";
+import { ExportButton } from "./ExportButton";
 
 type ImportExportButtonsProps = {
   /** The API resource segment, e.g. "customers" — both endpoints hang off it. */
@@ -24,20 +25,8 @@ type ImportExportButtonsProps = {
 export function ImportExportButtons({ resource, label, onImported }: ImportExportButtonsProps) {
   const { showToast } = useToast();
   const fileInputRef = useRef<HTMLInputElement>(null);
-  const [isExporting, setIsExporting] = useState(false);
   const [isImporting, setIsImporting] = useState(false);
   const [lastResult, setLastResult] = useState<ImportResult | null>(null);
-
-  async function handleExport() {
-    setIsExporting(true);
-    try {
-      await downloadExport(resource, getAccessToken());
-    } catch (error) {
-      showToast(error instanceof ApiError ? error.message : `Unable to export ${label}.`, "error");
-    } finally {
-      setIsExporting(false);
-    }
-  }
 
   async function handleFileChosen(event: ChangeEvent<HTMLInputElement>) {
     const file = event.target.files?.[0];
@@ -64,9 +53,9 @@ export function ImportExportButtons({ resource, label, onImported }: ImportExpor
   return (
     <div className="flex flex-col items-end gap-2">
       <div className="flex gap-2">
-        <Button type="button" variant="secondary" onClick={handleExport} disabled={isExporting}>
-          {isExporting ? "Exporting…" : "Export"}
-        </Button>
+        {/* Export is its own component now: it asks for a format, and the same chooser is reused by
+            screens that have no import at all. */}
+        <ExportButton resource={resource} label={label} />
         <Button type="button" variant="secondary" onClick={() => fileInputRef.current?.click()} disabled={isImporting}>
           {isImporting ? "Importing…" : "Import"}
         </Button>
