@@ -6,11 +6,13 @@ import { Button } from "@/components/ui/Button";
 import { Input } from "@/components/ui/Input";
 import { DEFAULT_PAGE_SIZE, Pagination } from "@/components/ui/Pagination";
 import { ImportExportButtons } from "@/components/ui/ImportExportButtons";
+import { Modal } from "@/components/ui/Modal";
+import { EmployeeForm } from "./EmployeeForm";
 import { useToast } from "@/components/ui/ToastProvider";
 import { useDebouncedValue } from "@/lib/use-debounced-value";
 import { getAccessToken } from "@/lib/auth";
 import { ApiError, type PaginationMeta } from "@/lib/api-client";
-import { searchEmployees, retireEmployee, EMPLOYMENT_TYPE_LABELS, type Employee } from "@/lib/api/employees";
+import { createEmployee, searchEmployees, retireEmployee, EMPLOYMENT_TYPE_LABELS, type Employee } from "@/lib/api/employees";
 
 /** yyyy-MM-dd off the local calendar — a last working day is a day in the shop, not a UTC instant. */
 function todayIsoDate(): string {
@@ -22,6 +24,7 @@ function todayIsoDate(): string {
 export default function EmployeesPage() {
   const { showToast } = useToast();
   const [searchInput, setSearchInput] = useState("");
+  const [isAdding, setIsAdding] = useState(false);
   const debouncedSearch = useDebouncedValue(searchInput, 300);
   const [page, setPage] = useState(1);
   const [pageSize, setPageSize] = useState(DEFAULT_PAGE_SIZE);
@@ -96,11 +99,11 @@ export default function EmployeesPage() {
         <h1 className="text-2xl font-semibold">Employees</h1>
         <div className="flex items-start gap-2">
           <ImportExportButtons resource="employees" label="employees" onImported={loadEmployees} />
-          <Link href="/dashboard/employees/new">
-            {/* Label is just "New" — the page heading above already says Employees. The aria-label
-                keeps it unambiguous for a screen reader reading controls out of context. */}
-            <Button type="button" aria-label="New employee">New</Button>
-          </Link>
+          {/* Opens in place rather than navigating, so adding a member of staff does not cost the
+              page position and filters. /dashboard/employees/new still works. */}
+          <Button type="button" aria-label="New employee" onClick={() => setIsAdding(true)}>
+            New
+          </Button>
         </div>
       </div>
 
@@ -242,6 +245,23 @@ export default function EmployeesPage() {
           </div>
         </div>
       )}
+
+      <Modal
+        open={isAdding}
+        title="New Employee"
+        description="Code, name and phone number are required."
+        onClose={() => setIsAdding(false)}
+      >
+        <EmployeeForm
+          submitLabel="Create employee"
+          onSubmit={async (input) => {
+            await createEmployee(input, getAccessToken());
+            showToast("Employee created.");
+            setIsAdding(false);
+            await loadEmployees();
+          }}
+        />
+      </Modal>
     </div>
   );
 }

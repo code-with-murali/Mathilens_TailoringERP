@@ -7,11 +7,13 @@ import { Input } from "@/components/ui/Input";
 import { DEFAULT_PAGE_SIZE, Pagination } from "@/components/ui/Pagination";
 import { ConfirmDialog } from "@/components/ui/ConfirmDialog";
 import { ImportExportButtons } from "@/components/ui/ImportExportButtons";
+import { Modal } from "@/components/ui/Modal";
+import { CustomerForm } from "./CustomerForm";
 import { useToast } from "@/components/ui/ToastProvider";
 import { useDebouncedValue } from "@/lib/use-debounced-value";
 import { getAccessToken } from "@/lib/auth";
 import { ApiError, type PaginationMeta } from "@/lib/api-client";
-import { searchCustomers, deleteCustomer, RELIGIONS, type Customer, type Religion } from "@/lib/api/customers";
+import { createCustomer, searchCustomers, deleteCustomer, RELIGIONS, type Customer, type Religion } from "@/lib/api/customers";
 
 const filterClassName =
   "rounded-md border border-border bg-surface px-3 py-2 text-sm outline-none transition-colors focus:border-primary focus:ring-2 focus:ring-primary/25";
@@ -24,6 +26,7 @@ export default function CustomersPage() {
   // Religion is a niche, occasion-wear filter, not something staff narrow by every day, so it
   // sits behind a disclosure rather than taking permanent space next to the search box.
   const [isAdvancedOpen, setIsAdvancedOpen] = useState(false);
+  const [isAdding, setIsAdding] = useState(false);
   const [page, setPage] = useState(1);
   const [pageSize, setPageSize] = useState(DEFAULT_PAGE_SIZE);
   const [customers, setCustomers] = useState<Customer[]>([]);
@@ -85,11 +88,12 @@ export default function CustomersPage() {
         <h1 className="text-2xl font-semibold">Customers</h1>
         <div className="flex items-start gap-2">
           <ImportExportButtons resource="customers" label="customers" onImported={loadCustomers} />
-          <Link href="/dashboard/customers/new">
-            {/* Label is just "New" — the page heading above already says Customers. The aria-label
-                keeps it unambiguous for a screen reader reading controls out of context. */}
-            <Button type="button" aria-label="New customer">New</Button>
-          </Link>
+          {/* Opens in place rather than navigating. The list stays on screen behind it, so adding
+              a customer no longer costs the page position, the search term and the filters.
+              /dashboard/customers/new still works — bookmarks and older links keep resolving. */}
+          <Button type="button" aria-label="New customer" onClick={() => setIsAdding(true)}>
+            New
+          </Button>
         </div>
       </div>
 
@@ -221,6 +225,26 @@ export default function CustomersPage() {
         onConfirm={handleConfirmDelete}
         onCancel={() => setPendingDelete(null)}
       />
+
+      <Modal
+        open={isAdding}
+        title="New Customer"
+        description="Name and phone number are required; the rest can be filled in later."
+        onClose={() => setIsAdding(false)}
+      >
+        <CustomerForm
+          submitLabel="Create customer"
+          onSubmit={async (input) => {
+            await createCustomer(input, getAccessToken());
+            showToast("Customer created.");
+            setIsAdding(false);
+            // Reload rather than close-and-hope: the new customer may or may not fall on the page
+            // currently shown, and a list that silently disagrees with what was just saved is worse
+            // than a moment of loading.
+            await loadCustomers();
+          }}
+        />
+      </Modal>
     </div>
   );
 }
