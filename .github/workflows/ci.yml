@@ -44,6 +44,21 @@ jobs:
       - name: Build
         run: dotnet build MathilensERP.slnx --no-restore --configuration Release
 
+      # The API migrates on startup everywhere except Development, and the integration tests pin
+      # Development precisely to stay out of that path — so booting the host does not create the
+      # schema. A running Postgres alone is not enough: the authorization lookup would query a
+      # table that does not exist. Apply the migrations here instead.
+      #
+      # ASPNETCORE_ENVIRONMENT is Development for the same reason: `dotnet ef` executes Program.cs
+      # up to the point the host is built, so any other value would have it migrate twice.
+      - name: Create the test schema
+        run: |
+          dotnet tool install --global dotnet-ef
+          dotnet ef database update --project src/Infrastructure --startup-project src/Api
+        env:
+          ASPNETCORE_ENVIRONMENT: Development
+          ConnectionStrings__Default: "Host=localhost;Port=5432;Database=mathilens_test;Username=postgres;Password=postgres"
+
       - name: Test
         run: dotnet test MathilensERP.slnx --no-build --configuration Release
 
