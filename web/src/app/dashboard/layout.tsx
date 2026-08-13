@@ -57,7 +57,18 @@ const NAV_ITEMS: NavEntry[] = [
       { href: "/dashboard/stock", label: "Stock Details", icon: StockIcon, permission: PERMISSIONS.inventoryView },
     ],
   },
-  { href: "/dashboard/reports", label: "Reports", icon: ReportsIcon, permission: PERMISSIONS.reportsView },
+  {
+    label: "Reports",
+    icon: ReportsIcon,
+    children: [
+      { href: "/dashboard/reports/order-collections", label: "Orders & Collections", icon: ReportsIcon, permission: PERMISSIONS.reportsView },
+      { href: "/dashboard/reports/revenue", label: "Revenue", icon: RevenueIcon, permission: PERMISSIONS.reportsView },
+      { href: "/dashboard/reports/order-status", label: "Orders by Status", icon: OrdersIcon, permission: PERMISSIONS.reportsView },
+      { href: "/dashboard/reports/outstanding-invoices", label: "Outstanding Invoices", icon: InvoicesIcon, permission: PERMISSIONS.reportsView },
+      { href: "/dashboard/reports/birthday", label: "Birthday Report", icon: CakeIcon, permission: PERMISSIONS.reportsView },
+      { href: "/dashboard/reports/wedding", label: "Wedding Report", icon: RingsIcon, permission: PERMISSIONS.reportsView },
+    ],
+  },
   { href: "/dashboard/whatsapp", label: "WhatsApp", icon: WhatsAppIcon, permission: PERMISSIONS.whatsAppView },
   {
     label: "User Management",
@@ -352,6 +363,37 @@ function NavLink({
 }
 
 type IconProps = { className?: string };
+
+function RevenueIcon({ className }: IconProps) {
+  return (
+    <svg className={className} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+      <path d="M3 17l5-5 4 3 6-7" />
+      <path d="M15 8h4v4" />
+    </svg>
+  );
+}
+
+/** A cake with a candle — a birthday needs no more explanation than that. */
+function CakeIcon({ className }: IconProps) {
+  return (
+    <svg className={className} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+      <path d="M4 20h16v-6a3 3 0 0 0-3-3H7a3 3 0 0 0-3 3v6Z" />
+      <path d="M4 16c1.5 1.2 3 1.2 4.5 0S11.5 14.8 13 16s3 1.2 4.5 0" />
+      <path d="M12 8V5" />
+      <circle cx="12" cy="3.5" r="1" />
+    </svg>
+  );
+}
+
+/** Two interlocking rings. */
+function RingsIcon({ className }: IconProps) {
+  return (
+    <svg className={className} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" aria-hidden="true">
+      <circle cx="9" cy="14" r="6" />
+      <circle cx="15" cy="14" r="6" />
+    </svg>
+  );
+}
 
 function ChevronIcon({ className }: IconProps) {
   return (

@@ -5,6 +5,7 @@ using MathilensERP.Application.Customers;
 using MathilensERP.Application.Employees;
 using MathilensERP.Application.Inventory;
 using MathilensERP.Application.Measurements;
+using MathilensERP.Application.Occasions;
 using MathilensERP.Application.Orders;
 using MathilensERP.Application.Pricing;
 using MathilensERP.Application.Reports;
@@ -102,6 +103,7 @@ public static class DependencyInjection
         services.AddScoped<IClothReceiptRepository, ClothReceiptRepository>();
         services.AddScoped<IActivityLogRepository, ActivityLogRepository>();
         services.AddScoped<IReportRepository, ReportRepository>();
+        services.AddScoped<IOccasionRepository, OccasionRepository>();
 
         services.AddOptions<WhatsAppOptions>().Bind(configuration.GetSection(WhatsAppOptions.SectionName));
 

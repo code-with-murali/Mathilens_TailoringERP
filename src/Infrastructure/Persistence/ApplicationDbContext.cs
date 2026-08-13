@@ -36,6 +36,9 @@ public class ApplicationDbContext : IdentityDbContext<ApplicationUser, Applicati
 
     public DbSet<Customer> Customers => Set<Customer>();
 
+    /// <summary>Birthday and anniversary follow-ups: who was contacted, about which year's occasion, and what came of it.</summary>
+    public DbSet<OccasionContact> OccasionContacts => Set<OccasionContact>();
+
     public DbSet<Measurement> Measurements => Set<Measurement>();
 
     public DbSet<MeasurementHistory> MeasurementHistory => Set<MeasurementHistory>();
