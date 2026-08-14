@@ -1,6 +1,6 @@
 "use client";
 
-import { useCallback, useEffect, useState, type FormEvent } from "react";
+import { useCallback, useEffect, useRef, useState, type FormEvent } from "react";
 import { Button } from "@/components/ui/Button";
 import { Input } from "@/components/ui/Input";
 import { useToast } from "@/components/ui/ToastProvider";
@@ -17,8 +17,18 @@ export default function BrandingPage() {
   const [isSaving, setIsSaving] = useState(false);
   const [formError, setFormError] = useState<string | null>(null);
 
+  // A load that lands after the reader has started typing must not overwrite them. See the same
+  // guard on Invoice Settings for what that looked like: edits vanished, and Save reported success
+  // because writing back the unchanged values is a perfectly good request.
+  const isEdited = useRef(false);
+
   const load = useCallback(async () => {
-    setBranding(await getBranding(getAccessToken()).catch(() => EMPTY_BRANDING));
+    const loaded = await getBranding(getAccessToken()).catch(() => EMPTY_BRANDING);
+
+    if (!isEdited.current) {
+      setBranding(loaded);
+    }
+
     setIsLoading(false);
   }, []);
 
@@ -28,6 +38,7 @@ export default function BrandingPage() {
   }, [load]);
 
   function set<K extends keyof Branding>(field: K, value: Branding[K]) {
+    isEdited.current = true;
     setBranding((current) => ({ ...current, [field]: value }));
   }
 

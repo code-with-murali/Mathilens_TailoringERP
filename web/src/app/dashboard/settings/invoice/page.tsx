@@ -1,6 +1,6 @@
 "use client";
 
-import { useCallback, useEffect, useState, type FormEvent } from "react";
+import { useCallback, useEffect, useRef, useState, type FormEvent } from "react";
 import Link from "next/link";
 import { Button } from "@/components/ui/Button";
 import { Input } from "@/components/ui/Input";
@@ -48,11 +48,25 @@ export default function InvoiceSettingsPage() {
     setNowIso(new Date().toISOString());
   }, []);
 
+  /**
+   * True once the form holds something the reader put there.
+   *
+   * <p>A second load must never overwrite it. The effect below runs twice in development, and the
+   * fields unlock the moment the first read returns — so anything typed in between was being wiped
+   * by the second, and Save then wrote back the values as they had been. The save succeeded, which
+   * is why it reported success: the request was fine, the payload was stale.</p>
+   */
+  const isEdited = useRef(false);
+
   const load = useCallback(async () => {
     setIsLoading(true);
     const loaded = await getInvoiceSettings(getAccessToken()).catch(() => DEFAULT_INVOICE_SETTINGS);
-    setSettings(loaded);
-    setTaxRateInput(String(loaded.taxRatePercent));
+
+    if (!isEdited.current) {
+      setSettings(loaded);
+      setTaxRateInput(String(loaded.taxRatePercent));
+    }
+
     setIsLoading(false);
   }, []);
 
@@ -64,7 +78,13 @@ export default function InvoiceSettingsPage() {
   }, [load]);
 
   function set<K extends keyof InvoiceSettings>(field: K, value: InvoiceSettings[K]) {
+    isEdited.current = true;
     setSettings((current) => ({ ...current, [field]: value }));
+  }
+
+  function setTaxRate(value: string) {
+    isEdited.current = true;
+    setTaxRateInput(value);
   }
 
   // Held as text so a half-typed "0." isn't rewritten under the cursor; validated on save.
@@ -251,7 +271,7 @@ export default function InvoiceSettingsPage() {
             max="100"
             step="0.01"
             value={taxRateInput}
-            onChange={(e) => setTaxRateInput(e.target.value)}
+            onChange={(e) => setTaxRate(e.target.value)}
             disabled={isLoading}
           />
 
