@@ -40,7 +40,7 @@ export const DEFAULT_INVOICE_SETTINGS: InvoiceSettings = {
   numberPrefix: DEFAULT_NUMBER_PREFIX,
   numberIncludeYear: true,
   dateFormat: "dd/MM/yyyy",
-  footerNote: DEFAULT_FOOTER_NOTE,
+  footerNote: "",
   taxRatePercent: 0,
   tagline: "",
   logoUrl: "",
@@ -88,7 +88,11 @@ export async function getInvoiceSettings(token: string | null): Promise<InvoiceS
     // invoice showed and what most of them expect.
     numberIncludeYear: values.get(INVOICE_NUMBER_INCLUDE_YEAR_KEY) !== "false",
     dateFormat: isDateFormat(dateFormat) ? dateFormat : DEFAULT_INVOICE_SETTINGS.dateFormat,
-    footerNote: values.get(INVOICE_FOOTER_NOTE_KEY)?.trim() || DEFAULT_FOOTER_NOTE,
+    // Returned exactly as stored, blank included. Substituting the default here put it in the
+    // settings field as though someone had typed it, so saving wrote the default back as a real
+    // value and a blank footer could never be told from a chosen one. The slip applies the default
+    // when it prints; this is the stored value, and the round trip has to be faithful.
+    footerNote: values.get(INVOICE_FOOTER_NOTE_KEY) ?? "",
     // A stored value that isn't a usable rate falls back to no tax. Charging a customer on the
     // strength of an unparseable setting is the one outcome worth ruling out here.
     taxRatePercent: Number.isFinite(rate) && rate >= 0 && rate <= 100 ? rate : 0,

@@ -6,6 +6,7 @@ import {
   getInvoiceSettings,
   formatInvoiceDate,
   invoiceNumberFor,
+  DEFAULT_FOOTER_NOTE,
   DEFAULT_INVOICE_SETTINGS,
   type InvoiceSettings,
 } from "@/lib/api/invoice-settings";
@@ -147,7 +148,10 @@ export function InvoiceDocument({
             printed once, here, where they will look for it. */}
         <span className="font-semibold">Collect on {showDate(order.dueAtUtc)}</span>
         <span>Thank you for choosing {shopName}!</span>
-        <span className="text-foreground/70">{settings.footerNote}</span>
+        {/* The default belongs here, at the moment of printing, not in the settings field — a shop
+            that has chosen nothing still gets a sensible last line, and one that has chosen
+            something sees exactly what it chose. */}
+        <span className="text-foreground/70">{settings.footerNote.trim() || DEFAULT_FOOTER_NOTE}</span>
       </div>
     </div>
   );

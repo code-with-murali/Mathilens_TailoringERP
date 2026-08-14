@@ -257,9 +257,12 @@ export default function InvoiceSettingsPage() {
               placeholder={DEFAULT_FOOTER_NOTE}
               className={fieldClassName}
             />
+            {/* The box holds what is stored, blank included — the fallback is shown as a
+                placeholder, which is what a placeholder is for. Putting the default in the box
+                itself made a blank footer look like a chosen one, and saving then wrote it back. */}
             <p className="text-xs text-foreground/60">
-              The last line of the invoice, under the thank-you. Left blank it reads
-              &quot;{DEFAULT_FOOTER_NOTE}&quot;
+              The last line of the invoice, under the thank-you. Leave it blank and the invoice
+              prints &quot;{DEFAULT_FOOTER_NOTE}&quot;
             </p>
           </div>
 
