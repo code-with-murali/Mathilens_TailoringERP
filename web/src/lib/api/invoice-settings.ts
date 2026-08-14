@@ -1,5 +1,5 @@
-import { getSetting, upsertSetting, SHOP_NAME_KEY, SHOP_CONTACT_NUMBER_KEY } from "./settings";
-import { SHOP_ADDRESS_KEY } from "./branding";
+import { listSettings, upsertSetting, SHOP_NAME_KEY, SHOP_CONTACT_NUMBER_KEY } from "./settings";
+import { SHOP_ADDRESS_KEY, SHOP_TAGLINE_KEY, BRANDING_LOGO_URL_KEY } from "./branding";
 
 /**
  * The letterhead keys are the same three Branding writes, deliberately: a shop that changes its
@@ -28,6 +28,9 @@ export type InvoiceSettings = {
   dateFormat: DateFormat;
   footerNote: string;
   taxRatePercent: number;
+  /** Read for the letterhead, edited on the Branding screen — this screen never writes them. */
+  tagline: string;
+  logoUrl: string;
 };
 
 export const DEFAULT_INVOICE_SETTINGS: InvoiceSettings = {
@@ -39,50 +42,58 @@ export const DEFAULT_INVOICE_SETTINGS: InvoiceSettings = {
   dateFormat: "dd/MM/yyyy",
   footerNote: DEFAULT_FOOTER_NOTE,
   taxRatePercent: 0,
+  tagline: "",
+  logoUrl: "",
 };
 
 function isDateFormat(value: string | undefined): value is DateFormat {
   return DATE_FORMATS.includes(value as DateFormat);
 }
 
+/** As many settings as the API will return in one page — there are a couple of dozen in total. */
+const SETTINGS_PAGE_SIZE = 100;
+const SETTINGS_MAX_PAGES = 5;
+
 /**
  * Everything the shop decides about its invoices.
  *
- * <p>A key that has never been set 404s, which is the normal state for a shop that has not opened
- * this screen — so a miss becomes the default rather than an error, and one absent key never blanks
- * the rest.</p>
+ * <p>Read as one listing rather than a request per key. Eleven parallel lookups for one letterhead
+ * was a lot of ways for a printed invoice to end up wearing the wrong shop's name, and every one of
+ * them failed silently into a default. One request has one outcome: it worked, or it did not.</p>
+ *
+ * <p>Throws rather than returning defaults. A caller that would rather show something than nothing
+ * can catch it — but that has to be a decision someone made, not what happens by omission.</p>
  */
 export async function getInvoiceSettings(token: string | null): Promise<InvoiceSettings> {
-  const keys = [
-    SHOP_NAME_KEY,
-    SHOP_ADDRESS_KEY,
-    SHOP_CONTACT_NUMBER_KEY,
-    INVOICE_NUMBER_PREFIX_KEY,
-    INVOICE_NUMBER_INCLUDE_YEAR_KEY,
-    INVOICE_DATE_FORMAT_KEY,
-    INVOICE_FOOTER_NOTE_KEY,
-    INVOICE_TAX_RATE_KEY,
-  ];
+  const values = new Map<string, string>();
 
-  const [name, address, phone, prefix, includeYear, dateFormat, footer, tax] = await Promise.all(
-    keys.map((key) => getSetting(key, token).catch(() => null)),
-  );
+  for (let page = 1; page <= SETTINGS_MAX_PAGES; page += 1) {
+    const { items, meta } = await listSettings(page, SETTINGS_PAGE_SIZE, token);
+    items.forEach((setting) => values.set(setting.key, setting.value));
 
-  const rate = Number(tax?.value);
+    if (page >= meta.totalPages) {
+      break;
+    }
+  }
+
+  const rate = Number(values.get(INVOICE_TAX_RATE_KEY));
+  const dateFormat = values.get(INVOICE_DATE_FORMAT_KEY);
 
   return {
-    companyName: name?.value ?? "",
-    address: address?.value ?? "",
-    phoneNumber: phone?.value ?? "",
-    numberPrefix: prefix?.value?.trim() || DEFAULT_NUMBER_PREFIX,
+    companyName: values.get(SHOP_NAME_KEY) ?? "",
+    address: values.get(SHOP_ADDRESS_KEY) ?? "",
+    phoneNumber: values.get(SHOP_CONTACT_NUMBER_KEY) ?? "",
+    numberPrefix: values.get(INVOICE_NUMBER_PREFIX_KEY)?.trim() || DEFAULT_NUMBER_PREFIX,
     // Anything other than an explicit "false" keeps the year, which is what the shop's sample
     // invoice showed and what most of them expect.
-    numberIncludeYear: includeYear?.value !== "false",
-    dateFormat: isDateFormat(dateFormat?.value) ? dateFormat.value : DEFAULT_INVOICE_SETTINGS.dateFormat,
-    footerNote: footer?.value?.trim() || DEFAULT_FOOTER_NOTE,
+    numberIncludeYear: values.get(INVOICE_NUMBER_INCLUDE_YEAR_KEY) !== "false",
+    dateFormat: isDateFormat(dateFormat) ? dateFormat : DEFAULT_INVOICE_SETTINGS.dateFormat,
+    footerNote: values.get(INVOICE_FOOTER_NOTE_KEY)?.trim() || DEFAULT_FOOTER_NOTE,
     // A stored value that isn't a usable rate falls back to no tax. Charging a customer on the
     // strength of an unparseable setting is the one outcome worth ruling out here.
     taxRatePercent: Number.isFinite(rate) && rate >= 0 && rate <= 100 ? rate : 0,
+    tagline: values.get(SHOP_TAGLINE_KEY) ?? "",
+    logoUrl: values.get(BRANDING_LOGO_URL_KEY) ?? "",
   };
 }
 

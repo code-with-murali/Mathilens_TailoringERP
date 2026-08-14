@@ -2,7 +2,6 @@
 
 import { Fragment, useEffect, useState } from "react";
 import { getAccessToken } from "@/lib/auth";
-import { getBranding, EMPTY_BRANDING, type Branding } from "@/lib/api/branding";
 import {
   getInvoiceSettings,
   formatInvoiceDate,
@@ -28,8 +27,8 @@ function money(amount: number): string {
  * earn its line. Rendered both in the print modal and on the order's Invoice card, from this one
  * component — a second copy of a document is where the two quietly stop matching.</p>
  *
- * <p>Letterhead, number format, date format and footer come from Invoice Settings (logo and tagline
- * from Branding), so each shop prints its own without a code change.</p>
+ * <p>Everything on it that isn't the order — letterhead, logo, number format, date format, footer —
+ * comes from Invoice Settings in one read, so each shop prints its own without a code change.</p>
  */
 export function InvoiceDocument({
   invoice,
@@ -44,24 +43,24 @@ export function InvoiceDocument({
    * edits that haven't been saved yet. Omit everywhere else. */
   settings?: InvoiceSettings;
 }) {
-  const [branding, setBranding] = useState<Branding>(EMPTY_BRANDING);
   const [savedSettings, setSavedSettings] = useState<InvoiceSettings>(DEFAULT_INVOICE_SETTINGS);
+  const [settingsFailed, setSettingsFailed] = useState(false);
 
   const isPreview = settingsOverride !== undefined;
 
   useEffect(() => {
-    // A shop that has configured nothing gets the defaults below rather than an error.
-    getBranding(getAccessToken())
-      .then(setBranding)
-      .catch(() => {});
-
     // A preview is handed its settings, so reading the saved ones would be a request whose answer
     // is thrown away.
-    if (!isPreview) {
-      getInvoiceSettings(getAccessToken())
-        .then(setSavedSettings)
-        .catch(() => {});
+    if (isPreview) {
+      return;
     }
+
+    getInvoiceSettings(getAccessToken())
+      .then((loaded) => {
+        setSavedSettings(loaded);
+        setSettingsFailed(false);
+      })
+      .catch(() => setSettingsFailed(true));
   }, [isPreview]);
 
   const settings = settingsOverride ?? savedSettings;
@@ -75,13 +74,21 @@ export function InvoiceDocument({
     // Smaller type on a narrower roll, but a touch more line spacing than the text size would
     // normally carry — a slip that is merely squeezed is harder to read across, not easier.
     <div className="mx-auto w-full max-w-[19rem] font-mono text-[11px] leading-[1.45] text-foreground">
+      {/* Said on the slip itself, because the failure it describes is the slip quietly wearing the
+          wrong shop's name — and that is not something to discover after handing one to a customer. */}
+      {settingsFailed && (
+        <p role="alert" className="mb-2 border border-danger px-2 py-1 text-center font-sans text-danger">
+          Shop details could not be loaded, so this invoice is showing defaults. Reload before printing it.
+        </p>
+      )}
+
       <div className="flex flex-col items-center text-center">
-        {branding.logoUrl.trim() !== "" && (
+        {settings.logoUrl.trim() !== "" && (
           // eslint-disable-next-line @next/next/no-img-element
-          <img src={branding.logoUrl} alt="" className="mb-1 h-7 w-auto object-contain" />
+          <img src={settings.logoUrl} alt="" className="mb-1 h-7 w-auto object-contain" />
         )}
         <span className="text-[13px] font-bold uppercase leading-snug tracking-wide">{shopName}</span>
-        {branding.tagline.trim() !== "" && <span>{branding.tagline}</span>}
+        {settings.tagline.trim() !== "" && <span>{settings.tagline}</span>}
         {addressLines.map((line) => (
           <span key={line}>{line}</span>
         ))}

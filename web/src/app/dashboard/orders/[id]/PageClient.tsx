@@ -44,7 +44,13 @@ function todayIsoDate(): string {
   return new Date().toISOString().slice(0, 10);
 }
 
-const INVOICE_SCAN_PAGE_SIZE = 100;
+/** The largest page the API will accept — PaginationDefaults.MaxPageSize. Asking for more is a 400. */
+const MAX_PAGE_SIZE = 100;
+
+/** A shop with more staff than this is not choosing from a dropdown anyway. */
+const EMPLOYEE_PAGE_LIMIT = 5;
+
+const INVOICE_SCAN_PAGE_SIZE = MAX_PAGE_SIZE;
 const INVOICE_SCAN_MAX_PAGES = 5;
 
 /**
@@ -229,13 +235,22 @@ export default function OrderDetailPage() {
     setIsLoadingAssignOptions(true);
 
     try {
-      // One unpaginated read: a tailoring shop's roster is a dropdown's worth of people, and paging
-      // a list you are meant to scan in one look would be worse than fetching it whole.
-      const { items } = await searchEmployees("", 1, 200, getAccessToken());
+      // Read a page at a time up to the API's own ceiling, and keep going while there are more.
+      // Asking for the whole roster in one request looked tidier but exceeded that ceiling, so the
+      // call came back 400 and the dropdown was simply empty — the bug this replaces.
+      const token = getAccessToken();
+      const roster: Employee[] = [];
+      for (let page = 1; page <= EMPLOYEE_PAGE_LIMIT; page += 1) {
+        const { items, meta } = await searchEmployees("", page, MAX_PAGE_SIZE, token);
+        roster.push(...items);
+        if (page >= meta.totalPages) {
+          break;
+        }
+      }
 
       // Retired staff are excluded. They stay in the system for the history on past orders, but
       // handing today's work to someone who has left is not a choice worth offering.
-      setAssignOptions(items.filter((employee) => employee.isActive));
+      setAssignOptions(roster.filter((employee) => employee.isActive));
     } catch (error) {
       setAssignError(error instanceof ApiError ? error.message : "Unable to load employees.");
     } finally {
