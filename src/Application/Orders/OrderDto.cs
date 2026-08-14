@@ -15,6 +15,8 @@ namespace MathilensERP.Application.Orders;
 /// </param>
 public sealed record OrderDto(
     Guid Id,
+    /// <summary>The shop's own reference for this order, e.g. "MTL-0001". Empty only on fixtures.</summary>
+    string OrderNumber,
     Guid CustomerId,
     Guid? EmployeeId,
     OrderStatus Status,

@@ -19,7 +19,13 @@ public sealed class SearchOrdersQueryHandler : IQueryHandler<SearchOrdersQuery, 
 
     public async Task<Result<PagedResult<OrderDto>>> Handle(SearchOrdersQuery query, CancellationToken cancellationToken)
     {
-        var page = await _orderRepository.SearchAsync(query.CustomerId, query.Status, query.Page, query.PageSize, cancellationToken);
+        var page = await _orderRepository.SearchAsync(
+            query.CustomerId,
+            query.Status,
+            query.SearchTerm,
+            query.Page,
+            query.PageSize,
+            cancellationToken);
 
         // One billing query for the whole page, not one per row.
         var orderIds = page.Items.Select(o => o.Id).ToList();

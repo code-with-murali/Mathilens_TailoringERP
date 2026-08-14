@@ -1,3 +1,4 @@
+using MathilensERP.Application.Common.Interfaces;
 using MathilensERP.Application.Common.Mediator;
 using MathilensERP.Application.Customers;
 using MathilensERP.Application.Employees;
@@ -14,17 +15,20 @@ public sealed class CreateOrderCommandHandler : ICommandHandler<CreateOrderComma
     private readonly ICustomerRepository _customerRepository;
     private readonly IEmployeeRepository _employeeRepository;
     private readonly IClothPriceRepository _clothPriceRepository;
+    private readonly IOrderNumberGenerator _orderNumbers;
 
     public CreateOrderCommandHandler(
         IOrderRepository orderRepository,
         ICustomerRepository customerRepository,
         IEmployeeRepository employeeRepository,
-        IClothPriceRepository clothPriceRepository)
+        IClothPriceRepository clothPriceRepository,
+        IOrderNumberGenerator orderNumbers)
     {
         _orderRepository = orderRepository;
         _customerRepository = customerRepository;
         _employeeRepository = employeeRepository;
         _clothPriceRepository = clothPriceRepository;
+        _orderNumbers = orderNumbers;
     }
 
     public async Task<Result<OrderDto>> Handle(CreateOrderCommand command, CancellationToken cancellationToken)
@@ -46,7 +50,11 @@ public sealed class CreateOrderCommandHandler : ICommandHandler<CreateOrderComma
             }
         }
 
-        var order = Order.Create(command.CustomerId, command.DueAtUtc, command.EmployeeId, command.Notes);
+        // Last of the checks, so a customer or employee that does not exist fails before a number is
+        // spent on an order that was never going to be created.
+        var orderNumber = await _orderNumbers.NextAsync(cancellationToken);
+
+        var order = Order.Create(command.CustomerId, command.DueAtUtc, command.EmployeeId, command.Notes, orderNumber);
 
         foreach (var itemInput in command.Items)
         {

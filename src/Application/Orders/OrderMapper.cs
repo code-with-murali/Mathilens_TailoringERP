@@ -13,6 +13,7 @@ internal static class OrderMapper
     public static OrderDto ToDto(this Order order, decimal? amountPaid = null) =>
         new(
             order.Id,
+            order.OrderNumber,
             order.CustomerId,
             order.EmployeeId,
             order.Status,

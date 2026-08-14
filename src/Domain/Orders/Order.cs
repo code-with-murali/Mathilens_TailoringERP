@@ -24,6 +24,18 @@ public sealed class Order : AuditableEntity
 
     private readonly List<OrderItem> _items = [];
 
+    /// <summary>
+    /// What the shop and the customer call this order out loud — "MTL-0001". The prefix is the
+    /// shop's, the count runs continuously and is never reused.
+    ///
+    /// <para>
+    /// Stored whole rather than rebuilt from a prefix and a count at display time. The prefix is a
+    /// setting somebody can change, and rebuilding would then quietly renumber every order already
+    /// written on a receipt in the customer's hand.
+    /// </para>
+    /// </summary>
+    public string OrderNumber { get; private set; } = string.Empty;
+
     public Guid CustomerId { get; private set; }
 
     public Guid? EmployeeId { get; private set; }
@@ -86,7 +98,18 @@ public sealed class Order : AuditableEntity
     {
     }
 
-    public static Order Create(Guid customerId, DateTime dueAtUtc, Guid? employeeId, string? notes = null)
+    /// <summary>
+    /// <paramref name="orderNumber"/> is optional so that the domain tests, which care about the
+    /// lifecycle rather than the label, are not each obliged to invent one. Every order the
+    /// application creates is given a number by <c>IOrderNumberGenerator</c>; an order without one
+    /// is a fixture, not something the shop can have made.
+    /// </summary>
+    public static Order Create(
+        Guid customerId,
+        DateTime dueAtUtc,
+        Guid? employeeId,
+        string? notes = null,
+        string? orderNumber = null)
     {
         return new Order(Guid.NewGuid())
         {
@@ -95,6 +118,7 @@ public sealed class Order : AuditableEntity
             DueAtUtc = dueAtUtc,
             Notes = notes,
             Status = OrderStatus.Received,
+            OrderNumber = orderNumber?.Trim() ?? string.Empty,
         };
     }
 

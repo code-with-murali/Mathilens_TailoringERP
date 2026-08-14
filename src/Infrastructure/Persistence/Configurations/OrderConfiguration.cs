@@ -14,6 +14,10 @@ public class OrderConfiguration : IEntityTypeConfiguration<Order>
         builder.ToTable("Orders");
         builder.HasKey(o => o.Id);
 
+        builder.Property(o => o.OrderNumber)
+            .IsRequired()
+            .HasMaxLength(30);
+
         builder.Property(o => o.CustomerId).IsRequired();
 
         builder.Property(o => o.Status)
@@ -49,6 +53,11 @@ public class OrderConfiguration : IEntityTypeConfiguration<Order>
 
         builder.Property(o => o.CreatedBy).IsRequired();
         builder.Property(o => o.CreatedAtUtc).IsRequired();
+
+        // Unfiltered, unlike the soft-delete-aware unique indexes elsewhere: a cancelled or deleted
+        // order keeps its number forever. Handing a reference back out would point two garments,
+        // two receipts and two conversations at the same string.
+        builder.HasIndex(o => o.OrderNumber).IsUnique();
 
         // 02_DATABASE.md § 10.7 Index Recommendations.
         builder.HasIndex(o => o.CustomerId);

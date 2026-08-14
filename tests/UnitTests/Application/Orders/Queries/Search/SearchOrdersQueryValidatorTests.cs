@@ -10,7 +10,7 @@ public class SearchOrdersQueryValidatorTests
     [Fact]
     public void Validate_WithValidQuery_Passes()
     {
-        var result = _validator.Validate(new SearchOrdersQuery(Guid.NewGuid(), OrderStatus.Received, 1, 20));
+        var result = _validator.Validate(new SearchOrdersQuery(Guid.NewGuid(), OrderStatus.Received, null, 1, 20));
 
         Assert.True(result.IsValid);
     }
@@ -18,7 +18,7 @@ public class SearchOrdersQueryValidatorTests
     [Fact]
     public void Validate_WithNoFilters_Passes()
     {
-        var result = _validator.Validate(new SearchOrdersQuery(null, null, 1, 20));
+        var result = _validator.Validate(new SearchOrdersQuery(null, null, null, 1, 20));
 
         Assert.True(result.IsValid);
     }
@@ -28,7 +28,7 @@ public class SearchOrdersQueryValidatorTests
     [InlineData(101)]
     public void Validate_WithPageSizeOutOfBounds_Fails(int pageSize)
     {
-        var result = _validator.Validate(new SearchOrdersQuery(null, null, 1, pageSize));
+        var result = _validator.Validate(new SearchOrdersQuery(null, null, null, 1, pageSize));
 
         Assert.False(result.IsValid);
         Assert.Contains(result.Errors, e => e.PropertyName == nameof(SearchOrdersQuery.PageSize));

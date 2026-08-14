@@ -33,6 +33,11 @@ public class ActivityLogConfiguration : IEntityTypeConfiguration<ActivityLog>
         // nothing worth repeating. 2000 matches the builder's own truncation limit.
         builder.Property(a => a.Description).HasMaxLength(2000);
 
+        // Unbounded text rather than a capped column: this holds JSON, and a JSON document cut off
+        // at a character limit is not shortened, it is broken. The interceptor bounds it at source
+        // instead — a fixed number of changes, each value clipped.
+        builder.Property(a => a.Changes);
+
         builder.Property(a => a.OccurredAtUtc).IsRequired();
 
         // The log is always read newest-first and filtered by these three, so each filter path is

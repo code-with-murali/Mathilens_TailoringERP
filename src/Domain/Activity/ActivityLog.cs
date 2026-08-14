@@ -35,6 +35,16 @@ public sealed class ActivityLog
     /// </summary>
     public string? Description { get; private set; }
 
+    /// <summary>
+    /// What each edited field was before and what it became, as JSON — the shape of
+    /// <c>EntityChange</c> in Application. Null for a create or a delete, which have only one side,
+    /// and for entries recorded before this existed.
+    ///
+    /// Held as JSON rather than as its own table because it is written once, read whole, and never
+    /// queried by field. A table would buy nothing and cost a join on the app's fastest-growing log.
+    /// </summary>
+    public string? Changes { get; private set; }
+
     public DateTime OccurredAtUtc { get; private set; }
 
     private ActivityLog()
@@ -49,7 +59,8 @@ public sealed class ActivityLog
         string action,
         string requestName,
         DateTime occurredAtUtc,
-        string? description = null) =>
+        string? description = null,
+        string? changes = null) =>
         new()
         {
             Id = Guid.NewGuid(),
@@ -60,5 +71,6 @@ public sealed class ActivityLog
             RequestName = Guard.AgainstNullOrWhiteSpace(requestName, nameof(requestName)),
             OccurredAtUtc = occurredAtUtc,
             Description = string.IsNullOrWhiteSpace(description) ? null : description,
+            Changes = string.IsNullOrWhiteSpace(changes) ? null : changes,
         };
 }

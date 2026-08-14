@@ -1,3 +1,4 @@
+using System.Text.Json;
 using MathilensERP.Application.Activity;
 using MathilensERP.Application.Common.Interfaces;
 using MathilensERP.Application.Common.Mediator;
@@ -26,23 +27,32 @@ public sealed class ActivityLogBehavior<TRequest, TResponse> : IPipelineBehavior
 
     private static readonly bool IsExempt = typeof(IUnloggedCommand).IsAssignableFrom(typeof(TRequest));
 
+    private static readonly JsonSerializerOptions ChangeJson = new(JsonSerializerDefaults.Web);
+
     private readonly IActivityLogRepository _activityLogRepository;
     private readonly ICurrentUserService _currentUserService;
+    private readonly IEntityChangeCollector _entityChangeCollector;
     private readonly ILogger<ActivityLogBehavior<TRequest, TResponse>> _logger;
 
     public ActivityLogBehavior(
         IActivityLogRepository activityLogRepository,
         ICurrentUserService currentUserService,
+        IEntityChangeCollector entityChangeCollector,
         ILogger<ActivityLogBehavior<TRequest, TResponse>> logger)
     {
         _activityLogRepository = activityLogRepository;
         _currentUserService = currentUserService;
+        _entityChangeCollector = entityChangeCollector;
         _logger = logger;
     }
 
     public async Task<TResponse> Handle(TRequest request, RequestHandlerDelegate<TResponse> next, CancellationToken cancellationToken)
     {
         var response = await next();
+
+        // Drained even when nothing will be written, so a skipped or failed command cannot leave
+        // its changes behind to be attributed to whatever runs next on this request.
+        var changes = _entityChangeCollector.Drain();
 
         if (!IsCommand || IsExempt || response.IsFailure)
         {
@@ -58,7 +68,8 @@ public sealed class ActivityLogBehavior<TRequest, TResponse> : IPipelineBehavior
                 ActivityDescriptor.ActionFor(typeof(TRequest)),
                 typeof(TRequest).Name,
                 DateTime.UtcNow,
-                ActivityDescriptionBuilder.Describe(request));
+                ActivityDescriptionBuilder.Describe(request),
+                changes.Count == 0 ? null : JsonSerializer.Serialize(changes, ChangeJson));
 
             await _activityLogRepository.AddAsync(entry, cancellationToken);
         }

@@ -17,7 +17,13 @@ public class OrderRepository : IOrderRepository
     public Task<Order?> GetByIdAsync(Guid id, CancellationToken cancellationToken) =>
         Include(_dbContext.Orders).SingleOrDefaultAsync(o => o.Id == id, cancellationToken);
 
-    public async Task<PagedResult<Order>> SearchAsync(Guid? customerId, OrderStatus? status, int page, int pageSize, CancellationToken cancellationToken)
+    public async Task<PagedResult<Order>> SearchAsync(
+        Guid? customerId,
+        OrderStatus? status,
+        string? searchTerm,
+        int page,
+        int pageSize,
+        CancellationToken cancellationToken)
     {
         var query = Include(_dbContext.Orders);
 
@@ -29,6 +35,26 @@ public class OrderRepository : IOrderRepository
         if (status is { } s)
         {
             query = query.Where(o => o.Status == s);
+        }
+
+        if (!string.IsNullOrWhiteSpace(searchTerm))
+        {
+            var term = $"%{searchTerm.Trim()}%";
+
+            // Phone numbers are stored as they were typed — "+91 98765 43210" — and nobody searching
+            // reproduces the spacing. Both sides are stripped so the digits match however either was
+            // written; "9876543210" then finds "+91 98765 43210".
+            var digits = $"%{searchTerm.Replace(" ", string.Empty).Replace("-", string.Empty).Trim()}%";
+
+            // Correlated rather than joined, because Order holds no navigation to Customer — the
+            // configuration maps the foreign key alone. EF turns this into an EXISTS, which is the
+            // right shape anyway: one row per order, no duplicates to distinct away.
+            query = query.Where(o =>
+                EF.Functions.ILike(o.OrderNumber, term) ||
+                _dbContext.Customers.Any(c =>
+                    c.Id == o.CustomerId &&
+                    (EF.Functions.ILike(c.FullName, term) ||
+                     EF.Functions.ILike(c.PhoneNumber.Replace(" ", string.Empty).Replace("-", string.Empty), digits))));
         }
 
         var totalCount = await query.CountAsync(cancellationToken);

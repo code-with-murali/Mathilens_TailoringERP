@@ -47,7 +47,7 @@ public sealed class OccasionsController : ApiControllerBase
 
     /// <summary>Occasions inside the window — upcoming and not yet contacted, or already contacted.</summary>
     [HttpGet]
-    [ProducesResponseType(typeof(ApiResponse<PagedResult<OccasionRowDto>>), StatusCodes.Status200OK)]
+    [ProducesResponseType(typeof(ApiResponse<IReadOnlyList<OccasionRowDto>>), StatusCodes.Status200OK)]
     [ProducesResponseType(typeof(ApiErrorResponse), StatusCodes.Status400BadRequest)]
     public async Task<IActionResult> Search(
         [FromQuery] OccasionType occasion,
@@ -60,7 +60,13 @@ public sealed class OccasionsController : ApiControllerBase
         var window = Math.Clamp(windowDays, 1, MaxWindowDays);
 
         var result = await _sender.Send(new SearchOccasionsQuery(occasion, scope, window, page, pageSize), cancellationToken);
-        return ToActionResult(result);
+
+        // Paged, so the rows go in `data` and the counts in `meta` — which is what every other list
+        // endpoint does and what the client's apiGetPaged reads. ToActionResult instead nested the
+        // whole PagedResult under `data`, so the browser got an object where it expected an array
+        // and the report died on rows.map. The two helpers differ by one word and produce envelopes
+        // that only diverge once something tries to iterate the result.
+        return ToPagedActionResult(result);
     }
 
     /// <summary>

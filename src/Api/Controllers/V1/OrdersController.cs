@@ -110,18 +110,24 @@ public sealed class OrdersController : ApiControllerBase
         return ToActionResult(result);
     }
 
-    /// <summary>Searches orders by customer and/or status, paginated (00_MASTER_SPEC.md § 8.3).</summary>
+    /// <summary>
+    /// Searches orders by customer, status and/or free text, paginated (00_MASTER_SPEC.md § 8.3).
+    ///
+    /// <paramref name="search"/> matches the order number, the customer's name or their phone
+    /// number — whichever of the three the caller happens to have been given.
+    /// </summary>
     [HttpGet]
     [ProducesResponseType(typeof(ApiResponse<IReadOnlyList<OrderDto>>), StatusCodes.Status200OK)]
     [ProducesResponseType(typeof(ApiErrorResponse), StatusCodes.Status400BadRequest)]
     public async Task<IActionResult> Search(
         [FromQuery] Guid? customerId,
         [FromQuery] OrderStatus? status,
+        [FromQuery] string? search,
         [FromQuery] int page = PaginationDefaults.DefaultPage,
         [FromQuery] int pageSize = PaginationDefaults.DefaultPageSize,
         CancellationToken cancellationToken = default)
     {
-        var result = await _sender.Send(new SearchOrdersQuery(customerId, status, page, pageSize), cancellationToken);
+        var result = await _sender.Send(new SearchOrdersQuery(customerId, status, search, page, pageSize), cancellationToken);
         return ToPagedActionResult(result);
     }
 

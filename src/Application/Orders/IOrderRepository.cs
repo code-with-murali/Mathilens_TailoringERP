@@ -8,7 +8,14 @@ public interface IOrderRepository
 {
     Task<Order?> GetByIdAsync(Guid id, CancellationToken cancellationToken);
 
-    Task<PagedResult<Order>> SearchAsync(Guid? customerId, OrderStatus? status, int page, int pageSize, CancellationToken cancellationToken);
+    /// <param name="searchTerm">Matched against the order number, the customer's name and their phone number. Null or blank matches everything.</param>
+    Task<PagedResult<Order>> SearchAsync(
+        Guid? customerId,
+        OrderStatus? status,
+        string? searchTerm,
+        int page,
+        int pageSize,
+        CancellationToken cancellationToken);
 
     /// <summary>Whether any live order was placed by this customer — used to keep a customer with order history from being deleted.</summary>
     Task<bool> ExistsForCustomerAsync(Guid customerId, CancellationToken cancellationToken);

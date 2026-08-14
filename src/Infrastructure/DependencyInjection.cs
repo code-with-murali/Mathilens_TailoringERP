@@ -53,6 +53,12 @@ public static class DependencyInjection
         services.AddScoped<ICurrentUserService, CurrentUserService>();
         services.AddScoped<AuditableEntitySaveChangesInterceptor>();
 
+        // Scoped, and the collector shared with the interceptor writing into it: the before-and-after
+        // is captured during SaveChanges and read after the command commits, so both halves have to
+        // be looking at the same instance for the length of one request.
+        services.AddScoped<IEntityChangeCollector, EntityChangeCollector>();
+        services.AddScoped<EntityChangeSaveChangesInterceptor>();
+
         // AddIdentityCore's default token providers (used for password reset, email
         // confirmation, etc.) need IDataProtectionProvider. A full WebApplication host
         // registers this automatically at runtime, but EF Core's design-time host (used by
@@ -61,7 +67,9 @@ public static class DependencyInjection
 
         services.AddDbContext<ApplicationDbContext>((sp, options) =>
             options.UseNpgsql(connectionString)
-                .AddInterceptors(sp.GetRequiredService<AuditableEntitySaveChangesInterceptor>()));
+                .AddInterceptors(
+                    sp.GetRequiredService<AuditableEntitySaveChangesInterceptor>(),
+                    sp.GetRequiredService<EntityChangeSaveChangesInterceptor>()));
 
         services
             .AddIdentityCore<ApplicationUser>(options =>
@@ -96,6 +104,7 @@ public static class DependencyInjection
         services.AddScoped<IMeasurementRepository, MeasurementRepository>();
         services.AddScoped<IEmployeeRepository, EmployeeRepository>();
         services.AddScoped<IOrderRepository, OrderRepository>();
+        services.AddScoped<IOrderNumberGenerator, OrderNumberGenerator>();
         services.AddScoped<IInvoiceRepository, InvoiceRepository>();
         services.AddScoped<IWhatsAppMessageRepository, WhatsAppMessageRepository>();
         services.AddScoped<ISettingRepository, SettingRepository>();

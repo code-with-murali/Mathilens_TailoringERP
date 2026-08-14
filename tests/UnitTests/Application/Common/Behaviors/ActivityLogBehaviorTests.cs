@@ -1,3 +1,4 @@
+using System.Text.Json;
 using MathilensERP.Application.Activity;
 using MathilensERP.Application.Auth.Commands.Login;
 using MathilensERP.Application.Auth.Commands.RefreshAccessToken;
@@ -18,12 +19,13 @@ public class ActivityLogBehaviorTests
 {
     private readonly IActivityLogRepository _repository = Substitute.For<IActivityLogRepository>();
     private readonly ICurrentUserService _currentUserService = Substitute.For<ICurrentUserService>();
+    private readonly IEntityChangeCollector _entityChangeCollector = Substitute.For<IEntityChangeCollector>();
 
     private static CreateCustomerCommand Command() => new("Asha Rao", "+91 98765 43210", null, null, null);
 
     private ActivityLogBehavior<TRequest, TResponse> Behavior<TRequest, TResponse>()
         where TResponse : Result =>
-        new(_repository, _currentUserService, NullLogger<ActivityLogBehavior<TRequest, TResponse>>.Instance);
+        new(_repository, _currentUserService, _entityChangeCollector, NullLogger<ActivityLogBehavior<TRequest, TResponse>>.Instance);
 
     [Fact]
     public async Task Handle_WithASuccessfulCommand_RecordsWhoDidWhat()
@@ -123,5 +125,45 @@ public class ActivityLogBehaviorTests
         var result = await behavior.Handle(Command(), () => Task.FromResult(expected), CancellationToken.None);
 
         Assert.True(result.IsSuccess);
+    }
+
+    [Fact]
+    public async Task Handle_WithFieldChanges_RecordsWhatTheyChangedFromAndTo()
+    {
+        _entityChangeCollector.Drain().Returns([new EntityChange("Customer", "Phone Number", "98765 43210", "91234 56789")]);
+        var behavior = Behavior<CreateCustomerCommand, Result<CustomerDto>>();
+
+        ActivityLog? recorded = null;
+        await _repository.AddAsync(Arg.Do<ActivityLog>(a => recorded = a), Arg.Any<CancellationToken>());
+
+        await behavior.Handle(
+            Command(),
+            () => Task.FromResult(Result.Success(new CustomerDto(
+                Guid.NewGuid(), "Asha Rao", "+91 98765 43210", null, null, null, null, null, null, null, DateTime.UtcNow))),
+            CancellationToken.None);
+
+        // Stored as JSON so the screen can lay the two values out itself rather than parsing a sentence.
+        var changes = JsonSerializer.Deserialize<List<EntityChange>>(
+            recorded?.Changes ?? "[]", new JsonSerializerOptions(JsonSerializerDefaults.Web));
+
+        var change = Assert.Single(changes!);
+        Assert.Equal("Phone Number", change.Field);
+        Assert.Equal("98765 43210", change.From);
+        Assert.Equal("91234 56789", change.To);
+    }
+
+    [Fact]
+    public async Task Handle_WithAFailedCommand_StillDrainsTheChanges()
+    {
+        var behavior = Behavior<CreateCustomerCommand, Result<CustomerDto>>();
+
+        await behavior.Handle(
+            Command(),
+            () => Task.FromResult(Result.Failure<CustomerDto>(Error.Validation("VALIDATION_ERROR", "Nope."))),
+            CancellationToken.None);
+
+        // Anything left in the collector would be picked up by whatever ran next on this request and
+        // attributed to it — an audit trail blaming the wrong action is worse than one missing a line.
+        _entityChangeCollector.Received(1).Drain();
     }
 }
