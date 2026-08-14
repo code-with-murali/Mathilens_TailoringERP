@@ -6,7 +6,6 @@ import {
   getInvoiceSettings,
   formatInvoiceDate,
   invoiceNumberFor,
-  DEFAULT_FOOTER_NOTE,
   DEFAULT_INVOICE_SETTINGS,
   type InvoiceSettings,
 } from "@/lib/api/invoice-settings";
@@ -28,8 +27,9 @@ function money(amount: number): string {
  * earn its line. Rendered both in the print modal and on the order's Invoice card, from this one
  * component — a second copy of a document is where the two quietly stop matching.</p>
  *
- * <p>Everything on it that isn't the order — letterhead, logo, number format, date format, footer —
- * comes from Invoice Settings in one read, so each shop prints its own without a code change.</p>
+ * <p>Everything on it that isn't the order — letterhead, logo, invoice number format, closing line —
+ * comes from Invoice Settings in one read, so each shop prints its own without a code change. Dates
+ * are the exception: dd/MM/yyyy on every slip, so two counters never print a date differently.</p>
  */
 export function InvoiceDocument({
   invoice,
@@ -67,7 +67,7 @@ export function InvoiceDocument({
   const settings = settingsOverride ?? savedSettings;
   const shopName = settings.companyName.trim() || DEFAULT_SHOP_NAME;
   const addressLines = settings.address.split("\n").map((line) => line.trim()).filter(Boolean);
-  const showDate = (iso: string) => formatInvoiceDate(iso, settings.dateFormat);
+  const showDate = formatInvoiceDate;
 
   const orderNumber = order.orderNumber?.trim() || `#${order.id.slice(0, 8).toUpperCase()}`;
 
@@ -148,10 +148,11 @@ export function InvoiceDocument({
             printed once, here, where they will look for it. */}
         <span className="font-semibold">Collect on {showDate(order.dueAtUtc)}</span>
         <span>Thank you for choosing {shopName}!</span>
-        {/* The default belongs here, at the moment of printing, not in the settings field — a shop
-            that has chosen nothing still gets a sensible last line, and one that has chosen
-            something sees exactly what it chose. */}
-        <span className="text-foreground/70">{settings.footerNote.trim() || DEFAULT_FOOTER_NOTE}</span>
+        {/* Only when a shop has written one. There is no stock closing line — a sentence nobody
+            chose is just another line of paper on every slip the shop prints. */}
+        {settings.footerNote.trim() !== "" && (
+          <span className="text-foreground/70">{settings.footerNote}</span>
+        )}
       </div>
     </div>
   );

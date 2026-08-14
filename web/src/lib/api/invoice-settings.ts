@@ -8,15 +8,10 @@ import { SHOP_ADDRESS_KEY, SHOP_TAGLINE_KEY, BRANDING_LOGO_URL_KEY } from "./bra
  */
 export const INVOICE_NUMBER_PREFIX_KEY = "Invoice.NumberPrefix";
 export const INVOICE_NUMBER_INCLUDE_YEAR_KEY = "Invoice.NumberIncludeYear";
-export const INVOICE_DATE_FORMAT_KEY = "Invoice.DateFormat";
 export const INVOICE_FOOTER_NOTE_KEY = "Invoice.FooterNote";
 /** A percentage, stored as a plain number string — "5" means 5% of the order's own total. */
 export const INVOICE_TAX_RATE_KEY = "Invoice.TaxRatePercent";
 
-export const DATE_FORMATS = ["dd/MM/yyyy", "MM/dd/yyyy", "yyyy-MM-dd", "dd-MMM-yyyy"] as const;
-export type DateFormat = (typeof DATE_FORMATS)[number];
-
-export const DEFAULT_FOOTER_NOTE = "Please retain this invoice for your records.";
 export const DEFAULT_NUMBER_PREFIX = "INV";
 
 export type InvoiceSettings = {
@@ -25,7 +20,7 @@ export type InvoiceSettings = {
   phoneNumber: string;
   numberPrefix: string;
   numberIncludeYear: boolean;
-  dateFormat: DateFormat;
+  /** Blank on most invoices — a shop that wants a closing line sets it in Settings > Advanced. */
   footerNote: string;
   taxRatePercent: number;
   /** Read for the letterhead, edited on the Branding screen — this screen never writes them. */
@@ -39,16 +34,11 @@ export const DEFAULT_INVOICE_SETTINGS: InvoiceSettings = {
   phoneNumber: "",
   numberPrefix: DEFAULT_NUMBER_PREFIX,
   numberIncludeYear: true,
-  dateFormat: "dd/MM/yyyy",
   footerNote: "",
   taxRatePercent: 0,
   tagline: "",
   logoUrl: "",
 };
-
-function isDateFormat(value: string | undefined): value is DateFormat {
-  return DATE_FORMATS.includes(value as DateFormat);
-}
 
 /** As many settings as the API will return in one page — there are a couple of dozen in total. */
 const SETTINGS_PAGE_SIZE = 100;
@@ -77,7 +67,6 @@ export async function getInvoiceSettings(token: string | null): Promise<InvoiceS
   }
 
   const rate = Number(values.get(INVOICE_TAX_RATE_KEY));
-  const dateFormat = values.get(INVOICE_DATE_FORMAT_KEY);
 
   return {
     companyName: values.get(SHOP_NAME_KEY) ?? "",
@@ -87,11 +76,8 @@ export async function getInvoiceSettings(token: string | null): Promise<InvoiceS
     // Anything other than an explicit "false" keeps the year, which is what the shop's sample
     // invoice showed and what most of them expect.
     numberIncludeYear: values.get(INVOICE_NUMBER_INCLUDE_YEAR_KEY) !== "false",
-    dateFormat: isDateFormat(dateFormat) ? dateFormat : DEFAULT_INVOICE_SETTINGS.dateFormat,
-    // Returned exactly as stored, blank included. Substituting the default here put it in the
-    // settings field as though someone had typed it, so saving wrote the default back as a real
-    // value and a blank footer could never be told from a chosen one. The slip applies the default
-    // when it prints; this is the stored value, and the round trip has to be faithful.
+    // Exactly as stored, blank included. Nothing is substituted for a blank — the slip simply has
+    // no closing line, which is the point of leaving it blank.
     footerNote: values.get(INVOICE_FOOTER_NOTE_KEY) ?? "",
     // A stored value that isn't a usable rate falls back to no tax. Charging a customer on the
     // strength of an unparseable setting is the one outcome worth ruling out here.
@@ -109,7 +95,6 @@ export async function saveInvoiceSettings(settings: InvoiceSettings, token: stri
     [SHOP_CONTACT_NUMBER_KEY, settings.phoneNumber.trim()],
     [INVOICE_NUMBER_PREFIX_KEY, settings.numberPrefix.trim().toUpperCase()],
     [INVOICE_NUMBER_INCLUDE_YEAR_KEY, String(settings.numberIncludeYear)],
-    [INVOICE_DATE_FORMAT_KEY, settings.dateFormat],
     [INVOICE_TAX_RATE_KEY, String(settings.taxRatePercent)],
     // The footer is not written here. Invoice Settings has no field for it any more, so writing it
     // back could only ever repeat what was read — or, if that read had failed, quietly overwrite a
@@ -121,25 +106,19 @@ export async function saveInvoiceSettings(settings: InvoiceSettings, token: stri
   }
 }
 
-const MONTH_ABBREVIATIONS = ["Jan", "Feb", "Mar", "Apr", "May", "Jun", "Jul", "Aug", "Sep", "Oct", "Nov", "Dec"];
-
-/** Formatted by hand rather than through a locale, so what the shop picked is what prints. */
-export function formatInvoiceDate(iso: string, format: DateFormat): string {
+/**
+ * dd/MM/yyyy, on every invoice.
+ *
+ * <p>Assembled by hand rather than through a locale, so the slip reads the same on every machine in
+ * the shop — a browser set to US English would otherwise print 08/14/2026 on one counter and
+ * 14/08/2026 on the next.</p>
+ */
+export function formatInvoiceDate(iso: string): string {
   const date = new Date(iso);
   const day = String(date.getDate()).padStart(2, "0");
   const month = String(date.getMonth() + 1).padStart(2, "0");
-  const year = String(date.getFullYear());
 
-  switch (format) {
-    case "MM/dd/yyyy":
-      return `${month}/${day}/${year}`;
-    case "yyyy-MM-dd":
-      return `${year}-${month}-${day}`;
-    case "dd-MMM-yyyy":
-      return `${day}-${MONTH_ABBREVIATIONS[date.getMonth()]}-${year}`;
-    default:
-      return `${day}/${month}/${year}`;
-  }
+  return `${day}/${month}/${date.getFullYear()}`;
 }
 
 /**

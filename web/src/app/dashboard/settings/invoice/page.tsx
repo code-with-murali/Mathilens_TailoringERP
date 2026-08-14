@@ -12,9 +12,7 @@ import { buildInvoicePreview } from "@/components/orders/invoice-preview-sample"
 import {
   getInvoiceSettings,
   saveInvoiceSettings,
-  DATE_FORMATS,
   DEFAULT_INVOICE_SETTINGS,
-  type DateFormat,
   type InvoiceSettings,
 } from "@/lib/api/invoice-settings";
 
@@ -221,27 +219,7 @@ export default function InvoiceSettingsPage() {
         </section>
 
         <section className="flex flex-col gap-4 rounded-lg border border-border bg-surface p-6">
-          <h2 className="font-semibold">Dates and tax</h2>
-
-          <div className="flex flex-col gap-1">
-            <label htmlFor="dateFormat" className="text-sm font-medium">
-              Date format
-            </label>
-            <select
-              id="dateFormat"
-              value={settings.dateFormat}
-              onChange={(e) => set("dateFormat", e.target.value as DateFormat)}
-              disabled={isLoading}
-              className={fieldClassName}
-            >
-              {DATE_FORMATS.map((format) => (
-                <option key={format} value={format}>
-                  {format}
-                </option>
-              ))}
-            </select>
-            <p className="text-xs text-foreground/60">Applies to every date on the invoice.</p>
-          </div>
+          <h2 className="font-semibold">Tax</h2>
 
           <Input
             id="taxRate"
