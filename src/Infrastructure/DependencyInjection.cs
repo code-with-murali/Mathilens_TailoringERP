@@ -106,6 +106,7 @@ public static class DependencyInjection
         services.AddScoped<IOrderRepository, OrderRepository>();
         services.AddScoped<IOrderNumberGenerator, OrderNumberGenerator>();
         services.AddScoped<IInvoiceRepository, InvoiceRepository>();
+        services.AddScoped<IInvoiceNumberGenerator, InvoiceNumberGenerator>();
         services.AddScoped<IWhatsAppMessageRepository, WhatsAppMessageRepository>();
         services.AddScoped<ISettingRepository, SettingRepository>();
         services.AddScoped<IClothPriceRepository, ClothPriceRepository>();

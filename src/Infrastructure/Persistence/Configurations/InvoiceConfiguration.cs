@@ -14,6 +14,15 @@ public class InvoiceConfiguration : IEntityTypeConfiguration<Invoice>
         builder.ToTable("Invoices");
         builder.HasKey(i => i.Id);
 
+        builder.Property(i => i.InvoiceNumber).IsRequired().HasMaxLength(32);
+
+        // Filtered, so the blank left on an invoice raised before numbering existed cannot block
+        // the next one. An unfiltered index here allowed exactly one such row and rejected everything
+        // after it — that is what took ordering down on the live site, and it is not worth repeating.
+        builder.HasIndex(i => i.InvoiceNumber)
+            .IsUnique()
+            .HasFilter("\"InvoiceNumber\" <> ''");
+
         builder.Property(i => i.OrderId).IsRequired();
         builder.Property(i => i.CustomerId).IsRequired();
 

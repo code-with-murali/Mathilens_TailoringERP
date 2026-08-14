@@ -28,7 +28,7 @@ export type InvoicePreview = { invoice: Invoice; order: Order; customer: Custome
  * @param nowIso Read once on the client rather than during render — a date baked into the server's
  *   HTML and re-derived on the client is the classic hydration mismatch.
  */
-export function buildInvoicePreview(nowIso: string, taxRatePercent: number): InvoicePreview {
+export function buildInvoicePreview(nowIso: string, taxRatePercent: number, numberPrefix: string): InvoicePreview {
   const dueAtUtc = new Date(new Date(nowIso).getTime() + DAYS_UNTIL_COLLECTION * 86_400_000).toISOString();
 
   const taxAmount = taxAmountFor(SAMPLE_SUBTOTAL, taxRatePercent);
@@ -72,6 +72,9 @@ export function buildInvoicePreview(nowIso: string, taxRatePercent: number): Inv
 
   const invoice: Invoice = {
     id: "93563890-0000-0000-0000-000000000000",
+    // Shown as the seventh invoice of the current year, so the preview reflects the code being
+    // typed. The real number is issued by the server when the invoice is raised.
+    invoiceNumber: `${numberPrefix.trim().toUpperCase() || "INV"}-${new Date(nowIso).getFullYear()}-0007`,
     orderId: order.id,
     customerId: customer.id,
     subtotal: SAMPLE_SUBTOTAL,

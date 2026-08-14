@@ -15,4 +15,10 @@ public static class SettingKeys
     /// Set on Settings → Order Number.
     /// </summary>
     public const string OrderNumberPrefix = "Orders.NumberPrefix";
+
+    /// <summary>
+    /// What every invoice number starts with, before the year and the running count — "INV" gives
+    /// "INV-2026-0001". Set on Settings → Invoice Settings.
+    /// </summary>
+    public const string InvoiceNumberPrefix = "Invoice.NumberPrefix";
 }

@@ -16,6 +16,12 @@ public sealed class Invoice : AuditableEntity
 {
     private readonly List<Payment> _payments = [];
 
+    /// <summary>
+    /// The shop's own reference for this bill — "INV-2026-0001". What a customer quotes back, and
+    /// what the shop looks it up by; the id is not something anyone can read off a printed slip.
+    /// </summary>
+    public string InvoiceNumber { get; private set; } = string.Empty;
+
     public Guid OrderId { get; private set; }
 
     public Guid CustomerId { get; private set; }
@@ -49,7 +55,17 @@ public sealed class Invoice : AuditableEntity
     {
     }
 
-    public static Invoice Create(Guid orderId, Guid customerId, decimal subtotal, decimal taxAmount, decimal discountAmount)
+    /// <param name="invoiceNumber">
+    /// Issued by <c>IInvoiceNumberGenerator</c>. Optional only so the existing tests, which care
+    /// about totals and payments rather than references, need not supply one.
+    /// </param>
+    public static Invoice Create(
+        Guid orderId,
+        Guid customerId,
+        decimal subtotal,
+        decimal taxAmount,
+        decimal discountAmount,
+        string? invoiceNumber = null)
     {
         if (subtotal <= 0)
         {
@@ -74,6 +90,7 @@ public sealed class Invoice : AuditableEntity
 
         return new Invoice(Guid.NewGuid())
         {
+            InvoiceNumber = invoiceNumber?.Trim() ?? string.Empty,
             OrderId = Guard.AgainstEmpty(orderId, nameof(orderId)),
             CustomerId = Guard.AgainstEmpty(customerId, nameof(customerId)),
             Subtotal = subtotal,

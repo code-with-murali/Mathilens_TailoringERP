@@ -7,6 +7,7 @@ internal static class InvoiceMapper
     public static InvoiceDto ToDto(this Invoice invoice) =>
         new(
             invoice.Id,
+            invoice.InvoiceNumber,
             invoice.OrderId,
             invoice.CustomerId,
             invoice.Subtotal,

@@ -5,7 +5,6 @@ import { getAccessToken } from "@/lib/auth";
 import {
   getInvoiceSettings,
   formatInvoiceDate,
-  invoiceNumberFor,
   DEFAULT_INVOICE_SETTINGS,
   type InvoiceSettings,
 } from "@/lib/api/invoice-settings";
@@ -98,7 +97,9 @@ export function InvoiceDocument({
 
       <Rule />
 
-      <Line label="Bill No" value={invoiceNumberFor(invoice.id, invoice.createdAtUtc, settings)} />
+      {/* Issued by the server from a per-year counter, so it is the same reference on the shop's
+          copy and the customer's. Falls back to the id for an invoice raised before numbering. */}
+      <Line label="Bill No" value={invoice.invoiceNumber?.trim() || `#${invoice.id.slice(0, 8).toUpperCase()}`} />
       <Line label="Date" value={showDate(invoice.createdAtUtc)} />
       <Line label="Order" value={orderNumber} />
       <Line label="Customer" value={customer.fullName} />

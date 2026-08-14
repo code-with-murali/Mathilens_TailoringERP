@@ -15,6 +15,8 @@ export type Payment = {
 
 export type Invoice = {
   id: string;
+  /** The shop's own reference — "INV-2026-0001". Empty only on an invoice raised before numbering existed. */
+  invoiceNumber: string;
   orderId: string;
   customerId: string;
   subtotal: number;

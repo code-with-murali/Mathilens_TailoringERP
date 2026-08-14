@@ -1,4 +1,5 @@
 using MathilensERP.Application.Billing;
+using MathilensERP.Application.Common.Interfaces;
 using MathilensERP.Application.Common.Mediator;
 using MathilensERP.Application.Orders;
 using MathilensERP.Domain.Billing;
@@ -16,11 +17,16 @@ public sealed class CreateInvoiceCommandHandler : ICommandHandler<CreateInvoiceC
 {
     private readonly IInvoiceRepository _invoiceRepository;
     private readonly IOrderRepository _orderRepository;
+    private readonly IInvoiceNumberGenerator _invoiceNumberGenerator;
 
-    public CreateInvoiceCommandHandler(IInvoiceRepository invoiceRepository, IOrderRepository orderRepository)
+    public CreateInvoiceCommandHandler(
+        IInvoiceRepository invoiceRepository,
+        IOrderRepository orderRepository,
+        IInvoiceNumberGenerator invoiceNumberGenerator)
     {
         _invoiceRepository = invoiceRepository;
         _orderRepository = orderRepository;
+        _invoiceNumberGenerator = invoiceNumberGenerator;
     }
 
     public async Task<Result<InvoiceDto>> Handle(CreateInvoiceCommand command, CancellationToken cancellationToken)
@@ -44,7 +50,12 @@ public sealed class CreateInvoiceCommandHandler : ICommandHandler<CreateInvoiceC
                 "Invoice.InvalidTotal", "The discount cannot bring the invoice total to zero or below."));
         }
 
-        var invoice = Invoice.Create(order.Id, order.CustomerId, subtotal, command.TaxAmount, command.DiscountAmount);
+        // Taken last, after every reason to refuse has been ruled out: the number is spent whether
+        // or not the invoice is saved, so claiming one before the validation above would burn a
+        // reference on a bill that was never issued.
+        var invoiceNumber = await _invoiceNumberGenerator.NextAsync(cancellationToken);
+
+        var invoice = Invoice.Create(order.Id, order.CustomerId, subtotal, command.TaxAmount, command.DiscountAmount, invoiceNumber);
 
         _invoiceRepository.Add(invoice);
         await _invoiceRepository.SaveChangesAsync(cancellationToken);

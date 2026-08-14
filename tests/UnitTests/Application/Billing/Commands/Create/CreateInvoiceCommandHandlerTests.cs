@@ -1,5 +1,6 @@
 using MathilensERP.Application.Billing;
 using MathilensERP.Application.Billing.Commands.Create;
+using MathilensERP.Application.Common.Interfaces;
 using MathilensERP.Application.Orders;
 using MathilensERP.Domain.Billing;
 using MathilensERP.Domain.Measurements;
@@ -10,6 +11,14 @@ namespace MathilensERP.UnitTests.Application.Billing.Commands.Create;
 
 public class CreateInvoiceCommandHandlerTests
 {
+    /// <summary>A generator that always issues the same reference — these tests are about totals, not numbering.</summary>
+    private static IInvoiceNumberGenerator InvoiceNumbers()
+    {
+        var generator = Substitute.For<IInvoiceNumberGenerator>();
+        generator.NextAsync(Arg.Any<CancellationToken>()).Returns("INV-2026-0001");
+        return generator;
+    }
+
     [Fact]
     public async Task Handle_WithExistingOrderWithItems_CreatesInvoiceFromOrderTotal()
     {
@@ -18,7 +27,7 @@ public class CreateInvoiceCommandHandlerTests
         var orderRepository = Substitute.For<IOrderRepository>();
         orderRepository.GetByIdAsync(order.Id, Arg.Any<CancellationToken>()).Returns(order);
         var invoiceRepository = Substitute.For<IInvoiceRepository>();
-        var handler = new CreateInvoiceCommandHandler(invoiceRepository, orderRepository);
+        var handler = new CreateInvoiceCommandHandler(invoiceRepository, orderRepository, InvoiceNumbers());
 
         var result = await handler.Handle(new CreateInvoiceCommand(order.Id, 50m, 0m), CancellationToken.None);
 
@@ -36,7 +45,7 @@ public class CreateInvoiceCommandHandlerTests
         var orderRepository = Substitute.For<IOrderRepository>();
         orderRepository.GetByIdAsync(Arg.Any<Guid>(), Arg.Any<CancellationToken>()).Returns((Order?)null);
         var invoiceRepository = Substitute.For<IInvoiceRepository>();
-        var handler = new CreateInvoiceCommandHandler(invoiceRepository, orderRepository);
+        var handler = new CreateInvoiceCommandHandler(invoiceRepository, orderRepository, InvoiceNumbers());
 
         var result = await handler.Handle(new CreateInvoiceCommand(Guid.NewGuid(), 0m, 0m), CancellationToken.None);
 
@@ -51,7 +60,7 @@ public class CreateInvoiceCommandHandlerTests
         var orderRepository = Substitute.For<IOrderRepository>();
         orderRepository.GetByIdAsync(order.Id, Arg.Any<CancellationToken>()).Returns(order);
         var invoiceRepository = Substitute.For<IInvoiceRepository>();
-        var handler = new CreateInvoiceCommandHandler(invoiceRepository, orderRepository);
+        var handler = new CreateInvoiceCommandHandler(invoiceRepository, orderRepository, InvoiceNumbers());
 
         var result = await handler.Handle(new CreateInvoiceCommand(order.Id, 0m, 0m), CancellationToken.None);
 
@@ -67,7 +76,7 @@ public class CreateInvoiceCommandHandlerTests
         var orderRepository = Substitute.For<IOrderRepository>();
         orderRepository.GetByIdAsync(order.Id, Arg.Any<CancellationToken>()).Returns(order);
         var invoiceRepository = Substitute.For<IInvoiceRepository>();
-        var handler = new CreateInvoiceCommandHandler(invoiceRepository, orderRepository);
+        var handler = new CreateInvoiceCommandHandler(invoiceRepository, orderRepository, InvoiceNumbers());
 
         var result = await handler.Handle(new CreateInvoiceCommand(order.Id, 0m, 200m), CancellationToken.None);
 

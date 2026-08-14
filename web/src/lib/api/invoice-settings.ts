@@ -7,7 +7,6 @@ import { SHOP_ADDRESS_KEY, SHOP_TAGLINE_KEY, BRANDING_LOGO_URL_KEY } from "./bra
  * value. Two screens, one setting.
  */
 export const INVOICE_NUMBER_PREFIX_KEY = "Invoice.NumberPrefix";
-export const INVOICE_NUMBER_INCLUDE_YEAR_KEY = "Invoice.NumberIncludeYear";
 export const INVOICE_FOOTER_NOTE_KEY = "Invoice.FooterNote";
 /** A percentage, stored as a plain number string — "5" means 5% of the order's own total. */
 export const INVOICE_TAX_RATE_KEY = "Invoice.TaxRatePercent";
@@ -19,7 +18,6 @@ export type InvoiceSettings = {
   address: string;
   phoneNumber: string;
   numberPrefix: string;
-  numberIncludeYear: boolean;
   /** Blank on most invoices — a shop that wants a closing line sets it in Settings > Advanced. */
   footerNote: string;
   taxRatePercent: number;
@@ -33,7 +31,6 @@ export const DEFAULT_INVOICE_SETTINGS: InvoiceSettings = {
   address: "",
   phoneNumber: "",
   numberPrefix: DEFAULT_NUMBER_PREFIX,
-  numberIncludeYear: true,
   footerNote: "",
   taxRatePercent: 0,
   tagline: "",
@@ -73,9 +70,6 @@ export async function getInvoiceSettings(token: string | null): Promise<InvoiceS
     address: values.get(SHOP_ADDRESS_KEY) ?? "",
     phoneNumber: values.get(SHOP_CONTACT_NUMBER_KEY) ?? "",
     numberPrefix: values.get(INVOICE_NUMBER_PREFIX_KEY)?.trim() || DEFAULT_NUMBER_PREFIX,
-    // Anything other than an explicit "false" keeps the year, which is what the shop's sample
-    // invoice showed and what most of them expect.
-    numberIncludeYear: values.get(INVOICE_NUMBER_INCLUDE_YEAR_KEY) !== "false",
     // Exactly as stored, blank included. Nothing is substituted for a blank — the slip simply has
     // no closing line, which is the point of leaving it blank.
     footerNote: values.get(INVOICE_FOOTER_NOTE_KEY) ?? "",
@@ -94,7 +88,6 @@ export async function saveInvoiceSettings(settings: InvoiceSettings, token: stri
     [SHOP_ADDRESS_KEY, settings.address.trim()],
     [SHOP_CONTACT_NUMBER_KEY, settings.phoneNumber.trim()],
     [INVOICE_NUMBER_PREFIX_KEY, settings.numberPrefix.trim().toUpperCase()],
-    [INVOICE_NUMBER_INCLUDE_YEAR_KEY, String(settings.numberIncludeYear)],
     [INVOICE_TAX_RATE_KEY, String(settings.taxRatePercent)],
     // The footer is not written here. Invoice Settings has no field for it any more, so writing it
     // back could only ever repeat what was read — or, if that read had failed, quietly overwrite a
@@ -119,24 +112,6 @@ export function formatInvoiceDate(iso: string): string {
   const month = String(date.getMonth() + 1).padStart(2, "0");
 
   return `${day}/${month}/${date.getFullYear()}`;
-}
-
-/**
- * The reference printed on the invoice — "INV-2026-93563890".
- *
- * <p>The tail is the invoice's own id, not a running count. An invoice has no number of its own in
- * the database, and a count generated in the browser could hand the same one to two invoices raised
- * at the same moment — a duplicated number on a document a customer holds is worse than an ugly
- * one. The code and the year are real settings; when the API grows a proper series, the tail is the
- * only part that changes.</p>
- */
-export function invoiceNumberFor(invoiceId: string, createdAtUtc: string, settings: InvoiceSettings): string {
-  const prefix = settings.numberPrefix.trim().toUpperCase() || DEFAULT_NUMBER_PREFIX;
-  const reference = invoiceId.slice(0, 8).toUpperCase();
-
-  return settings.numberIncludeYear
-    ? `${prefix}-${new Date(createdAtUtc).getFullYear()}-${reference}`
-    : `${prefix}-${reference}`;
 }
 
 /**

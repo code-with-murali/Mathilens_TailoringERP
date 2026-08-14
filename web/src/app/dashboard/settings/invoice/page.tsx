@@ -90,7 +90,7 @@ export default function InvoiceSettingsPage() {
 
   // What the form currently says, saved or not — the preview follows the fields as they are typed.
   const previewSettings: InvoiceSettings = { ...settings, taxRatePercent: isRateValid ? rate : 0 };
-  const preview = nowIso ? buildInvoicePreview(nowIso, previewSettings.taxRatePercent) : null;
+  const preview = nowIso ? buildInvoicePreview(nowIso, previewSettings.taxRatePercent, previewSettings.numberPrefix) : null;
 
   async function handleSave(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
@@ -198,23 +198,16 @@ export default function InvoiceSettingsPage() {
             placeholder="e.g. INV"
           />
 
-          <label className="flex items-center gap-2 text-sm">
-            <input
-              type="checkbox"
-              checked={settings.numberIncludeYear}
-              onChange={(e) => set("numberIncludeYear", e.target.checked)}
-              disabled={isLoading}
-              className="h-4 w-4 rounded border-border"
-            />
-            Include the year
-          </label>
-
-          {/* Said plainly, because a code and a year look like the start of a counted series and
-              this one isn't counted yet. Better read here than worked out from two invoices. */}
+          {/* The year is no longer optional. The count restarts each January, so without the year
+              next year's 0001 would be this year's 0001 a second time. */}
           <p className="text-xs text-foreground/60">
-            The code and year are yours to set. The part after them is the invoice&apos;s own unique
-            reference, not a count that goes up by one — invoices aren&apos;t numbered in sequence
-            yet, and inventing a count here could hand the same number to two invoices.
+            Invoices are numbered <span className="font-medium">{settings.numberPrefix.trim().toUpperCase() || "INV"}-{new Date().getFullYear()}-0001</span>,
+            counting up by one as they are raised. The count starts again at 0001 each January.
+          </p>
+
+          <p className="text-xs text-foreground/60">
+            Changing the code affects invoices raised from now on. Ones already issued keep the
+            reference they were given, and the count carries on rather than restarting.
           </p>
         </section>
 
