@@ -13,7 +13,6 @@ import {
   getInvoiceSettings,
   saveInvoiceSettings,
   DATE_FORMATS,
-  DEFAULT_FOOTER_NOTE,
   DEFAULT_INVOICE_SETTINGS,
   type DateFormat,
   type InvoiceSettings,
@@ -222,7 +221,7 @@ export default function InvoiceSettingsPage() {
         </section>
 
         <section className="flex flex-col gap-4 rounded-lg border border-border bg-surface p-6">
-          <h2 className="font-semibold">Dates, wording and tax</h2>
+          <h2 className="font-semibold">Dates and tax</h2>
 
           <div className="flex flex-col gap-1">
             <label htmlFor="dateFormat" className="text-sm font-medium">
@@ -242,28 +241,6 @@ export default function InvoiceSettingsPage() {
               ))}
             </select>
             <p className="text-xs text-foreground/60">Applies to every date on the invoice.</p>
-          </div>
-
-          <div className="flex flex-col gap-1">
-            <label htmlFor="footerNote" className="text-sm font-medium">
-              Footer text
-            </label>
-            <textarea
-              id="footerNote"
-              rows={2}
-              value={settings.footerNote}
-              onChange={(e) => set("footerNote", e.target.value)}
-              disabled={isLoading}
-              placeholder={DEFAULT_FOOTER_NOTE}
-              className={fieldClassName}
-            />
-            {/* The box holds what is stored, blank included — the fallback is shown as a
-                placeholder, which is what a placeholder is for. Putting the default in the box
-                itself made a blank footer look like a chosen one, and saving then wrote it back. */}
-            <p className="text-xs text-foreground/60">
-              The last line of the invoice, under the thank-you. Leave it blank and the invoice
-              prints &quot;{DEFAULT_FOOTER_NOTE}&quot;
-            </p>
           </div>
 
           <Input

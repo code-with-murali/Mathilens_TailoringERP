@@ -110,8 +110,10 @@ export async function saveInvoiceSettings(settings: InvoiceSettings, token: stri
     [INVOICE_NUMBER_PREFIX_KEY, settings.numberPrefix.trim().toUpperCase()],
     [INVOICE_NUMBER_INCLUDE_YEAR_KEY, String(settings.numberIncludeYear)],
     [INVOICE_DATE_FORMAT_KEY, settings.dateFormat],
-    [INVOICE_FOOTER_NOTE_KEY, settings.footerNote.trim()],
     [INVOICE_TAX_RATE_KEY, String(settings.taxRatePercent)],
+    // The footer is not written here. Invoice Settings has no field for it any more, so writing it
+    // back could only ever repeat what was read — or, if that read had failed, quietly overwrite a
+    // value someone set elsewhere with a default nobody chose.
   ];
 
   for (const [key, value] of values) {
