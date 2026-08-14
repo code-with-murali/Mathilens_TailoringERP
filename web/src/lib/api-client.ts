@@ -223,7 +223,17 @@ export async function apiDeleteFor<T>(path: string, token?: string | null): Prom
  * Downloads a file endpoint (spreadsheet exports). Returns the raw blob plus the filename the
  * server chose, so the caller doesn't have to duplicate the naming convention.
  */
-export async function apiGetFile(path: string, token?: string | null): Promise<{ blob: Blob; filename: string }> {
+export async function apiGetFile(
+  path: string,
+  token?: string | null,
+  /**
+   * Used only when the server's filename cannot be read. It must match the file actually being
+   * fetched: this defaulted to "export.xlsx" and so handed back PDFs under a spreadsheet's name
+   * whenever Content-Disposition was unreadable, which cross-origin it always was until the API
+   * began exposing that header.
+   */
+  fallbackFilename = "export",
+): Promise<{ blob: Blob; filename: string }> {
   const response = await fetchWithAuthRetry(path, { headers: authHeaders(token) }, token);
 
   await throwIfError(response);
@@ -233,7 +243,7 @@ export async function apiGetFile(path: string, token?: string | null): Promise<{
 
   return {
     blob: await response.blob(),
-    filename: match ? decodeURIComponent(match[1]) : "export.xlsx",
+    filename: match ? decodeURIComponent(match[1]) : fallbackFilename,
   };
 }
 

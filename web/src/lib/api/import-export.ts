@@ -25,7 +25,13 @@ export async function downloadExport(
   query?: Record<string, string>,
 ): Promise<void> {
   const params = new URLSearchParams({ format, ...query });
-  const { blob, filename } = await apiGetFile(`/api/v1/${resource}/export?${params}`, token);
+  // The fallback names the format actually asked for, so a file can never arrive under the wrong
+  // extension even if the server's own filename goes missing again. It loses only the date.
+  const { blob, filename } = await apiGetFile(
+    `/api/v1/${resource}/export?${params}`,
+    token,
+    `${resource}.${format}`,
+  );
   saveBlob(blob, filename);
 }
 

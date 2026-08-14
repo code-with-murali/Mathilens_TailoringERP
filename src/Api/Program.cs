@@ -162,7 +162,17 @@ builder.Services.AddCors(options =>
     {
         if (frontendOrigins.Length > 0)
         {
-            policy.WithOrigins(frontendOrigins).AllowAnyHeader().AllowAnyMethod();
+            // Content-Disposition has to be named explicitly. A browser hands cross-origin
+            // JavaScript only the CORS-safelisted response headers unless the server widens that
+            // list, and this one is not on it — so the export downloads carried the server's
+            // filename in a header the page was not allowed to read. The fallback name took over
+            // and every export, of either format, saved as "export.xlsx". A spreadsheet named
+            // export.xlsx looks entirely correct, which is why this hid until a PDF came out
+            // wearing it.
+            policy.WithOrigins(frontendOrigins)
+                .AllowAnyHeader()
+                .AllowAnyMethod()
+                .WithExposedHeaders("Content-Disposition");
         }
     });
 });
