@@ -13,12 +13,15 @@ export function Modal({
   open,
   title,
   description,
+  icon,
   onClose,
   children,
 }: {
   open: boolean;
   title: string;
   description?: string;
+  /** Optional mark beside the title, for dialogs that carry one. Purely decorative. */
+  icon?: ReactNode;
   onClose: () => void;
   children: ReactNode;
 }) {
@@ -50,7 +53,7 @@ export function Modal({
   }
 
   return (
-    <div className="fixed inset-0 z-50 flex items-start justify-center overflow-y-auto bg-black/50 px-4 py-8 backdrop-blur-[1px]">
+    <div className="fixed inset-0 z-50 flex items-start justify-center overflow-y-auto bg-black/50 px-4 py-6 backdrop-blur-[1px]">
       {/* A button rather than a div so dismissing by clicking away is reachable from a keyboard too;
           it is aria-hidden because the same escape is already on Escape and the Cancel control. */}
       <button type="button" aria-hidden="true" tabIndex={-1} onClick={onClose} className="fixed inset-0 -z-10 cursor-default" />
@@ -61,16 +64,25 @@ export function Modal({
         aria-label={title}
         className="my-auto w-full max-w-2xl rounded-lg border border-border bg-surface shadow-xl"
       >
-        <div className="flex items-start justify-between gap-4 border-b border-border px-6 py-4">
-          <div>
-            <h2 className="text-lg font-semibold">{title}</h2>
-            {description && <p className="mt-1 text-sm text-foreground/70">{description}</p>}
+        {/* Centred rather than top-aligned: with no description the title is a single line, and an
+            icon and a close button hanging from the top of a one-line header sit visibly high. */}
+        <div className="flex items-center justify-between gap-4 border-b border-border px-6 py-3">
+          <div className="flex items-center gap-3">
+            {icon && (
+              <span aria-hidden="true" className="flex h-9 w-9 shrink-0 items-center justify-center rounded-lg bg-primary/10 text-primary">
+                {icon}
+              </span>
+            )}
+            <div>
+              <h2 className="text-lg font-semibold">{title}</h2>
+              {description && <p className="mt-1 text-sm text-foreground/70">{description}</p>}
+            </div>
           </div>
           <button
             type="button"
             onClick={onClose}
             aria-label="Close"
-            className="-mr-2 -mt-1 rounded-md p-2 text-foreground/60 transition-colors hover:bg-surface-hover hover:text-foreground"
+            className="-mr-2 rounded-md p-2 text-foreground/60 transition-colors hover:bg-surface-hover hover:text-foreground"
           >
             <svg viewBox="0 0 24 24" className="h-5 w-5" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" aria-hidden="true">
               <path d="M6 6l12 12M18 6L6 18" />
@@ -78,7 +90,7 @@ export function Modal({
           </button>
         </div>
 
-        <div className="px-6 py-5">{children}</div>
+        <div className="px-6 py-4">{children}</div>
       </div>
     </div>
   );

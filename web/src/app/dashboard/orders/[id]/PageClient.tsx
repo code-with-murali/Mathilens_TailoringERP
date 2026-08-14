@@ -16,7 +16,9 @@ import { useRouteId } from "@/lib/use-route-id";
 import { ApiError } from "@/lib/api-client";
 import { getEmployee, searchEmployees, type Employee } from "@/lib/api/employees";
 import { getCustomer, searchCustomers, type Customer } from "@/lib/api/customers";
-import { createInvoice, searchInvoices, type Invoice } from "@/lib/api/billing";
+import { createInvoice, recordPayment, type Invoice } from "@/lib/api/billing";
+import { findInvoicesForOrder, activeInvoiceOf, deliveryFactsFor } from "@/lib/api/order-invoices";
+import { DeliveryDialog, type DeliveryPayment } from "@/components/orders/DeliveryDialog";
 import { getInvoiceSettings, taxAmountFor, DEFAULT_INVOICE_SETTINGS } from "@/lib/api/invoice-settings";
 import {
   getOrder,
@@ -39,47 +41,11 @@ const NEXT_STATUSES: Record<OrderStatus, OrderStatus[]> = {
 const fieldClassName =
   "rounded-md border border-border bg-surface px-3 py-2 text-sm outline-none transition-colors focus:border-primary focus:ring-2 focus:ring-primary/25";
 
-/** Today, in the yyyy-MM-dd that <input type="date"> speaks. */
-function todayIsoDate(): string {
-  return new Date().toISOString().slice(0, 10);
-}
-
 /** The largest page the API will accept — PaginationDefaults.MaxPageSize. Asking for more is a 400. */
 const MAX_PAGE_SIZE = 100;
 
 /** A shop with more staff than this is not choosing from a dropdown anyway. */
 const EMPLOYEE_PAGE_LIMIT = 5;
-
-const INVOICE_SCAN_PAGE_SIZE = MAX_PAGE_SIZE;
-const INVOICE_SCAN_MAX_PAGES = 5;
-
-/**
- * The invoices already raised against this order.
- *
- * <p>The invoice search filters by customer, not by order, so this reads that customer's invoices
- * and keeps the ones pointing here. An orderId filter would be the cleaner answer and belongs on
- * the API — until then this is what can be done from the browser, and for a customer with a single
- * page of invoices (nearly all of them) it costs one request.</p>
- *
- * <p>Capped rather than looped to exhaustion: a customer past this many invoices would be a decade
- * of orders, and an unbounded scan on a screen someone is standing at waiting for is the worse
- * failure. Past the cap the card offers to generate one — the API allows a second invoice, so that
- * is a real risk, but it is bounded by how implausible reaching the cap is.</p>
- */
-async function findInvoicesForOrder(orderId: string, customerId: string, token: string | null): Promise<Invoice[]> {
-  const found: Invoice[] = [];
-
-  for (let page = 1; page <= INVOICE_SCAN_MAX_PAGES; page += 1) {
-    const { items, meta } = await searchInvoices(customerId, null, page, INVOICE_SCAN_PAGE_SIZE, token);
-    found.push(...items.filter((invoice) => invoice.orderId === orderId));
-
-    if (page >= meta.totalPages) {
-      break;
-    }
-  }
-
-  return found;
-}
 
 export default function OrderDetailPage() {
   const orderId = useRouteId();
@@ -102,7 +68,7 @@ export default function OrderDetailPage() {
   const [assignError, setAssignError] = useState<string | null>(null);
 
   const [isConfirmingDelivery, setIsConfirmingDelivery] = useState(false);
-  const [deliveryDate, setDeliveryDate] = useState("");
+  const [deliveryError, setDeliveryError] = useState<string | null>(null);
 
   const [isEditingDetails, setIsEditingDetails] = useState(false);
   const [editCustomer, setEditCustomer] = useState<Customer | null>(null);
@@ -168,15 +134,49 @@ export default function OrderDetailPage() {
     }
   }
 
-  /** Delivery is the one transition that records a date, so it goes through a dialog rather than straight to the API. */
+  /** Delivery collects a date and any balance owed, so it goes through a dialog rather than straight to the API. */
   function startTransition(target: OrderStatus) {
     if (target !== "Delivered") {
       handleTransition(target);
       return;
     }
 
-    setDeliveryDate(todayIsoDate());
+    setDeliveryError(null);
     setIsConfirmingDelivery(true);
+  }
+
+  /**
+   * The money, then the handover — the server refuses delivery while anything is outstanding, so
+   * the payment has to land first. A transition that then fails leaves the payment recorded, which
+   * is right: the shop did take it.
+   */
+  async function handleDeliver(deliveredAtUtc: string, payment: DeliveryPayment | null) {
+    setDeliveryError(null);
+    setIsTransitioning(true);
+
+    try {
+      const token = getAccessToken();
+
+      if (payment) {
+        // Raised first when there is nothing to pay against — an order can reach Ready for Delivery
+        // without ever being invoiced, and money cannot be recorded against thin air.
+        const facts = deliveryFactsFor(order, invoices ?? [], taxRatePercent);
+        const invoice =
+          facts.payable ??
+          (await createInvoice(orderId, taxAmountFor(order?.totalAmount ?? 0, taxRatePercent), 0, token));
+
+        await recordPayment(invoice.id, payment.amount, payment.method, token);
+      }
+
+      await transitionOrderStatus(orderId, "Delivered", token, deliveredAtUtc);
+      showToast("Order delivered.");
+      setIsConfirmingDelivery(false);
+      await load();
+    } catch (error) {
+      setDeliveryError(error instanceof ApiError ? error.message : "Unable to complete this delivery.");
+    } finally {
+      setIsTransitioning(false);
+    }
   }
 
   function openDetailsForm() {
@@ -321,14 +321,9 @@ export default function OrderDetailPage() {
   // assignment as its own step rather than letting the click come back as an error.
   const needsAssignment = !order.employeeId && nextStatuses.includes("InProgress");
 
-  // The invoice this order currently stands on. Voided ones are skipped rather than shown as the
-  // order's invoice — a voided invoice is a withdrawn one, and the order needs a new one raised.
-  // Newest first, because nothing stops a second invoice being issued against the same order.
-  const liveInvoices = (invoices ?? [])
-    .filter((invoice) => invoice.status !== "Void")
-    .sort((a, b) => b.createdAtUtc.localeCompare(a.createdAtUtc));
-  const activeInvoice = liveInvoices[0] ?? null;
+  const activeInvoice = activeInvoiceOf(invoices ?? []);
   const hasVoidedInvoice = (invoices ?? []).some((invoice) => invoice.status === "Void");
+  const delivery = deliveryFactsFor(order, invoices ?? [], taxRatePercent);
 
   return (
     <>
@@ -654,31 +649,26 @@ export default function OrderDetailPage() {
         </div>
       </div>
 
-      <ConfirmDialog
-        open={isConfirmingDelivery}
-        title="Mark as delivered"
-        description="Record when this order was handed over to the customer. Delivery is refused while any amount is still outstanding on it."
-        confirmLabel="Mark as delivered"
-        confirmingLabel="Marking…"
-        confirmVariant="primary"
-        confirmDisabled={deliveryDate === ""}
-        isConfirming={isTransitioning}
-        onConfirm={() => handleTransition("Delivered", new Date(`${deliveryDate}T00:00:00Z`).toISOString())}
-        onCancel={() => setIsConfirmingDelivery(false)}
-      >
-        <div className="flex flex-col gap-1">
-          <label htmlFor="deliveryDate" className="text-sm">
-            Delivery date
-          </label>
-          <input
-            id="deliveryDate"
-            type="date"
-            value={deliveryDate}
-            onChange={(e) => setDeliveryDate(e.target.value)}
-            className={fieldClassName}
-          />
-        </div>
-      </ConfirmDialog>
+      {/* The same dialog the Orders list opens — one definition, so collecting the balance on the
+          way out cannot end up meaning two different things depending on which screen it was
+          started from. */}
+      {isConfirmingDelivery && (
+        <DeliveryDialog
+          orderNumber={order.orderNumber?.trim() || `#${order.id.slice(0, 8).toUpperCase()}`}
+          customerName={customer?.fullName ?? "—"}
+          orderTotal={delivery.orderTotal}
+          taxAmount={delivery.taxAmount}
+          taxRatePercent={taxRatePercent}
+          invoiceTotal={delivery.invoiceTotal}
+          advancePaid={delivery.advancePaid}
+          outstanding={delivery.outstanding}
+          willRaiseInvoice={delivery.willRaiseInvoice}
+          isConfirming={isTransitioning}
+          error={deliveryError}
+          onConfirm={handleDeliver}
+          onCancel={() => setIsConfirmingDelivery(false)}
+        />
+      )}
 
       <Modal
         open={isAssignOpen}

@@ -135,19 +135,37 @@ export function InvoiceDocument({
       {invoice.discountAmount > 0 && <Line label="Discount" value={money(invoice.discountAmount)} />}
       <Line label="TOTAL" value={money(invoice.totalAmount)} bold />
 
-      <Rule />
+      {/* Only while money is owed. On a settled bill "Paid 130.00 / Balance 0.00" repeats the total
+          and then reports that nothing is outstanding — two lines of a paper slip spent saying what
+          the absence of them already says. Where there is a balance both stay, because that is the
+          line the customer is meant to leave holding.
 
-      {/* No status word: Paid and Balance already say it, and "PART PAID" beside a balance of 500
-          is the same fact twice. */}
-      <Line label="Paid" value={money(invoice.amountPaid)} />
-      <Line label="Balance" value={money(invoice.remainingBalance)} bold />
+          No status word either way: Paid and Balance say it between them, and "PART PAID" beside a
+          balance of 500 is the same fact twice. */}
+      {invoice.remainingBalance > 0 && (
+        <>
+          <Rule />
+          <Line label="Paid" value={money(invoice.amountPaid)} />
+          <Line label="Balance" value={money(invoice.remainingBalance)} bold />
+        </>
+      )}
 
       <Rule />
 
       <div className="flex flex-col items-center gap-0.5 text-center">
-        {/* The one date the customer came for. It is the due date under another name, so it is
-            printed once, here, where they will look for it. */}
-        <span className="font-semibold">Collect on {showDate(order.dueAtUtc)}</span>
+        {/* The one date the customer came for, in whichever tense the order is in. A slip handed
+            over at the counter telling them to collect on a day that has passed reads as a mistake;
+            once it is theirs, the same line is a record of when they took it.
+
+            Falls back to the bare word if the handover somehow carries no date — better to say only
+            what is known than to print the due date under a label that would make it a lie. */}
+        {order.status === "Delivered" ? (
+          <span className="font-semibold">
+            {order.deliveredAtUtc ? `Delivered on ${showDate(order.deliveredAtUtc)}` : "Delivered"}
+          </span>
+        ) : (
+          <span className="font-semibold">Collect on {showDate(order.dueAtUtc)}</span>
+        )}
         <span>Thank you for choosing {shopName}!</span>
         {/* Only when a shop has written one. There is no stock closing line — a sentence nobody
             chose is just another line of paper on every slip the shop prints. */}
