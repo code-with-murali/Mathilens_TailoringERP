@@ -25,6 +25,8 @@ export type OrderItem = {
 
 export type Order = {
   id: string;
+  /** The shop's own reference, e.g. "MTL-0001" — what staff and customers call the order. */
+  orderNumber: string;
   customerId: string;
   employeeId: string | null;
   status: OrderStatus;
@@ -66,12 +68,14 @@ export type CreateOrderInput = {
 };
 export type UpdateOrderInput = { customerId: string; employeeId: string | null; dueAtUtc: string; notes: string | null };
 
+/** @param search Matches the order number, the customer's name or their phone number. */
 export function searchOrders(
   customerId: string | null,
   status: OrderStatus | null,
   page: number,
   pageSize: number,
   token: string | null,
+  search?: string | null,
 ) {
   const params = new URLSearchParams({ page: String(page), pageSize: String(pageSize) });
   if (customerId) {
@@ -79,6 +83,9 @@ export function searchOrders(
   }
   if (status) {
     params.set("status", status);
+  }
+  if (search && search.trim() !== "") {
+    params.set("search", search.trim());
   }
   return apiGetPaged<Order>(`/api/v1/orders?${params}`, token);
 }

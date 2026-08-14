@@ -13,6 +13,11 @@ export type Setting = {
  * shops commit to different turnaround times, so this isn't hardcoded). */
 export const DEFAULT_ORDER_DUE_DATE_DAYS_KEY = "Orders.DefaultDueDateDurationDays";
 
+/** What every order number starts with, before the running count — "MTL" gives "MTL-0001". Read by
+ * the server when it issues a number, so this string is mirrored in Shared/Constants/SettingKeys.cs
+ * and the two have to agree. */
+export const ORDER_NUMBER_PREFIX_KEY = "Orders.NumberPrefix";
+
 /** Letterhead details for the printable invoice — configured via the Settings page's generic
  * key/value store (same mechanism as the due-date default above) rather than hardcoded, since
  * each shop has its own name and contact number. */

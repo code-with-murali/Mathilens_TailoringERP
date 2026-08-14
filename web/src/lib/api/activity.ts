@@ -1,5 +1,13 @@
 import { apiGet, apiGetPaged } from "@/lib/api-client";
 
+/** One field's before-and-after. `from`/`to` are null where there was no value on that side. */
+export type ActivityChange = {
+  entity: string;
+  field: string;
+  from: string | null;
+  to: string | null;
+};
+
 export type ActivityLog = {
   id: string;
   userId: string | null;
@@ -9,6 +17,11 @@ export type ActivityLog = {
   requestName: string;
   /** What the action carried — "Full Name: Asha Rao, Phone Number: …". Null for older entries. */
   description: string | null;
+  /**
+   * What each edited field was changed from and to. Empty for a create or a delete, which have
+   * only one side, and for entries recorded before this was captured.
+   */
+  changes: ActivityChange[];
   occurredAtUtc: string;
 };
 

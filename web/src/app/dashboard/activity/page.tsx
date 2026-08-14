@@ -39,6 +39,34 @@ function toInstant(date: string, endOfDay: boolean): string | null {
   return new Date(`${date}T${endOfDay ? "23:59:59.999" : "00:00:00.000"}Z`).toISOString();
 }
 
+/**
+ * What one entry changed.
+ *
+ * <p>An edit shows each field's before-and-after, which is the thing worth reading. A create or a
+ * delete has only one side, so it falls back to the description — the values the action carried.
+ * Older entries have neither and say so, rather than looking like an action that changed nothing.</p>
+ */
+function ChangeList({ log }: { log: ActivityLog }) {
+  if (log.changes.length > 0) {
+    return (
+      <ul className="flex flex-col gap-1">
+        {log.changes.map((change, index) => (
+          <li key={`${change.entity}-${change.field}-${index}`} className="flex flex-wrap items-baseline gap-x-2">
+            <span className="font-medium text-foreground">{change.field}</span>
+            <span className="text-foreground/60 line-through">{change.from ?? "empty"}</span>
+            <span aria-hidden="true" className="text-foreground/50">
+              →
+            </span>
+            <span className="font-medium text-foreground">{change.to ?? "empty"}</span>
+          </li>
+        ))}
+      </ul>
+    );
+  }
+
+  return <span>{log.description ?? "—"}</span>;
+}
+
 export default function ActivityLogPage() {
   const [fromDate, setFromDate] = useState("");
   const [toDate, setToDate] = useState("");
@@ -188,7 +216,7 @@ export default function ActivityLogPage() {
                 <th className="px-4 py-3 font-medium">User</th>
                 <th className="px-4 py-3 font-medium">Screen</th>
                 <th className="px-4 py-3 font-medium">Action</th>
-                <th className="px-4 py-3 font-medium">Description</th>
+                <th className="px-4 py-3 font-medium">What changed</th>
               </tr>
             </thead>
             <tbody>
@@ -201,9 +229,10 @@ export default function ActivityLogPage() {
                     <td className="px-4 py-3 whitespace-nowrap">{log.userName ?? "System"}</td>
                     <td className="px-4 py-3 whitespace-nowrap">{log.screen}</td>
                     <td className="px-4 py-3 whitespace-nowrap">{log.action}</td>
-                    {/* The widest column by far, so it is the one allowed to wrap. Entries recorded
-                        before descriptions existed simply have none. */}
-                    <td className="min-w-[18rem] px-4 py-3 text-foreground/80">{log.description ?? "—"}</td>
+                    {/* The widest column by far, so it is the one allowed to wrap. */}
+                    <td className="min-w-[20rem] px-4 py-3 text-foreground/80">
+                      <ChangeList log={log} />
+                    </td>
                   </tr>
                 );
               })}

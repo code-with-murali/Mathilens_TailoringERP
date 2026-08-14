@@ -70,12 +70,33 @@ export default function BrandingPage() {
       <form onSubmit={handleSubmit} className="flex max-w-xl flex-col gap-4 rounded-lg border border-border bg-surface p-6">
         <Input id="shopName" label="Shop name" value={branding.shopName} onChange={(e) => set("shopName", e.target.value)} />
         <Input
+          id="tagline"
+          label="Tagline"
+          value={branding.tagline}
+          onChange={(e) => set("tagline", e.target.value)}
+          placeholder="All Types of Tailoring & Fabric Works"
+        />
+        <Input
           id="contactNumber"
           label="Contact number"
           value={branding.contactNumber}
           onChange={(e) => set("contactNumber", e.target.value)}
         />
-        <Input id="address" label="Address" value={branding.address} onChange={(e) => set("address", e.target.value)} />
+        <div className="flex flex-col gap-1">
+          <label htmlFor="address" className="text-sm font-medium">
+            Address
+          </label>
+          {/* A textarea, not a single line: an invoice letterhead runs to two or three lines and
+              each is printed as its own. */}
+          <textarea
+            id="address"
+            rows={3}
+            value={branding.address}
+            onChange={(e) => set("address", e.target.value)}
+            placeholder={"12, Lakshmi Nagar, 1st Street\nCoimbatore - 641 018, Tamil Nadu"}
+            className="rounded-md border border-border bg-surface px-3 py-2 text-sm outline-none transition-colors focus:border-primary focus:ring-2 focus:ring-primary/25"
+          />
+        </div>
 
         <div className="flex flex-col gap-1">
           <label htmlFor="logoUrl" className="text-sm font-medium">

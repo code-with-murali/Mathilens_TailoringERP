@@ -20,8 +20,24 @@ import {
 const fieldClassName =
   "rounded-md border border-border bg-surface px-3 py-2 text-sm outline-none transition-colors focus:border-primary focus:ring-2 focus:ring-primary/25";
 
+/**
+ * A full year, which is what "All" means here rather than a synonym for "no limit".
+ *
+ * Birthdays and anniversaries come round annually, so every customer holding a date has one falling
+ * inside the next 365 days — for "Still to call" this genuinely is everything. For "Already
+ * contacted" it reads as the last year, which is the one honest limit: the API clamps the window to
+ * 365 on purpose, because an unbounded one stops being a call sheet and becomes the customer list.
+ */
+const ALL_WINDOW_DAYS = 365;
+
 /** The shop asked for thirty days either way; the others are here because a season is not a month. */
-const WINDOW_OPTIONS = [7, 30, 60, 90] as const;
+const WINDOW_OPTIONS = [
+  { days: ALL_WINDOW_DAYS, label: "All" },
+  { days: 7, label: "7 days" },
+  { days: 30, label: "30 days" },
+  { days: 60, label: "60 days" },
+  { days: 90, label: "90 days" },
+] as const;
 
 /** yyyy-MM-dd off the local calendar — "today" has to mean the shop's today, not UTC's. */
 function todayIso(): string {
@@ -64,7 +80,9 @@ export function OccasionReport({
   const canRecord = can(PERMISSIONS.customersManage);
 
   const [scope, setScope] = useState<OccasionScope>("Upcoming");
-  const [windowDays, setWindowDays] = useState<number>(30);
+  // Opens on the whole year rather than the next thirty days, so nothing is hidden behind a window
+  // the reader did not choose. Narrower windows remain in the select for working a shorter list.
+  const [windowDays, setWindowDays] = useState<number>(ALL_WINDOW_DAYS);
   const [page, setPage] = useState(1);
   const [pageSize, setPageSize] = useState(DEFAULT_PAGE_SIZE);
 
@@ -179,9 +197,12 @@ export function OccasionReport({
             }}
             className={fieldClassName}
           >
-            {WINDOW_OPTIONS.map((days) => (
-              <option key={days} value={days}>
-                {days} days
+            {WINDOW_OPTIONS.map((option) => (
+              <option key={option.days} value={option.days}>
+                {/* "All" is the whole truth for the upcoming list, because every annual occasion
+                    falls inside a year. On the contacted list it is capped at a year, and saying so
+                    here is cheaper than someone wondering why an older call is missing. */}
+                {option.days === ALL_WINDOW_DAYS && scope === "Contacted" ? "All (last 12 months)" : option.label}
               </option>
             ))}
           </select>

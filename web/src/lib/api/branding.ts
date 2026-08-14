@@ -1,21 +1,32 @@
 import { getSetting, upsertSetting, SHOP_NAME_KEY, SHOP_CONTACT_NUMBER_KEY } from "./settings";
 
 export const SHOP_ADDRESS_KEY = "Shop.Address";
+/** The line under the shop name on a printed invoice — "All Types of Tailoring & Fabric Works". */
+export const SHOP_TAGLINE_KEY = "Shop.Tagline";
 export const BRANDING_LOGO_URL_KEY = "Branding.LogoUrl";
 export const BRANDING_PRIMARY_COLOR_KEY = "Branding.PrimaryColor";
 
 export type Branding = {
   shopName: string;
+  tagline: string;
   contactNumber: string;
   address: string;
   logoUrl: string;
   primaryColor: string;
 };
 
-export const EMPTY_BRANDING: Branding = { shopName: "", contactNumber: "", address: "", logoUrl: "", primaryColor: "" };
+export const EMPTY_BRANDING: Branding = {
+  shopName: "",
+  tagline: "",
+  contactNumber: "",
+  address: "",
+  logoUrl: "",
+  primaryColor: "",
+};
 
 const KEYS: Record<keyof Branding, string> = {
   shopName: SHOP_NAME_KEY,
+  tagline: SHOP_TAGLINE_KEY,
   contactNumber: SHOP_CONTACT_NUMBER_KEY,
   address: SHOP_ADDRESS_KEY,
   logoUrl: BRANDING_LOGO_URL_KEY,

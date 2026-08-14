@@ -1,8 +1,7 @@
 "use client";
 
-import { useEffect, useState } from "react";
-import { getAccessToken } from "@/lib/auth";
-import { getSetting, SHOP_NAME_KEY, SHOP_CONTACT_NUMBER_KEY } from "@/lib/api/settings";
+import { useEffect } from "react";
+import { InvoiceDocument } from "./InvoiceDocument";
 import type { Invoice } from "@/lib/api/billing";
 import type { Order } from "@/lib/api/orders";
 import type { Customer } from "@/lib/api/customers";
@@ -17,29 +16,10 @@ type InvoicePrintModalProps = {
   autoPrint?: boolean;
 };
 
-const DEFAULT_SHOP_NAME = "Mathilens Tailoring";
-
-/** Printable invoice shown right after Generate invoice, as a modal rather than a page navigation
- * so staff can print and keep working on the same order. Shop name/contact number are read from
- * the generic Settings key/value store (Shop.Name / Shop.ContactNumber) so each shop can set its
- * own letterhead from the Settings page without a code change. */
+/** The printable invoice as a modal rather than a page navigation, so staff can print and keep
+ * working on the same order. The slip itself is {@link InvoiceDocument} — this adds only the
+ * chrome around it, all of which is hidden when printing. */
 export function InvoicePrintModal({ invoice, order, customer, onClose, autoPrint = false }: InvoicePrintModalProps) {
-  const [shopName, setShopName] = useState(DEFAULT_SHOP_NAME);
-  const [shopContactNumber, setShopContactNumber] = useState("");
-
-  useEffect(() => {
-    getSetting(SHOP_NAME_KEY, getAccessToken())
-      .then((setting) => setShopName(setting.value || DEFAULT_SHOP_NAME))
-      .catch(() => {
-        // No shop name configured yet — falls back to the default above.
-      });
-    getSetting(SHOP_CONTACT_NUMBER_KEY, getAccessToken())
-      .then((setting) => setShopContactNumber(setting.value))
-      .catch(() => {
-        // No contact number configured yet — stays blank rather than showing a placeholder.
-      });
-  }, []);
-
   useEffect(() => {
     // Mount-only: this component is conditionally rendered (unmounted on Close), so every open
     // is a fresh mount and this fires exactly once per "Print Invoice" click.
@@ -55,7 +35,9 @@ export function InvoicePrintModal({ invoice, order, customer, onClose, autoPrint
       role="dialog"
       aria-modal="true"
     >
-      <div className="flex max-h-[90vh] w-full max-w-lg flex-col gap-4 overflow-y-auto rounded-lg border border-border bg-surface p-6 print:max-h-none print:w-auto print:max-w-none print:overflow-visible print:rounded-none print:border-0 print:p-0">
+      {/* Slip-width. The bill is a till receipt, so the modal is only as wide as the roll it prints
+          on — a wide dialog around a narrow slip just puts it adrift in the middle. */}
+      <div className="flex max-h-[90vh] w-full max-w-sm flex-col gap-4 overflow-y-auto rounded-lg border border-border bg-surface p-6 print:max-h-none print:w-auto print:max-w-none print:overflow-visible print:rounded-none print:border-0 print:p-0">
         <div className="flex items-center justify-between print:hidden">
           <h2 className="text-lg font-semibold">Invoice</h2>
           <div className="flex items-center gap-4">
@@ -68,53 +50,7 @@ export function InvoicePrintModal({ invoice, order, customer, onClose, autoPrint
           </div>
         </div>
 
-        <div className="flex flex-col items-center gap-1 border-b-2 border-black pb-3 text-center">
-          <span className="text-xs uppercase tracking-wide text-foreground/60">Invoice</span>
-          <span className="text-xl font-semibold">{shopName}</span>
-        </div>
-
-        <dl className="grid grid-cols-2 gap-x-4 gap-y-2 text-sm">
-          <div>
-            <dt className="text-foreground/70">Order number</dt>
-            <dd className="font-medium">#{order.id.slice(0, 8).toUpperCase()}</dd>
-          </div>
-          <div>
-            <dt className="text-foreground/70">Order date</dt>
-            <dd className="font-medium">{new Date(order.createdAtUtc).toLocaleDateString()}</dd>
-          </div>
-          <div>
-            <dt className="text-foreground/70">Customer</dt>
-            <dd className="font-medium">{customer.fullName}</dd>
-          </div>
-          <div>
-            <dt className="text-foreground/70">Phone number</dt>
-            <dd className="font-medium">{customer.phoneNumber}</dd>
-          </div>
-        </dl>
-
-        <div className="flex flex-col gap-1 border-y-2 border-black py-3 text-sm">
-          <div className="flex items-center justify-between">
-            <span className="text-foreground/70">Total amount</span>
-            <span className="font-medium">{invoice.totalAmount.toFixed(2)}</span>
-          </div>
-          <div className="flex items-center justify-between">
-            <span className="text-foreground/70">Advance paid</span>
-            <span className="font-medium">{invoice.amountPaid.toFixed(2)}</span>
-          </div>
-          <div className="flex items-center justify-between">
-            <span className="text-foreground/70">Balance due</span>
-            <span className="font-medium">{invoice.remainingBalance.toFixed(2)}</span>
-          </div>
-        </div>
-
-        <div className="flex items-center justify-between text-sm">
-          <span className="text-foreground/70">Collection date</span>
-          <span className="font-medium">{new Date(order.dueAtUtc).toLocaleDateString()}</span>
-        </div>
-
-        {shopContactNumber && (
-          <div className="text-center text-xs text-foreground/70">Contact: {shopContactNumber}</div>
-        )}
+        <InvoiceDocument invoice={invoice} order={order} customer={customer} />
       </div>
     </div>
   );

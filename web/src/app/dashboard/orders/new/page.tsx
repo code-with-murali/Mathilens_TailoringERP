@@ -21,6 +21,7 @@ import { createOrder, type CreateOrderItemInput, type Order } from "@/lib/api/or
 import { listMeasurementsForCustomer, createMeasurement, updateMeasurementValues, type Measurement } from "@/lib/api/measurements";
 import { getSetting, DEFAULT_ORDER_DUE_DATE_DAYS_KEY } from "@/lib/api/settings";
 import { createInvoice, recordPayment, PAYMENT_METHODS, type PaymentMethod, type Invoice } from "@/lib/api/billing";
+import { getInvoiceSettings, taxAmountFor, DEFAULT_INVOICE_SETTINGS } from "@/lib/api/invoice-settings";
 import "./theme.css";
 
 const fieldClassName = "rounded-md border border-border bg-surface px-3 py-1 text-sm outline-none transition-colors focus:border-primary focus:ring-2 focus:ring-primary/25";
@@ -501,9 +502,11 @@ export default function NewOrderPage() {
     setInvoiceError(null);
     setIsGeneratingInvoice(true);
     try {
-      // Tax/discount default to 0 since this form has no fields for them; staff can still adjust
-      // an invoice's status via payments afterward.
-      const invoice = await createInvoice(createdOrder.id, 0, 0, getAccessToken());
+      // Tax comes from the shop's rate in Invoice Settings, read at click time so this form and the
+      // order screen's Generate Invoice always charge the same thing. Discount stays 0 — there is
+      // no field for it, and a shop-wide default discount is not a thing a shop wants.
+      const { taxRatePercent } = await getInvoiceSettings(getAccessToken()).catch(() => DEFAULT_INVOICE_SETTINGS);
+      const invoice = await createInvoice(createdOrder.id, taxAmountFor(orderTotal, taxRatePercent), 0, getAccessToken());
       // recordPayment returns the invoice with amountPaid/remainingBalance updated — that's the
       // copy the printable invoice needs, not the pre-payment one from createInvoice.
       const finalInvoice = advanceValue > 0 ? await recordPayment(invoice.id, advanceValue, advanceMethod, getAccessToken()) : invoice;
@@ -524,7 +527,12 @@ export default function NewOrderPage() {
     <>
     <div className="orderNewSkin flex flex-col gap-3 print:hidden">
       <div className="flex items-center justify-between">
-        <h1 className="text-2xl font-semibold">{createdOrder ? `Order - #${createdOrder.id.slice(0, 8).toUpperCase()}` : "New Order"}</h1>
+        {/* Shows the number the order was just given, which is what gets written on the job card. */}
+        <h1 className="text-2xl font-semibold">
+          {createdOrder
+            ? `Order - ${createdOrder.orderNumber?.trim() || `#${createdOrder.id.slice(0, 8).toUpperCase()}`}`
+            : "New Order"}
+        </h1>
         <Link href="/dashboard/orders" className="text-sm text-foreground/70 hover:text-foreground">
           Back to orders
         </Link>

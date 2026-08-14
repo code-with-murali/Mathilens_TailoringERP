@@ -87,6 +87,8 @@ const NAV_ITEMS: NavEntry[] = [
     icon: SettingsIcon,
     children: [
       { href: "/dashboard/settings/order-duration", label: "Order Duration", icon: ClockIcon, permission: PERMISSIONS.settingsView },
+      { href: "/dashboard/settings/order-number", label: "Order Number", icon: HashIcon, permission: PERMISSIONS.settingsView },
+      { href: "/dashboard/settings/invoice", label: "Invoice Settings", icon: InvoicesIcon, permission: PERMISSIONS.settingsView },
       { href: "/dashboard/settings/measurement-templates", label: "Measurement", icon: RulerIcon, permission: PERMISSIONS.settingsView },
       // No permission at all: Front Desk and Tailor hold no Settings.View, and the theme toggle no
       // longer sits in the header, so gating this would leave them unable to change it anywhere.
@@ -430,6 +432,17 @@ function ShieldIcon({ className }: IconProps) {
     <svg className={className} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
       <path d="M12 3l7 3v6c0 4.4-3 7.9-7 9-4-1.1-7-4.6-7-9V6l7-3Z" />
       <path d="m9 12 2 2 4-4" />
+    </svg>
+  );
+}
+
+function HashIcon({ className }: IconProps) {
+  return (
+    <svg className={className} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+      <line x1="4" y1="9" x2="20" y2="9" />
+      <line x1="4" y1="15" x2="20" y2="15" />
+      <line x1="10" y1="3" x2="8" y2="21" />
+      <line x1="16" y1="3" x2="14" y2="21" />
     </svg>
   );
 }

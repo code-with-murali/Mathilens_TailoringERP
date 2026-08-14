@@ -6,10 +6,19 @@ const fieldClassName =
   "rounded-md border border-border bg-surface px-3 py-2 text-sm outline-none transition-colors focus:border-primary focus:ring-2 focus:ring-primary/25";
 
 /**
- * Ranges the shop actually thinks in — day-to-day operations at the short end, season-over-season
- * comparison at the long end.
+ * Far enough back to predate any record the shop holds, so "All" needs no special case downstream.
+ *
+ * The reports take a required from-and-to; a sentinel keeps that contract intact rather than making
+ * both ends nullable through the query, the handler and the export for the sake of one chip.
+ */
+export const ALL_TIME_FROM = "1900-01-01";
+
+/**
+ * Ranges the shop actually thinks in — everything at the top, then day-to-day operations at the
+ * short end and season-over-season comparison at the long end.
  */
 export const RANGE_PRESETS = [
+  { key: "all", label: "All" },
   { key: "today", label: "Today", days: 1 },
   { key: "7d", label: "Last 7 days", days: 7 },
   { key: "30d", label: "Last 30 days", days: 30 },
@@ -22,7 +31,13 @@ export const RANGE_PRESETS = [
 type RangePreset = (typeof RANGE_PRESETS)[number];
 export type PresetKey = RangePreset["key"] | "custom";
 
-export const DEFAULT_PRESET: PresetKey = "30d";
+/**
+ * Every report opens on the full history. A shop opening Revenue is asking what the business has
+ * done, not what the last thirty days did, and a default window quietly leaves figures out of a
+ * total nobody was told was windowed. Narrowing is one click away; noticing that a number was
+ * already narrowed is not.
+ */
+export const DEFAULT_PRESET: PresetKey = "all";
 
 /** yyyy-MM-dd read off the local calendar — "today" has to mean the shop's today, not UTC's. */
 export function toIsoDate(date: Date): string {
@@ -33,13 +48,19 @@ export function toIsoDate(date: Date): string {
 
 /** Both ends inclusive: "Last 7 days" is today and the six before it, not today minus seven. */
 export function presetRange(key: PresetKey): { from: string; to: string } {
-  const preset = RANGE_PRESETS.find((p) => p.key === key);
   const to = new Date();
+
+  // Handled before the arithmetic because it is the one preset with no length to subtract.
+  if (key === "all") {
+    return { from: ALL_TIME_FROM, to: toIsoDate(to) };
+  }
+
+  const preset = RANGE_PRESETS.find((p) => p.key === key);
   const from = new Date();
 
   if (preset && "days" in preset) {
     from.setDate(from.getDate() - (preset.days - 1));
-  } else if (preset) {
+  } else if (preset && "months" in preset) {
     // Month arithmetic rolls short months forward (31 Aug − 6 months lands on 2 or 3 Mar);
     // close enough for a report range, and never silently drops days off the end.
     from.setMonth(from.getMonth() - preset.months);

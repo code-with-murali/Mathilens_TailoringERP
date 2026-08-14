@@ -1,6 +1,4 @@
-"use client";
-
-import { ThemeToggle } from "@/components/theme-toggle";
+import { ThemePicker } from "./ThemePicker";
 
 /**
  * Light or dark mode.
@@ -15,15 +13,16 @@ export default function AppearanceSettingsPage() {
     <div className="flex flex-col gap-6">
       <h1 className="text-2xl font-semibold">Appearance</h1>
 
-      <div className="flex max-w-xl items-center justify-between gap-4 rounded-lg border border-border bg-surface p-6">
+      <div className="flex max-w-xl flex-col gap-6 rounded-lg border border-border bg-surface p-6">
         <div>
           <h2 className="text-lg font-semibold">Theme</h2>
           <p className="text-sm text-foreground/70">
-            Switch between light and dark mode. This is remembered on this device only, so each
-            person can set their own.
+            Pick a look and press Save. This is remembered on this device only, so each person can
+            set their own.
           </p>
         </div>
-        <ThemeToggle />
+
+        <ThemePicker />
       </div>
     </div>
   );
