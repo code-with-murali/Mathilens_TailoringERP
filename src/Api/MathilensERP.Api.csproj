@@ -14,6 +14,14 @@
     <ProjectReference Include="..\Domain\MathilensERP.Domain.csproj" />
   </ItemGroup>
 
+  <!-- PDFsharp resolves no fonts of its own on this package, so the faces ship inside the assembly
+       rather than being read off whatever host the API lands on. See EmbeddedFontResolver.
+       Noto Sans is SIL Open Font License 1.1 — Fonts/LICENSE.txt travels with them. -->
+  <ItemGroup>
+    <EmbeddedResource Include="Common\Export\Fonts\NotoSans-Regular.ttf" LogicalName="MathilensERP.Api.Fonts.NotoSans-Regular.ttf" />
+    <EmbeddedResource Include="Common\Export\Fonts\NotoSans-Bold.ttf" LogicalName="MathilensERP.Api.Fonts.NotoSans-Bold.ttf" />
+  </ItemGroup>
+
   <ItemGroup>
     <PackageReference Include="ClosedXML" Version="0.105.1" />
     <PackageReference Include="Microsoft.AspNetCore.Authentication.JwtBearer" Version="10.0.10" />
