@@ -7,16 +7,35 @@ import { StatusBadge, INVOICE_STATUS_BADGE } from "@/components/ui/StatusBadge";
 import { getAccessToken } from "@/lib/auth";
 import { ApiError, type PaginationMeta } from "@/lib/api-client";
 import { searchInvoices, INVOICE_STATUSES, type DateRange, type Invoice, type InvoiceStatus } from "@/lib/api/billing";
+import { getCustomer, type Customer } from "@/lib/api/customers";
+import { formatInvoiceDate } from "@/lib/api/invoice-settings";
+
+/**
+ * The shop's own reference — "INV-2026-0001".
+ *
+ * The fallback is a slice of the id, which is what identified an invoice before numbering existed.
+ * The AddInvoiceNumbers migration backfilled every one, so nothing should reach it; it is here so a
+ * row can never render an empty cell where its identifier belongs.
+ */
+function invoiceNumber(invoice: Invoice) {
+  return invoice.invoiceNumber?.trim() || `#${invoice.id.slice(0, 8).toUpperCase()}`;
+}
 
 const fieldClassName =
   "rounded-md border border-border bg-surface px-3 py-2 text-sm outline-none transition-colors focus:border-primary focus:ring-2 focus:ring-primary/25";
 
-/** The windows staff actually ask for at the counter, plus an explicit range for everything else. */
+/**
+ * The windows staff actually ask for at the counter, plus an explicit range for everything else.
+ *
+ * <p>Shortest first, with All dates at the end — the list is read in the order the questions get
+ * asked, and "everything ever" is the rarest of them.</p>
+ */
 const DATE_PRESETS = [
-  { key: "all", label: "All dates", days: null },
   { key: "today", label: "Today", days: 1 },
   { key: "3d", label: "Last 3 days", days: 3 },
   { key: "7d", label: "Last 7 days", days: 7 },
+  { key: "30d", label: "Last 30 days", days: 30 },
+  { key: "all", label: "All dates", days: null },
 ] as const;
 
 type DatePresetKey = (typeof DATE_PRESETS)[number]["key"] | "custom";
@@ -55,12 +74,16 @@ function toRange(fromDate: string, toDate: string): DateRange {
 
 export default function InvoicesPage() {
   const [status, setStatus] = useState<InvoiceStatus | "">("");
-  const [datePreset, setDatePreset] = useState<DatePresetKey>("all");
+  // Today, not everything. This screen is opened to see what the shop has taken today far more
+  // often than to read its whole billing history, and an unfiltered list grows without bound —
+  // every visit would page through years to reach this morning.
+  const [datePreset, setDatePreset] = useState<DatePresetKey>("today");
   const [customFrom, setCustomFrom] = useState(() => presetDates("7d").from);
   const [customTo, setCustomTo] = useState(() => presetDates("today").to);
   const [page, setPage] = useState(1);
   const [pageSize, setPageSize] = useState(DEFAULT_PAGE_SIZE);
   const [invoices, setInvoices] = useState<Invoice[]>([]);
+  const [customersById, setCustomersById] = useState<Record<string, Customer>>({});
   const [meta, setMeta] = useState<PaginationMeta | null>(null);
   const [isLoading, setIsLoading] = useState(true);
   const [loadError, setLoadError] = useState<string | null>(null);
@@ -80,9 +103,27 @@ export default function InvoicesPage() {
             })();
 
     try {
-      const { items, meta } = await searchInvoices(null, status || null, page, pageSize, getAccessToken(), range);
+      const token = getAccessToken();
+      const { items, meta } = await searchInvoices(null, status || null, page, pageSize, token, range);
       setInvoices(items);
       setMeta(meta);
+
+      // One lookup per distinct customer on the page, not per invoice — a customer with four
+      // invoices in the window is one request, not four. Kept across pages, so paging back and
+      // forth doesn't re-read names already held. Same shape as the Orders list.
+      const uniqueCustomerIds = Array.from(new Set(items.map((invoice) => invoice.customerId)));
+      const customers = await Promise.all(
+        uniqueCustomerIds.map((customerId) => getCustomer(customerId, token).catch(() => null)),
+      );
+      setCustomersById((prev) => {
+        const next = { ...prev };
+        customers.forEach((customer) => {
+          if (customer) {
+            next[customer.id] = customer;
+          }
+        });
+        return next;
+      });
     } catch (error) {
       setLoadError(error instanceof ApiError ? error.message : "Unable to load invoices.");
     } finally {
@@ -201,35 +242,61 @@ export default function InvoicesPage() {
       ) : (
         <div className="overflow-x-auto rounded-lg border border-border">
           <table className="w-full text-left text-sm">
-            <thead className="border-b border-border bg-surface">
+            {/* Tinted like the Orders list, for the same reason: bg-surface is the white the rows
+                sit on, so the header had a hairline and nothing else to separate it. */}
+            <thead className="border-b border-border bg-primary/10 text-primary">
               <tr>
-                <th className="px-4 py-3 font-medium">Date</th>
-                <th className="px-4 py-3 font-medium">Status</th>
-                <th className="px-4 py-3 font-medium">Total</th>
-                <th className="px-4 py-3 font-medium">Paid</th>
-                <th className="px-4 py-3 font-medium">Balance</th>
-                <th className="px-4 py-3 font-medium">
-                  <span className="sr-only">Actions</span>
-                </th>
+                {/* Every column sizes to its own content — w-px is a floor the browser has to widen
+                    to fit, so with nowrap each lands exactly as wide as its longest cell. Status
+                    declares nothing and takes the leftover, which parks the empty space at the far
+                    right where it reads as margin. Letting Customer Name absorb it instead opened a
+                    hand's width of nothing between a name and the number beside it. */}
+                <th className="w-px whitespace-nowrap px-4 py-3 font-semibold">Invoice No.</th>
+                <th className="w-px whitespace-nowrap px-4 py-3 font-semibold">Customer Name</th>
+                <th className="w-px whitespace-nowrap px-4 py-3 font-semibold">Mobile Number</th>
+                <th className="w-px whitespace-nowrap px-4 py-3 font-semibold">Date</th>
+                <th className="w-px whitespace-nowrap px-4 py-3 text-right font-semibold">Total</th>
+                <th className="w-px whitespace-nowrap px-4 py-3 text-right font-semibold">Paid</th>
+                <th className="w-px whitespace-nowrap px-4 py-3 text-right font-semibold">Balance</th>
+                <th className="px-4 py-3 font-semibold">Status</th>
               </tr>
             </thead>
             <tbody>
-              {invoices.map((invoice) => (
-                <tr key={invoice.id} className="border-b border-border last:border-0">
-                  <td className="px-4 py-3 whitespace-nowrap">{new Date(invoice.createdAtUtc).toLocaleDateString()}</td>
-                  <td className="px-4 py-3">
-                    <StatusBadge {...INVOICE_STATUS_BADGE[invoice.status]} />
-                  </td>
-                  <td className="px-4 py-3">{invoice.totalAmount.toFixed(2)}</td>
-                  <td className="px-4 py-3">{invoice.amountPaid.toFixed(2)}</td>
-                  <td className="px-4 py-3">{invoice.remainingBalance.toFixed(2)}</td>
-                  <td className="px-4 py-3 text-right">
-                    <Link href={`/dashboard/invoices/${invoice.id}`} className="text-foreground/70 hover:text-foreground">
-                      View
-                    </Link>
-                  </td>
-                </tr>
-              ))}
+              {invoices.map((invoice) => {
+                const customer = customersById[invoice.customerId];
+                return (
+                  <tr key={invoice.id} className="border-b border-border last:border-0">
+                    {/* The number is the link, so there is no separate View action — it is the
+                        reference the customer quotes and the obvious thing to click. */}
+                    <td className="whitespace-nowrap px-4 py-3 font-mono">
+                      <Link href={`/dashboard/invoices/${invoice.id}`} className="text-primary hover:underline">
+                        {invoiceNumber(invoice)}
+                      </Link>
+                    </td>
+                    <td className="whitespace-nowrap px-4 py-3">{customer?.fullName ?? "—"}</td>
+                    <td className="whitespace-nowrap px-4 py-3">{customer?.phoneNumber ?? "—"}</td>
+                    {/* dd/MM/yyyy, like the slip and the invoice page. toLocaleDateString follows
+                        the browser's locale, so this column read 8/14/2026 while the invoice it
+                        links to read 14/08/2026. */}
+                    <td className="whitespace-nowrap px-4 py-3">{formatInvoiceDate(invoice.createdAtUtc)}</td>
+                    <td className="whitespace-nowrap px-4 py-3 text-right tabular-nums">{invoice.totalAmount.toFixed(2)}</td>
+                    <td className="whitespace-nowrap px-4 py-3 text-right tabular-nums">{invoice.amountPaid.toFixed(2)}</td>
+                    {/* Outstanding money is the number worth spotting without reading the row. */}
+                    <td
+                      className={
+                        invoice.remainingBalance > 0
+                          ? "whitespace-nowrap px-4 py-3 text-right font-medium tabular-nums text-danger"
+                          : "whitespace-nowrap px-4 py-3 text-right tabular-nums"
+                      }
+                    >
+                      {invoice.remainingBalance.toFixed(2)}
+                    </td>
+                    <td className="whitespace-nowrap px-4 py-3">
+                      <StatusBadge {...INVOICE_STATUS_BADGE[invoice.status]} />
+                    </td>
+                  </tr>
+                );
+              })}
             </tbody>
           </table>
         </div>

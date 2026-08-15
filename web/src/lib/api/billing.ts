@@ -6,6 +6,25 @@ export type InvoiceStatus = (typeof INVOICE_STATUSES)[number];
 export const PAYMENT_METHODS = ["Cash", "Card", "Upi", "BankTransfer", "Other"] as const;
 export type PaymentMethod = (typeof PAYMENT_METHODS)[number];
 
+/**
+ * What each method is called, as opposed to what the enum spells it.
+ *
+ * <p>"Upi" and "BankTransfer" are C# identifiers, and screens that printed the value straight
+ * through showed them to staff that way. One map, so a payment reads the same on the invoice page,
+ * in the method picker and in the delivery dialog.</p>
+ */
+const PAYMENT_METHOD_LABELS: Record<PaymentMethod, string> = {
+  Cash: "Cash",
+  Card: "Card",
+  Upi: "UPI",
+  BankTransfer: "Bank Transfer",
+  Other: "Other",
+};
+
+export function paymentMethodLabel(method: PaymentMethod): string {
+  return PAYMENT_METHOD_LABELS[method] ?? method;
+}
+
 export type Payment = {
   id: string;
   amount: number;

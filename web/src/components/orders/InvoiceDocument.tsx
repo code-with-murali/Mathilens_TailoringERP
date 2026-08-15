@@ -6,13 +6,12 @@ import {
   getInvoiceSettings,
   formatInvoiceDate,
   DEFAULT_INVOICE_SETTINGS,
+  DEFAULT_SHOP_NAME,
   type InvoiceSettings,
 } from "@/lib/api/invoice-settings";
 import type { Invoice } from "@/lib/api/billing";
 import type { Order } from "@/lib/api/orders";
 import type { Customer } from "@/lib/api/customers";
-
-const DEFAULT_SHOP_NAME = "Mathilens Tailoring";
 
 function money(amount: number): string {
   return amount.toFixed(2);

@@ -9,12 +9,31 @@ import { useToast } from "@/components/ui/ToastProvider";
 import { getAccessToken } from "@/lib/auth";
 import { useRouteId } from "@/lib/use-route-id";
 import { ApiError } from "@/lib/api-client";
-import { getInvoice, recordPayment, voidInvoice, PAYMENT_METHODS, type Invoice, type PaymentMethod } from "@/lib/api/billing";
+import {
+  getInvoice,
+  recordPayment,
+  voidInvoice,
+  paymentMethodLabel,
+  PAYMENT_METHODS,
+  type Invoice,
+  type PaymentMethod,
+} from "@/lib/api/billing";
 import { getOrder, type Order } from "@/lib/api/orders";
 import { getCustomer, type Customer } from "@/lib/api/customers";
+import {
+  getInvoiceSettings,
+  formatInvoiceDate,
+  formatInvoiceDateTime,
+  DEFAULT_SHOP_NAME,
+} from "@/lib/api/invoice-settings";
 
 const fieldClassName =
   "rounded-md border border-border bg-surface px-3 py-2 text-sm outline-none transition-colors focus:border-primary focus:ring-2 focus:ring-primary/25";
+
+/** The shop's own reference. The fallback is what identified an invoice before numbering existed. */
+function invoiceNumber(invoice: Invoice) {
+  return invoice.invoiceNumber?.trim() || `#${invoice.id.slice(0, 8).toUpperCase()}`;
+}
 
 export default function InvoiceDetailPage() {
   const invoiceId = useRouteId();
@@ -23,6 +42,9 @@ export default function InvoiceDetailPage() {
   const [order, setOrder] = useState<Order | null>(null);
   const [customer, setCustomer] = useState<Customer | null>(null);
   const [loadError, setLoadError] = useState<string | null>(null);
+  // For the printed letterhead only. This page used to print "Mathilens Tailoring ERP" — the name
+  // of the software — on a document going to a customer of whichever shop is using it.
+  const [shopName, setShopName] = useState(DEFAULT_SHOP_NAME);
 
   const [paymentAmount, setPaymentAmount] = useState("");
   const [paymentMethod, setPaymentMethod] = useState<PaymentMethod>(PAYMENT_METHODS[0]);
@@ -44,6 +66,13 @@ export default function InvoiceDetailPage() {
       ]);
       setOrder(orderData);
       setCustomer(customerData);
+
+      // Falls back to the shared default if it can't be read — the invoice is still usable, and a
+      // failed settings read shouldn't blank a page someone opened to take money on.
+      const settings = await getInvoiceSettings(getAccessToken()).catch(() => null);
+      if (settings?.companyName.trim()) {
+        setShopName(settings.companyName.trim());
+      }
     } catch (error) {
       setLoadError(error instanceof ApiError ? error.message : "Unable to load this invoice.");
     }
@@ -112,14 +141,25 @@ export default function InvoiceDetailPage() {
     <div className="flex flex-col gap-6">
       {/* print:block instead of a permanent header — the app-chrome title above says "Invoice"
           fine on screen, but a printed page needs its own letterhead since the dashboard nav
-          (which carries the shop name) is hidden for print. */}
+          (which carries the shop name) is hidden for print.
+
+          The name comes from Invoice Settings. It used to be the string "Mathilens Tailoring ERP"
+          written into this file, so every shop using this software printed the software's name on
+          documents it handed to its own customers. */}
       <div className="hidden print:block">
-        <h1 className="text-2xl font-semibold">Mathilens Tailoring ERP</h1>
-        <p className="text-sm text-foreground/70">Invoice #{invoice.id.slice(0, 8).toUpperCase()} — printed {new Date().toLocaleDateString()}</p>
+        <h1 className="text-2xl font-semibold">{shopName}</h1>
+        <p className="text-sm text-foreground/70">
+          Invoice {invoiceNumber(invoice)} — printed {formatInvoiceDate(new Date().toISOString())}
+        </p>
       </div>
 
-      <div className="flex items-center justify-between print:hidden">
-        <h1 className="text-2xl font-semibold">Invoice</h1>
+      <div className="flex items-start justify-between gap-4 print:hidden">
+        <div>
+          <h1 className="text-2xl font-semibold">Invoice</h1>
+          {/* The reference the customer quotes. It was on the slip and on the list, and missing
+              from the one screen dedicated to a single invoice. */}
+          <p className="mt-0.5 font-mono text-sm text-primary">{invoiceNumber(invoice)}</p>
+        </div>
         <div className="flex items-center gap-4">
           <button type="button" onClick={() => window.print()} className="text-sm text-foreground/70 hover:text-foreground">
             Print
@@ -130,7 +170,9 @@ export default function InvoiceDetailPage() {
         </div>
       </div>
 
-      <div className="rounded-lg border border-border bg-surface p-6 print:border-0 print:p-0">
+      <div className="flex flex-col gap-5 rounded-lg border border-border bg-surface p-6 print:border-0 print:p-0">
+        {/* Who and when, then what it comes to — two groups rather than ten equal cells, because
+            "whose invoice is this" and "how much is left" are different questions. */}
         <dl className="grid grid-cols-2 gap-4 text-sm sm:grid-cols-3">
           <div>
             <dt className="text-foreground/70">Customer</dt>
@@ -141,8 +183,28 @@ export default function InvoiceDetailPage() {
             <dd className="font-medium">{customer ? customer.phoneNumber : "—"}</dd>
           </div>
           <div>
+            <dt className="text-foreground/70">Order</dt>
+            {/* The invoice knew its order and gave no way to reach it — you could see that it
+                billed something without seeing what. */}
+            <dd className="font-medium">
+              {order ? (
+                <Link href={`/dashboard/orders/${order.id}`} className="font-mono text-primary hover:underline print:text-foreground">
+                  {order.orderNumber?.trim() || `#${order.id.slice(0, 8).toUpperCase()}`}
+                </Link>
+              ) : (
+                "—"
+              )}
+            </dd>
+          </div>
+          <div>
+            <dt className="text-foreground/70">Invoice date</dt>
+            <dd className="font-medium">{formatInvoiceDate(invoice.createdAtUtc)}</dd>
+          </div>
+          <div>
             <dt className="text-foreground/70">Due date</dt>
-            <dd className="font-medium">{order ? new Date(order.dueAtUtc).toLocaleDateString() : "—"}</dd>
+            {/* dd/MM/yyyy like every other date in the app. toLocaleDateString followed the
+                browser's locale, so one counter read 19/08/2026 and another 8/19/2026. */}
+            <dd className="font-medium">{order ? formatInvoiceDate(order.dueAtUtc) : "—"}</dd>
           </div>
           <div>
             <dt className="text-foreground/70">Status</dt>
@@ -150,34 +212,46 @@ export default function InvoiceDetailPage() {
               <StatusBadge {...INVOICE_STATUS_BADGE[invoice.status]} />
             </dd>
           </div>
+        </dl>
+
+        <dl className="grid grid-cols-2 gap-4 border-t border-border pt-5 text-sm sm:grid-cols-3">
           <div>
             <dt className="text-foreground/70">Subtotal</dt>
-            <dd className="font-medium">{invoice.subtotal.toFixed(2)}</dd>
+            <dd className="font-medium tabular-nums">{invoice.subtotal.toFixed(2)}</dd>
           </div>
           <div>
+            {/* Zeroes stay on this screen where they are hidden on the slip: paper costs a line,
+                and the shop's own record should say outright that no tax was charged. */}
             <dt className="text-foreground/70">Tax</dt>
-            <dd className="font-medium">{invoice.taxAmount.toFixed(2)}</dd>
+            <dd className="font-medium tabular-nums">{invoice.taxAmount.toFixed(2)}</dd>
           </div>
           <div>
             <dt className="text-foreground/70">Discount</dt>
-            <dd className="font-medium">{invoice.discountAmount.toFixed(2)}</dd>
+            <dd className="font-medium tabular-nums">{invoice.discountAmount.toFixed(2)}</dd>
           </div>
           <div>
             <dt className="text-foreground/70">Total</dt>
-            <dd className="font-medium">{invoice.totalAmount.toFixed(2)}</dd>
+            <dd className="font-medium tabular-nums">{invoice.totalAmount.toFixed(2)}</dd>
           </div>
           <div>
             <dt className="text-foreground/70">Advance / Paid</dt>
-            <dd className="font-medium">{invoice.amountPaid.toFixed(2)}</dd>
+            <dd className="font-medium tabular-nums">{invoice.amountPaid.toFixed(2)}</dd>
           </div>
           <div>
             <dt className="text-foreground/70">Balance</dt>
-            <dd className="font-medium">{invoice.remainingBalance.toFixed(2)}</dd>
+            {/* Outstanding money carries colour here the same way it does in every list. */}
+            <dd
+              className={
+                invoice.remainingBalance > 0 ? "font-medium tabular-nums text-danger" : "font-medium tabular-nums"
+              }
+            >
+              {invoice.remainingBalance.toFixed(2)}
+            </dd>
           </div>
         </dl>
 
         {canVoid && (
-          <div className="mt-4 print:hidden">
+          <div className="print:hidden">
             <Button type="button" variant="danger" onClick={() => setConfirmingVoid(true)}>
               Void Invoice
             </Button>
@@ -190,12 +264,17 @@ export default function InvoiceDetailPage() {
         {invoice.payments.length === 0 ? (
           <p className="text-sm text-foreground/70">No payments recorded yet.</p>
         ) : (
+          // Fixed columns rather than justify-between, so the amounts sit in a line down the list
+          // instead of drifting with the length of the method beside them.
           <ul className="flex flex-col gap-2">
             {invoice.payments.map((payment) => (
-              <li key={payment.id} className="flex items-center justify-between rounded-md border border-border px-3 py-2 text-sm">
-                <span>{payment.method}</span>
-                <span className="font-medium">{payment.amount.toFixed(2)}</span>
-                <span className="text-foreground/70">{new Date(payment.createdAtUtc).toLocaleString()}</span>
+              <li
+                key={payment.id}
+                className="grid grid-cols-[1fr_auto_auto] items-baseline gap-4 rounded-md border border-border px-3 py-2 text-sm"
+              >
+                <span>{paymentMethodLabel(payment.method)}</span>
+                <span className="text-right font-medium tabular-nums">{payment.amount.toFixed(2)}</span>
+                <span className="w-32 text-right text-foreground/70">{formatInvoiceDateTime(payment.createdAtUtc)}</span>
               </li>
             ))}
           </ul>
@@ -217,7 +296,7 @@ export default function InvoiceDetailPage() {
               <select value={paymentMethod} onChange={(e) => setPaymentMethod(e.target.value as PaymentMethod)} className={fieldClassName}>
                 {PAYMENT_METHODS.map((method) => (
                   <option key={method} value={method}>
-                    {method}
+                    {paymentMethodLabel(method)}
                   </option>
                 ))}
               </select>

@@ -3,7 +3,7 @@
 import { useState, type ReactNode } from "react";
 import { Button } from "@/components/ui/Button";
 import { Modal } from "@/components/ui/Modal";
-import { type PaymentMethod } from "@/lib/api/billing";
+import { paymentMethodLabel, type PaymentMethod } from "@/lib/api/billing";
 
 const fieldClassName =
   "rounded-md border border-border bg-surface px-3 py-2 text-sm outline-none transition-colors focus:border-primary focus:ring-2 focus:ring-primary/25";
@@ -112,14 +112,13 @@ function UpiIcon() {
  * for by bank transfer, and a fifth tile would narrow the row for nothing. It remains available on
  * the invoice's own page, which offers the full set.</p>
  */
-const DELIVERY_METHODS: { value: PaymentMethod; label: string; Icon: () => ReactNode }[] = [
+const DELIVERY_METHODS: { value: PaymentMethod; Icon: () => ReactNode }[] = [
   // Cash leads because it is both the commonest and the default — the selected tile sitting first
   // means the eye starts where the answer usually already is.
-  { value: "Cash", label: "Cash", Icon: CashIcon },
-  // "Upi" is the API's spelling; "UPI" is what it is called.
-  { value: "Upi", label: "UPI", Icon: UpiIcon },
-  { value: "Card", label: "Card", Icon: CardIcon },
-  { value: "Other", label: "Other", Icon: OtherIcon },
+  { value: "Cash", Icon: CashIcon },
+  { value: "Upi", Icon: UpiIcon },
+  { value: "Card", Icon: CardIcon },
+  { value: "Other", Icon: OtherIcon },
 ];
 
 /**
@@ -310,7 +309,7 @@ export function DeliveryDialog({
                         the label, so the tap target is the card rather than the dot inside it —
                         which is what makes this quicker than the dropdown it replaced. */}
                     <div className="grid grid-cols-4 gap-2">
-                      {DELIVERY_METHODS.map(({ value, label, Icon }) => (
+                      {DELIVERY_METHODS.map(({ value, Icon }) => (
                         <label
                           key={value}
                           className={`flex cursor-pointer flex-col items-center gap-1.5 rounded-lg border px-1 py-2 text-xs transition-colors ${
@@ -326,7 +325,7 @@ export function DeliveryDialog({
                           <span className="flex h-5 items-center justify-center">
                             <Icon />
                           </span>
-                          <span className="leading-none">{label}</span>
+                          <span className="leading-none">{paymentMethodLabel(value)}</span>
                           <input
                             type="radio"
                             name="deliveryPaymentMethod"

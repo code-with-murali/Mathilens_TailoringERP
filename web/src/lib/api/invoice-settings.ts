@@ -13,6 +13,9 @@ export const INVOICE_TAX_RATE_KEY = "Invoice.TaxRatePercent";
 
 export const DEFAULT_NUMBER_PREFIX = "INV";
 
+/** Printed when the shop hasn't set its own name. Shared, so no screen can hard-code a different one. */
+export const DEFAULT_SHOP_NAME = "Mathilens Tailoring";
+
 export type InvoiceSettings = {
   companyName: string;
   address: string;
@@ -112,6 +115,21 @@ export function formatInvoiceDate(iso: string): string {
   const month = String(date.getMonth() + 1).padStart(2, "0");
 
   return `${day}/${month}/${date.getFullYear()}`;
+}
+
+/**
+ * The same date with the clock time, for records where the moment matters — a payment taken at
+ * 9:54 in the evening is a different fact from one taken that morning.
+ *
+ * <p>24-hour, and assembled the same way as the date above rather than through a locale, for the
+ * same reason: two machines in one shop should not disagree about what a timestamp says.</p>
+ */
+export function formatInvoiceDateTime(iso: string): string {
+  const date = new Date(iso);
+  const hours = String(date.getHours()).padStart(2, "0");
+  const minutes = String(date.getMinutes()).padStart(2, "0");
+
+  return `${formatInvoiceDate(iso)}, ${hours}:${minutes}`;
 }
 
 /**
