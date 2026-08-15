@@ -512,7 +512,7 @@ export default function OrdersPage() {
       <div className="flex flex-wrap items-end gap-4">
         {/* One box for all three, because whoever is at the counter has been handed one of them —
             a number off a receipt, a name, or a phone — and should not have to know which. */}
-        <div className="min-w-[16rem] flex-1">
+        <div className="min-w-0 flex-1 basis-64">
           <Input
             id="orderSearch"
             label="Search by order number, name or phone"
@@ -553,8 +553,8 @@ export default function OrdersPage() {
       ) : orders.length === 0 ? (
         <p className="text-sm text-foreground/70">No orders found.</p>
       ) : (
-        <div className="overflow-x-auto rounded-lg border border-border">
-          <table className="w-full text-left text-sm">
+        <div className="table-wrap overflow-x-auto rounded-lg border border-border">
+          <table className="stacked w-full text-left text-sm">
             {/* A tinted band rather than bg-surface, which is the same white the rows sit on — the
                 header had nothing separating it from the first order but a hairline. Built from the
                 theme's primary, so it follows dark mode instead of being a hard-coded colour. */}
@@ -590,15 +590,20 @@ export default function OrdersPage() {
                   <tr key={order.id} className="border-b border-border last:border-0">
                     {/* nowrap on the cells as well as the headers: a column is only as narrow as
                         its content if that content is allowed to stay on one line. */}
-                    <td className="whitespace-nowrap px-4 py-3 font-mono">
+                    <td data-label="Order Number" className="whitespace-nowrap px-4 py-3 font-mono">
                       <Link href={`/dashboard/orders/${order.id}`} className="text-primary hover:underline">
                         {orderNumber(order)}
                       </Link>
                     </td>
-                    <td className="whitespace-nowrap px-4 py-3">{customer?.fullName ?? "—"}</td>
-                    <td className="whitespace-nowrap px-4 py-3">{customer?.phoneNumber ?? "—"}</td>
+                    <td data-label="Customer Name" className="whitespace-nowrap px-4 py-3">
+                      {customer?.fullName ?? "—"}
+                    </td>
+                    <td data-label="Phone Number" className="whitespace-nowrap px-4 py-3">
+                      {customer?.phoneNumber ?? "—"}
+                    </td>
                     {/* Outstanding money is the number worth spotting from across the room. */}
                     <td
+                      data-label="Balance"
                       className={
                         order.balanceAmount !== null && order.balanceAmount > 0
                           ? "whitespace-nowrap px-4 py-3 text-right font-medium tabular-nums text-danger"
@@ -607,7 +612,7 @@ export default function OrdersPage() {
                     >
                       {order.balanceAmount?.toFixed(2) ?? "—"}
                     </td>
-                    <td className="whitespace-nowrap px-4 py-3">
+                    <td data-label="Status" className="whitespace-nowrap px-4 py-3">
                       <StatusBadge {...ORDER_STATUS_BADGE[order.status]} />
                     </td>
                     {/* One button and one menu on every row, whatever state the order is in. The
@@ -615,12 +620,13 @@ export default function OrdersPage() {
                         column where the controls sit in the same place on every line can be used
                         without being read, which the previous set — a different handful of links
                         per row depending on status — could not. */}
-                    <td className="px-4 py-3">
+                    <td data-label="" className="px-4 py-3">
                       <div className="flex items-center justify-end gap-2">
                         {/* Fixed width, so a row whose step is "Mark Ready" doesn't push the menu
                             out of line with the row above it. The dash holds the slot open for an
-                            order that has nothing left to do. */}
-                        <div className="w-[7.5rem] shrink-0 text-right">
+                            order that has nothing left to do — centred in that slot, where the
+                            button's own label sits, rather than shoved against its right edge. */}
+                        <div className="flex w-[7.5rem] shrink-0 justify-center">
                           {step ? (
                             <Button
                               type="button"
@@ -635,7 +641,7 @@ export default function OrdersPage() {
                               {isRowBusy && step.kind === "transition" ? step.busyLabel : step.label}
                             </Button>
                           ) : (
-                            <span className="pr-3 text-foreground/40">—</span>
+                            <span className="text-foreground/40">—</span>
                           )}
                         </div>
 

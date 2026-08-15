@@ -61,8 +61,8 @@ export default function OutstandingInvoicesReportPage() {
       ) : invoices.length === 0 ? (
         <p className="text-sm text-foreground/70">No outstanding invoices.</p>
       ) : (
-        <div className="overflow-x-auto rounded-lg border border-border">
-          <table className="w-full text-left text-sm">
+        <div className="table-wrap overflow-x-auto rounded-lg border border-border">
+          <table className="stacked w-full text-left text-sm">
             <thead className="border-b border-border bg-surface">
               <tr>
                 <th className="px-4 py-3 font-medium">Status</th>
@@ -75,13 +75,13 @@ export default function OutstandingInvoicesReportPage() {
             <tbody>
               {invoices.map((invoice) => (
                 <tr key={invoice.id} className="border-b border-border last:border-0">
-                  <td className="px-4 py-3">
+                  <td data-label="Status" className="px-4 py-3">
                     <StatusBadge {...(INVOICE_STATUS_BADGE[invoice.status] ?? { label: invoice.status, tone: "neutral" })} />
                   </td>
-                  <td className="px-4 py-3">{invoice.totalAmount.toFixed(2)}</td>
-                  <td className="px-4 py-3">{invoice.amountPaid.toFixed(2)}</td>
-                  <td className="px-4 py-3">{invoice.remainingBalance.toFixed(2)}</td>
-                  <td className="px-4 py-3">{new Date(invoice.createdAtUtc).toLocaleDateString()}</td>
+                  <td data-label="Total" className="px-4 py-3">{invoice.totalAmount.toFixed(2)}</td>
+                  <td data-label="Paid" className="px-4 py-3">{invoice.amountPaid.toFixed(2)}</td>
+                  <td data-label="Balance" className="px-4 py-3">{invoice.remainingBalance.toFixed(2)}</td>
+                  <td data-label="Created" className="px-4 py-3">{new Date(invoice.createdAtUtc).toLocaleDateString()}</td>
                 </tr>
               ))}
             </tbody>

@@ -240,8 +240,8 @@ export default function InvoicesPage() {
       ) : invoices.length === 0 ? (
         <p className="text-sm text-foreground/70">No invoices found.</p>
       ) : (
-        <div className="overflow-x-auto rounded-lg border border-border">
-          <table className="w-full text-left text-sm">
+        <div className="table-wrap overflow-x-auto rounded-lg border border-border">
+          <table className="stacked w-full text-left text-sm">
             {/* Tinted like the Orders list, for the same reason: bg-surface is the white the rows
                 sit on, so the header had a hairline and nothing else to separate it. */}
             <thead className="border-b border-border bg-primary/10 text-primary">
@@ -268,21 +268,21 @@ export default function InvoicesPage() {
                   <tr key={invoice.id} className="border-b border-border last:border-0">
                     {/* The number is the link, so there is no separate View action — it is the
                         reference the customer quotes and the obvious thing to click. */}
-                    <td className="whitespace-nowrap px-4 py-3 font-mono">
+                    <td data-label="Invoice No." className="whitespace-nowrap px-4 py-3 font-mono">
                       <Link href={`/dashboard/invoices/${invoice.id}`} className="text-primary hover:underline">
                         {invoiceNumber(invoice)}
                       </Link>
                     </td>
-                    <td className="whitespace-nowrap px-4 py-3">{customer?.fullName ?? "—"}</td>
-                    <td className="whitespace-nowrap px-4 py-3">{customer?.phoneNumber ?? "—"}</td>
+                    <td data-label="Customer Name" className="whitespace-nowrap px-4 py-3">{customer?.fullName ?? "—"}</td>
+                    <td data-label="Mobile Number" className="whitespace-nowrap px-4 py-3">{customer?.phoneNumber ?? "—"}</td>
                     {/* dd/MM/yyyy, like the slip and the invoice page. toLocaleDateString follows
                         the browser's locale, so this column read 8/14/2026 while the invoice it
                         links to read 14/08/2026. */}
-                    <td className="whitespace-nowrap px-4 py-3">{formatInvoiceDate(invoice.createdAtUtc)}</td>
-                    <td className="whitespace-nowrap px-4 py-3 text-right tabular-nums">{invoice.totalAmount.toFixed(2)}</td>
-                    <td className="whitespace-nowrap px-4 py-3 text-right tabular-nums">{invoice.amountPaid.toFixed(2)}</td>
+                    <td data-label="Date" className="whitespace-nowrap px-4 py-3">{formatInvoiceDate(invoice.createdAtUtc)}</td>
+                    <td data-label="Total" className="whitespace-nowrap px-4 py-3 text-right tabular-nums">{invoice.totalAmount.toFixed(2)}</td>
+                    <td data-label="Paid" className="whitespace-nowrap px-4 py-3 text-right tabular-nums">{invoice.amountPaid.toFixed(2)}</td>
                     {/* Outstanding money is the number worth spotting without reading the row. */}
-                    <td
+                    <td data-label="Balance"
                       className={
                         invoice.remainingBalance > 0
                           ? "whitespace-nowrap px-4 py-3 text-right font-medium tabular-nums text-danger"
@@ -291,7 +291,7 @@ export default function InvoicesPage() {
                     >
                       {invoice.remainingBalance.toFixed(2)}
                     </td>
-                    <td className="whitespace-nowrap px-4 py-3">
+                    <td data-label="Status" className="whitespace-nowrap px-4 py-3">
                       <StatusBadge {...INVOICE_STATUS_BADGE[invoice.status]} />
                     </td>
                   </tr>

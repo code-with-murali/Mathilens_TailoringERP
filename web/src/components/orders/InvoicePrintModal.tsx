@@ -31,13 +31,13 @@ export function InvoicePrintModal({ invoice, order, customer, onClose, autoPrint
 
   return (
     <div
-      className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 px-4 print:static print:inset-auto print:z-auto print:block print:bg-transparent print:p-0"
+      className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 p-3 print:static print:inset-auto print:z-auto print:block print:bg-transparent print:p-0"
       role="dialog"
       aria-modal="true"
     >
       {/* Slip-width. The bill is a till receipt, so the modal is only as wide as the roll it prints
           on — a wide dialog around a narrow slip just puts it adrift in the middle. */}
-      <div className="flex max-h-[90vh] w-full max-w-sm flex-col gap-4 overflow-y-auto rounded-lg border border-border bg-surface p-6 print:max-h-none print:w-auto print:max-w-none print:overflow-visible print:rounded-none print:border-0 print:p-0">
+      <div className="flex max-h-[92dvh] w-full max-w-sm flex-col gap-4 overflow-y-auto rounded-lg border border-border bg-surface p-4 sm:p-6 print:max-h-none print:w-auto print:max-w-none print:overflow-visible print:rounded-none print:border-0 print:p-0">
         <div className="flex items-center justify-between print:hidden">
           <h2 className="text-lg font-semibold">Invoice</h2>
           <div className="flex items-center gap-4">

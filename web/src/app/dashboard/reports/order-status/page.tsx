@@ -61,8 +61,8 @@ export default function OrderStatusReportPage() {
       ) : !data || data.statusCounts.length === 0 ? (
         <p className="text-sm text-foreground/70">No orders in this period.</p>
       ) : (
-        <div className="overflow-x-auto rounded-lg border border-border">
-          <table className="w-full text-left text-sm">
+        <div className="table-wrap overflow-x-auto rounded-lg border border-border">
+          <table className="stacked w-full text-left text-sm">
             <thead className="border-b border-border bg-surface">
               <tr>
                 <th className="px-4 py-3 font-medium">Status</th>
@@ -73,8 +73,8 @@ export default function OrderStatusReportPage() {
               {data.statusCounts.map((row) => (
                 <tr key={row.status} className="border-b border-border last:border-0">
                   {/* Through the shared label map — this table used to print the raw enum. */}
-                  <td className="px-4 py-3">{orderStatusLabel(row.status)}</td>
-                  <td className="px-4 py-3">{row.count}</td>
+                  <td data-label="Status" className="px-4 py-3">{orderStatusLabel(row.status)}</td>
+                  <td data-label="Count" className="px-4 py-3">{row.count}</td>
                 </tr>
               ))}
             </tbody>

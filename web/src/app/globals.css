@@ -74,6 +74,92 @@ body {
   background: var(--background);
   color: var(--foreground);
   font-family: Arial, Helvetica, sans-serif;
+  /* Nothing in this app is meant to be reached by scrolling sideways. A stray wide element is a
+     bug to fix, not a reason to hand the reader a second axis — clip rather than hidden so
+     position: sticky inside the page keeps working. */
+  overflow-x: clip;
+}
+
+/*
+  Tables that become cards on a phone.
+
+  A six-column table cannot be read on a 360px screen, and the usual answer — a horizontal
+  scrollbar — hides half the row behind a gesture nobody makes. Below the md breakpoint each row
+  becomes its own card and each cell a "Label  value" line, so every column is still on screen and
+  the only scrolling is downwards.
+
+  The label comes from `data-label` on the cell rather than from the header, because the header is
+  what gets hidden. A cell with an empty `data-label` — the actions column — prints no label and
+  keeps its controls to the right.
+
+  Specificity is deliberate: `table.stacked td` outranks a single Tailwind utility, so the
+  `px-4 py-3 text-right whitespace-nowrap` already on these cells is overridden without !important
+  and without having to strip it from every screen.
+*/
+@media (max-width: 767px) {
+  table.stacked,
+  table.stacked tbody,
+  table.stacked tr,
+  table.stacked td {
+    display: block;
+    width: 100%;
+  }
+
+  table.stacked thead {
+    display: none;
+  }
+
+  table.stacked tr {
+    border: 1px solid var(--border);
+    border-radius: 0.5rem;
+    background: var(--surface);
+    margin-bottom: 0.625rem;
+    padding: 0.25rem 0;
+  }
+
+  table.stacked tr:last-child {
+    margin-bottom: 0;
+  }
+
+  table.stacked td {
+    display: flex;
+    align-items: baseline;
+    justify-content: space-between;
+    gap: 0.75rem;
+    padding: 0.375rem 0.75rem;
+    border: 0;
+    text-align: right;
+    white-space: normal;
+    overflow-wrap: anywhere;
+  }
+
+  table.stacked td::before {
+    content: attr(data-label);
+    flex: 0 0 auto;
+    max-width: 45%;
+    font-weight: 500;
+    text-align: left;
+    color: color-mix(in srgb, var(--foreground) 65%, transparent);
+  }
+
+  table.stacked td[data-label=""]::before,
+  table.stacked td:not([data-label])::before {
+    display: none;
+  }
+
+  table.stacked td[data-label=""] {
+    justify-content: flex-end;
+    padding-top: 0.5rem;
+  }
+
+  /* The rounded, ruled box a table normally sits in belongs to the table. Once the rows are cards
+     it would be a border around a stack of borders. */
+  .table-wrap {
+    border: 0;
+    border-radius: 0;
+    overflow: visible;
+    background: transparent;
+  }
 }
 
 /* Printed pages (invoices, etc.) should read as plain paper regardless of the active theme —

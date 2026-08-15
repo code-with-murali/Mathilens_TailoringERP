@@ -57,8 +57,8 @@ export default function MeasurementHistoryPage() {
       ) : entries.length === 0 ? (
         <p className="text-sm text-foreground/70">No history recorded yet.</p>
       ) : (
-        <div className="overflow-x-auto rounded-lg border border-border">
-          <table className="w-full text-left text-sm">
+        <div className="table-wrap overflow-x-auto rounded-lg border border-border">
+          <table className="stacked w-full text-left text-sm">
             <thead className="border-b border-border bg-surface">
               <tr>
                 <th className="px-4 py-3 font-medium">Recorded</th>
@@ -69,9 +69,9 @@ export default function MeasurementHistoryPage() {
             <tbody>
               {entries.map((entry) => (
                 <tr key={entry.id} className="border-b border-border last:border-0">
-                  <td className="px-4 py-3">{new Date(entry.createdAtUtc).toLocaleString()}</td>
-                  <td className="px-4 py-3">{entry.garmentType}</td>
-                  <td className="px-4 py-3">
+                  <td data-label="Recorded" className="px-4 py-3">{new Date(entry.createdAtUtc).toLocaleString()}</td>
+                  <td data-label="Garment" className="px-4 py-3">{entry.garmentType}</td>
+                  <td data-label="Values" className="px-4 py-3">
                     {Object.entries(entry.values)
                       .map(([name, value]) => `${name}: ${value}`)
                       .join(", ")}

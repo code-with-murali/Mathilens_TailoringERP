@@ -81,8 +81,8 @@ export default function WhatsAppMessagesPage() {
       ) : messages.length === 0 ? (
         <p className="text-sm text-foreground/70">No messages found.</p>
       ) : (
-        <div className="overflow-x-auto rounded-lg border border-border">
-          <table className="w-full text-left text-sm">
+        <div className="table-wrap overflow-x-auto rounded-lg border border-border">
+          <table className="stacked w-full text-left text-sm">
             <thead className="border-b border-border bg-surface">
               <tr>
                 <th className="px-4 py-3 font-medium">Type</th>
@@ -96,10 +96,10 @@ export default function WhatsAppMessagesPage() {
             <tbody>
               {messages.map((message) => (
                 <tr key={message.id} className="border-b border-border last:border-0">
-                  <td className="px-4 py-3">{message.messageType}</td>
-                  <td className="max-w-md truncate px-4 py-3">{message.content}</td>
-                  <td className="px-4 py-3">{message.status}</td>
-                  <td className="px-4 py-3 text-right">
+                  <td data-label="Type" className="px-4 py-3">{message.messageType}</td>
+                  <td data-label="Content" className="max-w-md truncate px-4 py-3">{message.content}</td>
+                  <td data-label="Status" className="px-4 py-3">{message.status}</td>
+                  <td data-label="" className="px-4 py-3 text-right">
                     <Link href={`/dashboard/whatsapp/${message.id}`} className="text-foreground/70 hover:text-foreground">
                       View
                     </Link>

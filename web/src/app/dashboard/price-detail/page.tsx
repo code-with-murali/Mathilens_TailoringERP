@@ -177,8 +177,8 @@ export default function PriceDetailPage() {
       ) : clothPrices.length === 0 ? (
         <p className="text-sm text-foreground/70">No prices configured yet.</p>
       ) : (
-        <div className="overflow-x-auto rounded-lg border border-border">
-          <table className="w-full text-left text-sm">
+        <div className="table-wrap overflow-x-auto rounded-lg border border-border">
+          <table className="stacked w-full text-left text-sm">
             <thead className="border-b border-border bg-surface">
               <tr>
                 <th className="px-4 py-3 font-medium">Cloth code</th>
@@ -193,11 +193,11 @@ export default function PriceDetailPage() {
             <tbody>
               {clothPrices.map((clothPrice) => (
                 <tr key={clothPrice.id} className="border-b border-border last:border-0">
-                  <td className="px-4 py-3 font-mono">{clothPrice.clothCode}</td>
-                  <td className="px-4 py-3">{clothPrice.clothName}</td>
-                  <td className="px-4 py-3">{clothPrice.costPrice.toFixed(2)}</td>
-                  <td className="px-4 py-3">{clothPrice.sellingPrice.toFixed(2)}</td>
-                  <td className="px-4 py-3">
+                  <td data-label="Cloth code" className="px-4 py-3 font-mono">{clothPrice.clothCode}</td>
+                  <td data-label="Cloth name" className="px-4 py-3">{clothPrice.clothName}</td>
+                  <td data-label="Cost price" className="px-4 py-3">{clothPrice.costPrice.toFixed(2)}</td>
+                  <td data-label="Selling price" className="px-4 py-3">{clothPrice.sellingPrice.toFixed(2)}</td>
+                  <td data-label="" className="px-4 py-3">
                     <div className="flex justify-end gap-3">
                       <button type="button" onClick={() => openEditForm(clothPrice)} className="text-foreground/70 hover:text-foreground">
                         Edit

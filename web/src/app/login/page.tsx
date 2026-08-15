@@ -52,9 +52,15 @@ export default function LoginPage() {
   }
 
   return (
-    /* One screen, never a scrollbar. dvh rather than vh because a phone's retracting address bar
-       makes 100vh taller than what is actually on show, which puts Sign in just past the fold. */
-    <main className="relative flex h-dvh flex-col overflow-hidden bg-background">
+    /*
+      One screen and no scrollbar on a desktop, where the layout is designed around the card sitting
+      on the seam between the panel and the band and there is room for all of it.
+
+      On a phone it is min-height instead: the card is the whole page there, and clipping the Login
+      button off the bottom of a short handset is a worse outcome than a short scroll. dvh rather
+      than vh because a phone's retracting address bar makes 100vh taller than what is on show.
+    */
+    <main className="relative flex min-h-dvh flex-col bg-background lg:h-dvh lg:min-h-0 lg:overflow-hidden">
       {/*
         The machine fills the left of the page, the accent band the right, and the card straddles the
         seam between them — which is what gives the layout its depth, so both are backdrops here
@@ -78,7 +84,7 @@ export default function LoginPage() {
         roughly two thirds of the card wants to be over the page and a third over the accent, and
         with the band 26% wide that lands the card's right edge around 16% in from the edge.
       */}
-      <div className="relative flex flex-1 items-center justify-center px-5 lg:justify-between lg:gap-8 lg:px-12 lg:pr-[16%] xl:px-20 xl:pr-[16%]">
+      <div className="relative flex flex-1 items-center justify-center px-4 py-6 sm:px-5 lg:justify-between lg:gap-8 lg:px-12 lg:py-0 lg:pr-[16%] xl:px-20 xl:pr-[16%]">
         {/*
           The machine sits in the flow rather than in the panel behind it, so it centres in the gap
           actually left beside the card. Positioned in the panel with a fixed percentage padding it
@@ -110,8 +116,26 @@ export default function LoginPage() {
         </div>
 
         {/* ---- Sign-in card ---- */}
-        <div className="w-full max-w-[30rem] shrink-0 rounded-xl border border-border bg-surface px-7 py-9 shadow-[0_18px_50px_-12px_rgba(0,0,0,0.35)] sm:px-10">
+        <div className="w-full max-w-[30rem] shrink-0 rounded-xl border border-border bg-surface px-5 py-7 shadow-[0_18px_50px_-12px_rgba(0,0,0,0.35)] sm:px-10 sm:py-9">
           <div className="flex flex-col items-center">
+            {/*
+              The machine, on a phone.
+
+              Below lg the artwork beside the card is hidden — there is no room for a column next to
+              the form — which left the one thing on the page that says what the shop does absent
+              from the view most staff actually sign in on. Here it sits above the wordmark instead,
+              small enough to cost the form nothing.
+
+              Held on a light plate in both themes for the same reason the wide layout's panel is:
+              the source is a black machine on a transparent background, and on the dark surface it
+              would be a silhouette in a hole.
+            */}
+            {/* eslint-disable-next-line @next/next/no-img-element -- output: "export" has no image optimiser configured */}
+            <img
+              src="/login.webp"
+              alt=""
+              className="mb-3 h-20 w-auto rounded-lg bg-[#f6f4f0] object-contain px-3 py-2 lg:hidden"
+            />
             <span className="flex h-12 w-12 items-center justify-center rounded-xl bg-primary text-xl font-bold text-primary-foreground">
               M
             </span>

@@ -147,8 +147,8 @@ export default function AdvancedSettingsPage() {
       ) : settings.length === 0 ? (
         <p className="text-sm text-foreground/70">No settings configured yet.</p>
       ) : (
-        <div className="overflow-x-auto rounded-lg border border-border">
-          <table className="w-full text-left text-sm">
+        <div className="table-wrap overflow-x-auto rounded-lg border border-border">
+          <table className="stacked w-full text-left text-sm">
             <thead className="border-b border-border bg-surface">
               <tr>
                 <th className="px-4 py-3 font-medium">Key</th>
@@ -161,9 +161,9 @@ export default function AdvancedSettingsPage() {
             <tbody>
               {settings.map((setting) => (
                 <tr key={setting.id} className="border-b border-border last:border-0">
-                  <td className="px-4 py-3 font-mono">{setting.key}</td>
-                  <td className="max-w-md truncate px-4 py-3">{setting.value}</td>
-                  <td className="px-4 py-3">
+                  <td data-label="Key" className="px-4 py-3 font-mono">{setting.key}</td>
+                  <td data-label="Value" className="max-w-md truncate px-4 py-3">{setting.value}</td>
+                  <td data-label="" className="px-4 py-3">
                     <div className="flex justify-end gap-3">
                       <button
                         type="button"

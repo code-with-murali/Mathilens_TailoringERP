@@ -607,8 +607,8 @@ export default function OrderDetailPage() {
           {previousOrders.length === 0 ? (
             <p className="text-sm text-foreground/70">No earlier orders for this customer.</p>
           ) : (
-            <div className="overflow-x-auto rounded-md border border-border">
-              <table className="w-full text-left text-sm">
+            <div className="table-wrap overflow-x-auto rounded-md border border-border">
+              <table className="stacked w-full text-left text-sm">
                 <thead className="border-b border-border">
                   <tr>
                     <th className="px-3 py-2 font-medium">Order</th>
@@ -621,17 +621,17 @@ export default function OrderDetailPage() {
                 <tbody>
                   {previousOrders.map((previous) => (
                     <tr key={previous.id} className="border-b border-border last:border-0">
-                      <td className="px-3 py-2 font-mono">
+                      <td data-label="Order" className="px-3 py-2 font-mono">
                         <Link href={`/dashboard/orders/${previous.id}`} className="text-primary hover:underline">
                           {previous.orderNumber?.trim() || `#${previous.id.slice(0, 8).toUpperCase()}`}
                         </Link>
                       </td>
-                      <td className="px-3 py-2">{new Date(previous.createdAtUtc).toLocaleDateString()}</td>
-                      <td className="px-3 py-2">
+                      <td data-label="Placed" className="px-3 py-2">{new Date(previous.createdAtUtc).toLocaleDateString()}</td>
+                      <td data-label="Status" className="px-3 py-2">
                         <StatusBadge {...ORDER_STATUS_BADGE[previous.status]} />
                       </td>
-                      <td className="px-3 py-2 text-right tabular-nums">{previous.totalAmount.toFixed(2)}</td>
-                      <td
+                      <td data-label="Amount" className="px-3 py-2 text-right tabular-nums">{previous.totalAmount.toFixed(2)}</td>
+                      <td data-label="Balance"
                         className={
                           previous.balanceAmount !== null && previous.balanceAmount > 0
                             ? "px-3 py-2 text-right font-medium tabular-nums text-danger"

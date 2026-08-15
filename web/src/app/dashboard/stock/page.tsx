@@ -93,8 +93,8 @@ export default function StockDetailsPage() {
           Nothing received yet. Record a delivery on the Inventory screen and it will appear here.
         </p>
       ) : (
-        <div className="overflow-x-auto rounded-lg border border-border">
-          <table className="w-full text-left text-sm">
+        <div className="table-wrap overflow-x-auto rounded-lg border border-border">
+          <table className="stacked w-full text-left text-sm">
             <thead className="border-b border-border bg-surface">
               <tr>
                 <th className="px-4 py-3 font-medium">Cloth Code</th>
@@ -107,13 +107,13 @@ export default function StockDetailsPage() {
             <tbody>
               {rows.map((row) => (
                 <tr key={row.clothPriceId} className="border-b border-border last:border-0">
-                  <td className="px-4 py-3">
+                  <td data-label="Cloth Code" className="px-4 py-3">
                     <span className="font-mono">{row.clothCode}</span>
                     <span className="text-foreground/60"> — {row.clothName}</span>
                   </td>
                   {/* One line per unit throughout: 12.5 metres and 3 rolls are two facts, not
                       15.5 of anything. */}
-                  <td className="px-4 py-3">
+                  <td data-label="Available Quantity" className="px-4 py-3">
                     <div className="flex flex-col">
                       {row.quantities.map((q) => (
                         <span
@@ -127,7 +127,7 @@ export default function StockDetailsPage() {
                       ))}
                     </div>
                   </td>
-                  <td className="px-4 py-3 text-foreground/70">
+                  <td data-label="Received" className="px-4 py-3 text-foreground/70">
                     <div className="flex flex-col">
                       {row.quantities.map((q) => (
                         <span key={q.unit} className="whitespace-nowrap">
@@ -136,7 +136,7 @@ export default function StockDetailsPage() {
                       ))}
                     </div>
                   </td>
-                  <td className="px-4 py-3 text-foreground/70">
+                  <td data-label="Used" className="px-4 py-3 text-foreground/70">
                     <div className="flex flex-col">
                       {row.quantities.map((q) => (
                         <span key={q.unit} className="whitespace-nowrap">
@@ -145,7 +145,7 @@ export default function StockDetailsPage() {
                       ))}
                     </div>
                   </td>
-                  <td className="px-4 py-3 whitespace-nowrap text-foreground/70">
+                  <td data-label="Last received" className="px-4 py-3 whitespace-nowrap text-foreground/70">
                     {row.lastReceivedOn ? new Date(`${row.lastReceivedOn}T00:00:00Z`).toLocaleDateString() : "—"}
                   </td>
                 </tr>
