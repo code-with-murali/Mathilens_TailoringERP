@@ -27,10 +27,18 @@ public static partial class ActivityValues
     public static bool IsSecret(string propertyName) =>
         SecretNameFragments.Any(fragment => propertyName.Contains(fragment, StringComparison.OrdinalIgnoreCase));
 
-    /// <summary>Returns null for anything not worth a line: unset values and empty collections.</summary>
+    /// <summary>
+    /// Returns null for anything not worth a line: unset values, empty collections, and record ids.
+    ///
+    /// A GUID is the one value in the system that means nothing at all to the person reading the
+    /// trail — "Customer Id: 3f2a9c…" is noise where a name belongs, and the row already says which
+    /// screen and which action it was. Dropping it here covers both the description and the
+    /// before-and-after list, which are built from the same formatter.
+    /// </summary>
     public static string? Format(object? value) => value switch
     {
         null => null,
+        Guid => null,
         string s => string.IsNullOrWhiteSpace(s) ? null : s.Trim(),
         bool b => b ? "Yes" : "No",
         DateTime d => d.ToString("yyyy-MM-dd HH:mm"),

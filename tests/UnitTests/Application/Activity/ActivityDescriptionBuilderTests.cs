@@ -70,15 +70,16 @@ public class ActivityDescriptionBuilderTests
     }
 
     [Fact]
-    public void Describe_ForADelete_IdentifiesTheRecord()
+    public void Describe_ForADelete_SaysNothingRatherThanQuotingAGuid()
     {
         var id = Guid.NewGuid();
 
         var description = ActivityDescriptionBuilder.Describe(new DeleteCustomerCommand(id));
 
-        // A delete command carries only the id — naming the customer would mean the handler
-        // recording it, since only the handler ever loads the row.
-        Assert.Contains(id.ToString(), description);
+        // A delete command carries only the id, and a GUID means nothing to the person reading the
+        // trail — "Customer Id: 3f2a9c…" is noise where a name belongs. Which record it was is
+        // what the screen and the action already say, so the description stays empty instead.
+        Assert.Null(description);
     }
 
     [Fact]

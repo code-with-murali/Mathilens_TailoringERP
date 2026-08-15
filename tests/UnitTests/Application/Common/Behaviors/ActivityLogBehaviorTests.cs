@@ -93,9 +93,11 @@ public class ActivityLogBehaviorTests
     }
 
     [Fact]
-    public async Task Handle_WithASignIn_StillRecordsIt()
+    public async Task Handle_WithNobodySignedIn_RecordsNothing()
     {
-        _currentUserService.UserName.Returns("asha@shop.example");
+        // Signing in happens before there is anyone to attribute it to, so these rows read as
+        // "System" — which is precisely what the trail is not for. It answers "who did this", and
+        // a row that cannot name anybody only crowds out the ones that can.
         var behavior = Behavior<LoginCommand, Result<AuthTokensDto>>();
 
         await behavior.Handle(
@@ -103,16 +105,13 @@ public class ActivityLogBehaviorTests
             () => Task.FromResult(Result.Success(new AuthTokensDto("access", "refresh", DateTime.UtcNow.AddMinutes(15)))),
             CancellationToken.None);
 
-        // Exempting the automatic refresh must not quietly exempt sign-in, which is a real event
-        // with a person behind it and the first thing anyone looks for in an audit trail.
-        await _repository.Received(1).AddAsync(
-            Arg.Is<ActivityLog>(a => a != null && a.Screen == "Auth" && a.Action == "Login"),
-            Arg.Any<CancellationToken>());
+        await _repository.DidNotReceive().AddAsync(Arg.Any<ActivityLog>(), Arg.Any<CancellationToken>());
     }
 
     [Fact]
     public async Task Handle_WhenRecordingFails_StillReturnsTheCommandsResult()
     {
+        _currentUserService.UserId.Returns(Guid.NewGuid());
         _repository.AddAsync(Arg.Any<ActivityLog>(), Arg.Any<CancellationToken>())
             .Returns<Task>(_ => throw new InvalidOperationException("audit table unavailable"));
         var behavior = Behavior<CreateCustomerCommand, Result<CustomerDto>>();
@@ -130,6 +129,7 @@ public class ActivityLogBehaviorTests
     [Fact]
     public async Task Handle_WithFieldChanges_RecordsWhatTheyChangedFromAndTo()
     {
+        _currentUserService.UserId.Returns(Guid.NewGuid());
         _entityChangeCollector.Drain().Returns([new EntityChange("Customer", "Phone Number", "98765 43210", "91234 56789")]);
         var behavior = Behavior<CreateCustomerCommand, Result<CustomerDto>>();
 

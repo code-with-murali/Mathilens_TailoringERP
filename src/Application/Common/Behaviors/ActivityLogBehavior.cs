@@ -54,7 +54,10 @@ public sealed class ActivityLogBehavior<TRequest, TResponse> : IPipelineBehavior
         // its changes behind to be attributed to whatever runs next on this request.
         var changes = _entityChangeCollector.Drain();
 
-        if (!IsCommand || IsExempt || response.IsFailure)
+        // Nothing unattended is recorded. A row attributed to "System" is the app talking to
+        // itself — a startup backfill, a token being renewed — and the trail exists to answer
+        // "who did this", which those rows cannot. They only crowd out the ones that can.
+        if (!IsCommand || IsExempt || response.IsFailure || _currentUserService.UserId is null)
         {
             return response;
         }

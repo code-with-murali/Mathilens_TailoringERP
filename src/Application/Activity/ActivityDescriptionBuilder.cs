@@ -39,6 +39,13 @@ public static class ActivityDescriptionBuilder
                 continue;
             }
 
+            if (property.Name is "Id")
+            {
+                // The bare record id. Which row it was is what Screen and Action already say, and
+                // the trail is meant to read as labels and values a person recognises.
+                continue;
+            }
+
             var label = ActivityValues.Humanize(property.Name);
 
             if (ActivityValues.IsSecret(property.Name))
