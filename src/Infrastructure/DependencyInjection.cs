@@ -95,6 +95,12 @@ public static class DependencyInjection
         services.AddScoped<IIdentityService, IdentityService>();
         services.AddScoped<IUserAdminService, UserAdminService>();
 
+        // Two classes rather than one implementing both: RoleAdminService needs the settings store
+        // to carry a renamed role's rights across, and RolePermissionService needs the catalogue —
+        // folding them together would be a dependency cycle the container could not resolve.
+        services.AddScoped<IRoleCatalog, RoleCatalog>();
+        services.AddScoped<IRoleAdminService, RoleAdminService>();
+
         // The resolver itself lives in Application (it is plain policy over a repository port);
         // supplying it a cache implementation is this layer's job. It sits on the authorization
         // path of every request, so it must not read a settings row per call.

@@ -65,7 +65,7 @@ export default function InventoryPage() {
   const [formError, setFormError] = useState<string | null>(null);
   const [isSaving, setIsSaving] = useState(false);
 
-  const canManage = can(PERMISSIONS.inventoryManage);
+  const canManage = can(PERMISSIONS.inventoryCreate);
 
   const load = useCallback(async () => {
     setIsLoading(true);
@@ -307,7 +307,7 @@ export default function InventoryPage() {
       )}
 
       <div className="flex flex-wrap items-end gap-4">
-        <div className="min-w-[16rem] flex-1">
+        <div className="min-w-0 flex-1 basis-64">
           <Input
             id="search"
             label="Search by cloth, supplier or bill no."
@@ -362,8 +362,8 @@ export default function InventoryPage() {
       ) : receipts.length === 0 ? (
         <p className="text-sm text-foreground/70">No cloth receipts recorded yet.</p>
       ) : (
-        <div className="overflow-x-auto rounded-lg border border-border">
-          <table className="w-full text-left text-sm">
+        <div className="table-wrap overflow-x-auto rounded-lg border border-border">
+          <table className="stacked w-full text-left text-sm">
             <thead className="border-b border-border bg-surface">
               <tr>
                 <th className="px-4 py-3 font-medium">Received</th>
@@ -378,18 +378,18 @@ export default function InventoryPage() {
             <tbody>
               {receipts.map((receipt) => (
                 <tr key={receipt.id} className="border-b border-border last:border-0">
-                  <td className="px-4 py-3 whitespace-nowrap">{formatDate(receipt.receivedOn)}</td>
-                  <td className="px-4 py-3">
+                  <td data-label="Received" className="px-4 py-3 whitespace-nowrap">{formatDate(receipt.receivedOn)}</td>
+                  <td data-label="Cloth" className="px-4 py-3">
                     <span className="font-mono">{receipt.clothCode}</span>
                     <span className="text-foreground/60"> — {receipt.clothName}</span>
                   </td>
-                  <td className="px-4 py-3 whitespace-nowrap">
+                  <td data-label="Quantity" className="px-4 py-3 whitespace-nowrap">
                     {receipt.quantity.toFixed(2)} {receipt.unit.toLowerCase()}
                   </td>
-                  <td className="px-4 py-3">{receipt.supplierName ?? "—"}</td>
-                  <td className="px-4 py-3">{receipt.invoiceNumber ?? "—"}</td>
-                  <td className="px-4 py-3 whitespace-nowrap">{receipt.ratePerUnit?.toFixed(2) ?? "—"}</td>
-                  <td className="px-4 py-3 whitespace-nowrap">{receipt.totalCost?.toFixed(2) ?? "—"}</td>
+                  <td data-label="Supplier" className="px-4 py-3">{receipt.supplierName ?? "—"}</td>
+                  <td data-label="Bill no." className="px-4 py-3">{receipt.invoiceNumber ?? "—"}</td>
+                  <td data-label="Rate" className="px-4 py-3 whitespace-nowrap">{receipt.ratePerUnit?.toFixed(2) ?? "—"}</td>
+                  <td data-label="Total" className="px-4 py-3 whitespace-nowrap">{receipt.totalCost?.toFixed(2) ?? "—"}</td>
                 </tr>
               ))}
             </tbody>

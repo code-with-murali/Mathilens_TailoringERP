@@ -38,7 +38,7 @@ public sealed class CustomersController : ApiControllerBase
 
     /// <summary>Creates a new customer.</summary>
     [HttpPost]
-    [Authorize(Policy = Permissions.CustomersManage)]
+    [Authorize(Policy = Permissions.CustomersCreate)]
     [ProducesResponseType(typeof(ApiResponse<CustomerDto>), StatusCodes.Status200OK)]
     [ProducesResponseType(typeof(ApiErrorResponse), StatusCodes.Status400BadRequest)]
     public async Task<IActionResult> Create([FromBody] CreateCustomerRequest request, CancellationToken cancellationToken)
@@ -119,7 +119,7 @@ public sealed class CustomersController : ApiControllerBase
     /// valid rows are saved and invalid ones come back listed by their row number.
     /// </summary>
     [HttpPost("import")]
-    [Authorize(Policy = Permissions.CustomersManage)]
+    [Authorize(Policy = Permissions.CustomersImport)]
     [RequestSizeLimit(ImportLimits.MaxFileBytes)]
     [ProducesResponseType(typeof(ApiResponse<ImportResultDto>), StatusCodes.Status200OK)]
     [ProducesResponseType(typeof(ApiErrorResponse), StatusCodes.Status400BadRequest)]
@@ -143,7 +143,7 @@ public sealed class CustomersController : ApiControllerBase
     /// chosen — including the ones the operator then thinks better of.</para>
     /// </summary>
     [HttpPost("import/preview")]
-    [Authorize(Policy = Permissions.CustomersManage)]
+    [Authorize(Policy = Permissions.CustomersImport)]
     [RequestSizeLimit(ImportLimits.MaxFileBytes)]
     [ProducesResponseType(typeof(ApiResponse<CustomerImportPreviewDto>), StatusCodes.Status200OK)]
     [ProducesResponseType(typeof(ApiErrorResponse), StatusCodes.Status400BadRequest)]
@@ -211,7 +211,7 @@ public sealed class CustomersController : ApiControllerBase
 
     /// <summary>Updates an existing customer's details.</summary>
     [HttpPut("{id:guid}")]
-    [Authorize(Policy = Permissions.CustomersManage)]
+    [Authorize(Policy = Permissions.CustomersEdit)]
     [ProducesResponseType(typeof(ApiResponse<CustomerDto>), StatusCodes.Status200OK)]
     [ProducesResponseType(typeof(ApiErrorResponse), StatusCodes.Status400BadRequest)]
     [ProducesResponseType(typeof(ApiErrorResponse), StatusCodes.Status404NotFound)]
@@ -234,7 +234,7 @@ public sealed class CustomersController : ApiControllerBase
 
     /// <summary>Soft-deletes a customer.</summary>
     [HttpDelete("{id:guid}")]
-    [Authorize(Policy = Permissions.CustomersManage)]
+    [Authorize(Policy = Permissions.CustomersDelete)]
     [ProducesResponseType(StatusCodes.Status204NoContent)]
     [ProducesResponseType(typeof(ApiErrorResponse), StatusCodes.Status404NotFound)]
     public async Task<IActionResult> Delete(Guid id, CancellationToken cancellationToken)

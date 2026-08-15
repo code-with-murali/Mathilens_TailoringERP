@@ -127,7 +127,7 @@ public sealed class OccasionsController : ApiControllerBase
 
     /// <summary>Marks an occasion as followed up, or amends the remarks if it was already marked.</summary>
     [HttpPost("contacts")]
-    [Authorize(Policy = Permissions.CustomersManage)]
+    [Authorize(Policy = Permissions.CustomersEdit)]
     [ProducesResponseType(typeof(ApiResponse<object>), StatusCodes.Status200OK)]
     [ProducesResponseType(typeof(ApiErrorResponse), StatusCodes.Status400BadRequest)]
     public async Task<IActionResult> RecordContact([FromBody] RecordOccasionContactRequest request, CancellationToken cancellationToken)

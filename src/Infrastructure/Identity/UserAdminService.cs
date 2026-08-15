@@ -16,13 +16,18 @@ namespace MathilensERP.Infrastructure.Identity;
 public sealed class UserAdminService : IUserAdminService
 {
     private readonly UserManager<ApplicationUser> _userManager;
+    private readonly RoleManager<ApplicationRole> _roleManager;
     private readonly Persistence.ApplicationDbContext _dbContext;
     private readonly IPasswordHasher<ApplicationUser> _passwordHasher;
 
-    public UserAdminService(UserManager<ApplicationUser> userManager, Persistence.ApplicationDbContext dbContext,
+    public UserAdminService(
+        UserManager<ApplicationUser> userManager,
+        RoleManager<ApplicationRole> roleManager,
+        Persistence.ApplicationDbContext dbContext,
         IPasswordHasher<ApplicationUser> passwordHasher)
     {
         _userManager = userManager;
+        _roleManager = roleManager;
         _dbContext = dbContext;
         _passwordHasher = passwordHasher;
     }
@@ -52,7 +57,9 @@ public sealed class UserAdminService : IUserAdminService
 
     public async Task<Result<AppUserDto>> CreateUserAsync(string email, string password, string role, CancellationToken cancellationToken)
     {
-        if (!AppRoles.IsKnownRole(role))
+        // Against the role store rather than a fixed list: a shop can add its own roles on the
+        // User Roles screen, and one created five minutes ago is as assignable as Front Desk.
+        if (!await _roleManager.RoleExistsAsync(role))
         {
             return Result.Failure<AppUserDto>(Error.Validation("Users.UnknownRole", $"'{role}' is not a role in this system."));
         }
@@ -77,7 +84,7 @@ public sealed class UserAdminService : IUserAdminService
 
     public async Task<Result> SetRoleAsync(Guid userId, string role, CancellationToken cancellationToken)
     {
-        if (!AppRoles.IsKnownRole(role))
+        if (!await _roleManager.RoleExistsAsync(role))
         {
             return Result.Failure(Error.Validation("Users.UnknownRole", $"'{role}' is not a role in this system."));
         }

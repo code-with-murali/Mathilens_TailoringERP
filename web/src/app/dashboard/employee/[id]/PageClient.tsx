@@ -71,7 +71,9 @@ export default function EmployeeViewPage() {
   const [retireError, setRetireError] = useState<string | null>(null);
   const [isRetiring, setIsRetiring] = useState(false);
 
-  const canManage = can(PERMISSIONS.employeesManage);
+  // Retiring and bringing someone back are the only things this page changes, so it asks for
+  // exactly that right rather than for staff editing as a whole.
+  const canManage = can(PERMISSIONS.employeesRetire);
 
   const loadEmployee = useCallback(async () => {
     try {
@@ -229,8 +231,8 @@ export default function EmployeeViewPage() {
         ) : orders.length === 0 ? (
           <p className="text-sm text-foreground/70">No orders have been assigned to this employee yet.</p>
         ) : (
-          <div className="overflow-x-auto rounded-lg border border-border">
-            <table className="w-full text-left text-sm">
+          <div className="table-wrap overflow-x-auto rounded-lg border border-border">
+            <table className="stacked w-full text-left text-sm">
               <thead className="border-b border-border bg-surface">
                 <tr>
                   <th className="px-4 py-3 font-medium">Order</th>
@@ -246,18 +248,18 @@ export default function EmployeeViewPage() {
               <tbody>
                 {orders.map((order) => (
                   <tr key={order.orderId} className="border-b border-border last:border-0">
-                    <td className="px-4 py-3 whitespace-nowrap font-mono">
+                    <td data-label="Order" className="px-4 py-3 whitespace-nowrap font-mono">
                       <Link href={`/dashboard/orders/${order.orderId}`} className="hover:text-primary">
                         #{order.orderId.slice(0, 8).toUpperCase()}
                       </Link>
                     </td>
-                    <td className="px-4 py-3">{order.customerName}</td>
-                    <td className="px-4 py-3">{order.itemCount}</td>
-                    <td className="px-4 py-3 whitespace-nowrap">{order.status}</td>
-                    <td className="px-4 py-3 whitespace-nowrap">{formatInstant(order.dueAtUtc)}</td>
-                    <td className="px-4 py-3 whitespace-nowrap">{formatInstant(order.workStartedAtUtc)}</td>
-                    <td className="px-4 py-3 whitespace-nowrap">{formatInstant(order.workCompletedAtUtc)}</td>
-                    <td className="px-4 py-3 whitespace-nowrap">{formatInstant(order.deliveredAtUtc)}</td>
+                    <td data-label="Customer" className="px-4 py-3">{order.customerName}</td>
+                    <td data-label="Items" className="px-4 py-3">{order.itemCount}</td>
+                    <td data-label="Status" className="px-4 py-3 whitespace-nowrap">{order.status}</td>
+                    <td data-label="Due" className="px-4 py-3 whitespace-nowrap">{formatInstant(order.dueAtUtc)}</td>
+                    <td data-label="Work started" className="px-4 py-3 whitespace-nowrap">{formatInstant(order.workStartedAtUtc)}</td>
+                    <td data-label="Work finished" className="px-4 py-3 whitespace-nowrap">{formatInstant(order.workCompletedAtUtc)}</td>
+                    <td data-label="Delivered" className="px-4 py-3 whitespace-nowrap">{formatInstant(order.deliveredAtUtc)}</td>
                   </tr>
                 ))}
               </tbody>

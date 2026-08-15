@@ -76,9 +76,12 @@ const NAV_ITEMS: NavEntry[] = [
     children: [
       { href: "/dashboard/employees", label: "Employees", icon: EmployeesIcon, permission: PERMISSIONS.employeesView },
       { href: "/dashboard/users", label: "Users", icon: UsersIcon, permission: PERMISSIONS.usersView },
-      // Users.Manage, matching the API: the role-permission endpoints are guarded by it so that a
+      // Which roles exist, as against what each one may do — two separate rights, because adding a
+      // role is harmless on its own and granting it rights is not.
+      { href: "/dashboard/user-roles", label: "User Role", icon: RoleIcon, permission: PERMISSIONS.usersRoles },
+      // Users.Rights, matching the API: the role-permission endpoints are guarded by it so that a
       // Manager holding Settings.Manage cannot grant themselves the right to hand out access.
-      { href: "/dashboard/user-rights", label: "User Rights", icon: ShieldIcon, permission: PERMISSIONS.usersManage },
+      { href: "/dashboard/user-rights", label: "User Rights", icon: ShieldIcon, permission: PERMISSIONS.usersRights },
       { href: "/dashboard/activity", label: "Activity Log", icon: ActivityIcon, permission: PERMISSIONS.activityView },
     ],
   },
@@ -328,8 +331,11 @@ export default function DashboardLayout({ children }: LayoutProps<"/dashboard">)
           Small screens only: on a desktop the rail is always on-screen and carries its own collapse
           toggle, so this would be an empty strip of padding above the page heading.
         */}
-        <div className="flex shrink-0 items-center px-6 pt-4 print:hidden lg:hidden">{drawerToggle}</div>
-        <main className="flex-1 px-6 py-6">{children}</main>
+        <div className="flex shrink-0 items-center px-4 pt-4 print:hidden sm:px-6 lg:hidden">{drawerToggle}</div>
+        {/* min-w-0 so a wide child inside can shrink rather than stretching the flex row and
+            handing the page a sideways scrollbar. Narrower gutters on a phone, where six wasted
+            rems is most of a column. */}
+        <main className="min-w-0 flex-1 px-4 py-5 sm:px-6 sm:py-6">{children}</main>
       </div>
     </div>
   );
@@ -423,6 +429,17 @@ function ReceiptIcon({ className }: IconProps) {
     <svg className={className} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
       <path d="M5 3v18l2.5-1.6L10 21l2-1.6L14 21l2.5-1.6L19 21V3H5Z" />
       <path d="M9 8h6M9 12h6" />
+    </svg>
+  );
+}
+
+/** A name badge — a role is the label a person wears, not the person. */
+function RoleIcon({ className }: IconProps) {
+  return (
+    <svg className={className} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+      <rect x="3" y="5" width="18" height="14" rx="2" />
+      <circle cx="8.5" cy="11" r="2" />
+      <path d="M5 16c.6-1.5 2-2.2 3.5-2.2S11.4 14.5 12 16M14.5 10h4.5M14.5 13.5h3" />
     </svg>
   );
 }

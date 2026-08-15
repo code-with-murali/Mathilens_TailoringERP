@@ -65,7 +65,7 @@ public sealed class ClothPricesController : ApiControllerBase
     /// success: valid rows are saved and invalid ones come back listed by their row number.
     /// </summary>
     [HttpPost("import")]
-    [Authorize(Policy = Permissions.PricingManage)]
+    [Authorize(Policy = Permissions.PricingImport)]
     [RequestSizeLimit(ImportLimits.MaxFileBytes)]
     [ProducesResponseType(typeof(ApiResponse<ImportResultDto>), StatusCodes.Status200OK)]
     [ProducesResponseType(typeof(ApiErrorResponse), StatusCodes.Status400BadRequest)]
@@ -104,7 +104,7 @@ public sealed class ClothPricesController : ApiControllerBase
 
     /// <summary>Creates a new cloth price entry.</summary>
     [HttpPost]
-    [Authorize(Policy = Permissions.PricingManage)]
+    [Authorize(Policy = Permissions.PricingCreate)]
     [ProducesResponseType(typeof(ApiResponse<ClothPriceDto>), StatusCodes.Status200OK)]
     [ProducesResponseType(typeof(ApiErrorResponse), StatusCodes.Status400BadRequest)]
     [ProducesResponseType(typeof(ApiErrorResponse), StatusCodes.Status409Conflict)]
@@ -141,7 +141,7 @@ public sealed class ClothPricesController : ApiControllerBase
 
     /// <summary>Updates an existing cloth price entry.</summary>
     [HttpPut("{id:guid}")]
-    [Authorize(Policy = Permissions.PricingManage)]
+    [Authorize(Policy = Permissions.PricingEdit)]
     [ProducesResponseType(typeof(ApiResponse<ClothPriceDto>), StatusCodes.Status200OK)]
     [ProducesResponseType(typeof(ApiErrorResponse), StatusCodes.Status400BadRequest)]
     [ProducesResponseType(typeof(ApiErrorResponse), StatusCodes.Status404NotFound)]
@@ -155,7 +155,7 @@ public sealed class ClothPricesController : ApiControllerBase
 
     /// <summary>Soft-deletes a cloth price entry.</summary>
     [HttpDelete("{id:guid}")]
-    [Authorize(Policy = Permissions.PricingManage)]
+    [Authorize(Policy = Permissions.PricingDelete)]
     [ProducesResponseType(StatusCodes.Status204NoContent)]
     [ProducesResponseType(typeof(ApiErrorResponse), StatusCodes.Status404NotFound)]
     public async Task<IActionResult> Delete(Guid id, CancellationToken cancellationToken)

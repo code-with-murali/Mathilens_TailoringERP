@@ -23,27 +23,41 @@ namespace MathilensERP.Application.Authorization;
 /// </summary>
 public sealed class RolePermissionService : IRolePermissionService
 {
-    private const string KeyPrefix = "Authorization.RolePermissions.";
+    /// <summary>
+    /// Where one role's configured rights live. Public because a rename has to carry the row across
+    /// with the role — see <c>RoleAdminService</c>.
+    /// </summary>
+    public const string KeyPrefix = "Authorization.RolePermissions.";
+
     private const string CacheKey = "Authorization.RolePermissions.All";
 
     /// <summary>Bounds how long a stale map could survive a write made by another instance.</summary>
     private static readonly TimeSpan CacheLifetime = TimeSpan.FromMinutes(5);
 
     private readonly ISettingRepository _settingRepository;
+    private readonly IRoleCatalog _roleCatalog;
     private readonly IMemoryCache _cache;
 
-    public RolePermissionService(ISettingRepository settingRepository, IMemoryCache cache)
+    public RolePermissionService(ISettingRepository settingRepository, IRoleCatalog roleCatalog, IMemoryCache cache)
     {
         _settingRepository = settingRepository;
+        _roleCatalog = roleCatalog;
         _cache = cache;
     }
 
+    /// <summary>
+    /// Deliberately does not check the role still exists.
+    ///
+    /// This runs on the authorization path of every request, and a role the shop has since deleted
+    /// resolves to nothing anyway — so the check would buy a database read per call to reach the
+    /// same answer. A role the shop created carries exactly what it has been granted, and nothing
+    /// until it has been.
+    /// </summary>
     public async Task<IReadOnlyList<string>> PermissionsForAsync(IEnumerable<string> roles, CancellationToken cancellationToken)
     {
         var overrides = await GetOverridesAsync(cancellationToken);
 
         return roles
-            .Where(AppRoles.IsKnownRole)
             .SelectMany(role => Resolve(role, overrides))
             .Distinct(StringComparer.Ordinal)
             .OrderBy(permission => permission, StringComparer.Ordinal)
@@ -54,21 +68,22 @@ public sealed class RolePermissionService : IRolePermissionService
     {
         var overrides = await GetOverridesAsync(cancellationToken);
 
-        // Screens and their actions come from the permission catalogue, so a module added later
-        // shows up here on its own — and one that only supports viewing offers no Manage box.
-        var screens = Permissions.All
-            .Select(permission => new { Permission = permission, Parts = permission.Split('.') })
-            .Where(x => x.Parts.Length == 2)
-            .GroupBy(x => x.Parts[0], StringComparer.Ordinal)
-            .Select(group => new ScreenPermissionsDto(
-                group.Key,
-                group.Select(x => new ScreenPermissionDto(x.Permission, x.Parts[1])).ToList()))
+        // Screens and the individual actions they offer, straight from the permission catalogue —
+        // a module gains a checkbox by gaining an action there and nowhere else. The Manage
+        // umbrellas are left out: they are what the built-in sets are written in terms of, not
+        // something to tick when every action underneath has its own box.
+        var screens = Permissions.ModuleOrder
+            .Select(module => new ScreenPermissionsDto(
+                module,
+                Permissions.ActionsByModule[module]
+                    .Select(action => new ScreenPermissionDto($"{module}.{action}", action))
+                    .ToList()))
             .ToList();
 
-        var roles = AppRoles.All
+        var roles = (await _roleCatalog.ListRoleNamesAsync(cancellationToken))
             .Select(role => new RolePermissionsDto(
                 role,
-                Resolve(role, overrides),
+                Granular(Resolve(role, overrides)),
                 IsEditable: !IsOwner(role),
                 IsCustomised: !IsOwner(role) && overrides.ContainsKey(role)))
             .ToList();
@@ -81,7 +96,7 @@ public sealed class RolePermissionService : IRolePermissionService
         IReadOnlyList<string> permissions,
         CancellationToken cancellationToken)
     {
-        var failure = Validate(role, permissions);
+        var failure = await ValidateAsync(role, permissions, cancellationToken);
         if (failure is not null)
         {
             return Result.Failure<RolePermissionsDto>(failure);
@@ -113,7 +128,7 @@ public sealed class RolePermissionService : IRolePermissionService
 
     public async Task<Result<RolePermissionsDto>> ResetPermissionsAsync(string role, CancellationToken cancellationToken)
     {
-        if (!AppRoles.IsKnownRole(role))
+        if (!await _roleCatalog.RoleExistsAsync(role, cancellationToken))
         {
             return Result.Failure<RolePermissionsDto>(
                 Error.Validation("Roles.UnknownRole", $"'{role}' is not a role in this system."));
@@ -132,12 +147,12 @@ public sealed class RolePermissionService : IRolePermissionService
             _cache.Remove(CacheKey);
         }
 
-        return new RolePermissionsDto(role, AppRoles.PermissionsFor([role]), IsEditable: true, IsCustomised: false);
+        return new RolePermissionsDto(role, Granular(AppRoles.PermissionsFor([role])), IsEditable: true, IsCustomised: false);
     }
 
-    private static Error? Validate(string role, IReadOnlyList<string> permissions)
+    private async Task<Error?> ValidateAsync(string role, IReadOnlyList<string> permissions, CancellationToken cancellationToken)
     {
-        if (!AppRoles.IsKnownRole(role))
+        if (!await _roleCatalog.RoleExistsAsync(role, cancellationToken))
         {
             return Error.Validation("Roles.UnknownRole", $"'{role}' is not a role in this system.");
         }
@@ -164,9 +179,28 @@ public sealed class RolePermissionService : IRolePermissionService
 
     private static bool IsOwner(string role) => string.Equals(role, AppRoles.Owner, StringComparison.OrdinalIgnoreCase);
 
+    /// <summary>
+    /// Drops the <c>Manage</c> umbrellas before the rights grid sees a role's permissions.
+    ///
+    /// The grid ticks individual actions and sends back what it holds. Leaving a <c>Manage</c> in
+    /// that set would make unticking impossible: the box for it does not exist, so it would ride
+    /// along untouched into the save and expand straight back into everything it had just been
+    /// asked to take away.
+    /// </summary>
+    private static IReadOnlyList<string> Granular(IEnumerable<string> permissions) =>
+        permissions.Where(p => Permissions.Granular.Contains(p, StringComparer.Ordinal)).ToList();
+
+    /// <summary>
+    /// What one role actually grants.
+    ///
+    /// Widened through <see cref="Permissions.Expand"/> on the way out, because both sources can
+    /// still speak in <c>Manage</c>: the built-in sets are written that way, and so is every
+    /// override stored before the actions were split apart. A role the shop added itself has no
+    /// built-in set to fall back on, so without an override it grants nothing.
+    /// </summary>
     private static IReadOnlyList<string> Resolve(string role, IReadOnlyDictionary<string, IReadOnlyList<string>> overrides) =>
         IsOwner(role) ? Permissions.All
-        : overrides.TryGetValue(role, out var configured) ? configured
+        : overrides.TryGetValue(role, out var configured) ? Permissions.Expand(configured)
         : AppRoles.PermissionsFor([role]);
 
     private async Task<IReadOnlyDictionary<string, IReadOnlyList<string>>> GetOverridesAsync(CancellationToken cancellationToken)
@@ -181,8 +215,10 @@ public sealed class RolePermissionService : IRolePermissionService
 
         foreach (var setting in stored)
         {
+            // Owner alone is skipped — it is fixed at everything. Any other name is honoured,
+            // including the roles a shop has created for itself.
             var role = setting.Key[KeyPrefix.Length..];
-            if (!AppRoles.IsKnownRole(role) || IsOwner(role))
+            if (IsOwner(role))
             {
                 continue;
             }

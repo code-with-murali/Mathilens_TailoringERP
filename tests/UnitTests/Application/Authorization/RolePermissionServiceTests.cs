@@ -1,4 +1,5 @@
 using System.Text.Json;
+using MathilensERP.Application.Common.Interfaces;
 using MathilensERP.Application.Settings;
 using MathilensERP.Domain.Settings;
 using MathilensERP.Application.Authorization;
@@ -14,11 +15,21 @@ public class RolePermissionServiceTests
 
     private readonly ISettingRepository _settings = Substitute.For<ISettingRepository>();
 
+    /// <summary>Stands in for the role store: the four built-ins exist, nothing else does.</summary>
+    private readonly IRoleCatalog _roles = Substitute.For<IRoleCatalog>();
+
+    public RolePermissionServiceTests()
+    {
+        _roles.ListRoleNamesAsync(Arg.Any<CancellationToken>()).Returns(AppRoles.All);
+        _roles.RoleExistsAsync(Arg.Any<string>(), Arg.Any<CancellationToken>())
+            .Returns(call => AppRoles.IsKnownRole(call.Arg<string>() ?? string.Empty));
+    }
+
     private RolePermissionService Service(params Setting[] stored)
     {
         _settings.ListByKeyPrefixAsync(KeyPrefix, Arg.Any<CancellationToken>()).Returns(stored);
         // A fresh cache per service, so one test's map can never leak into another's.
-        return new RolePermissionService(_settings, new MemoryCache(new MemoryCacheOptions()));
+        return new RolePermissionService(_settings, _roles, new MemoryCache(new MemoryCacheOptions()));
     }
 
     private static Setting Stored(string role, params string[] permissions) =>
@@ -54,7 +65,7 @@ public class RolePermissionServiceTests
         var permissions = await service.PermissionsForAsync([AppRoles.Owner], CancellationToken.None);
 
         Assert.Equal(Permissions.All.OrderBy(p => p, StringComparer.Ordinal), permissions.OrderBy(p => p, StringComparer.Ordinal));
-        Assert.Contains(Permissions.UsersManage, permissions);
+        Assert.Contains(Permissions.UsersRights, permissions);
     }
 
     [Fact]
@@ -120,6 +131,19 @@ public class RolePermissionServiceTests
     }
 
     [Fact]
+    public async Task GetMatrix_ReportsOnlyIndividualActions_SoUntickingIsExpressible()
+    {
+        // Tailor's built-in set is written as Orders.Manage. The grid has no box for that, so if
+        // it came back in the role's permissions it would ride untouched through a save and expand
+        // straight back into every Orders action the user had just cleared.
+        var matrix = await Service().GetMatrixAsync(CancellationToken.None);
+
+        var tailor = matrix.Roles.Single(r => r.Role == AppRoles.Tailor);
+        Assert.DoesNotContain(tailor.Permissions, p => p.EndsWith(".Manage", StringComparison.Ordinal));
+        Assert.Contains(Permissions.OrdersCreate, tailor.Permissions);
+    }
+
+    [Fact]
     public async Task GetMatrix_MarksOwnerAsNotEditableAndEveryOtherRoleAsEditable()
     {
         var matrix = await Service().GetMatrixAsync(CancellationToken.None);
@@ -133,13 +157,20 @@ public class RolePermissionServiceTests
     {
         var matrix = await Service().GetMatrixAsync(CancellationToken.None);
 
-        // Every permission is represented exactly once, so a module added later needs no edit here.
+        // Every individual action is represented exactly once, so a module added later needs no
+        // edit here.
         var flattened = matrix.Screens.SelectMany(s => s.Permissions.Select(p => p.Permission)).ToList();
-        Assert.Equal(Permissions.All.OrderBy(p => p, StringComparer.Ordinal), flattened.OrderBy(p => p, StringComparer.Ordinal));
+        Assert.Equal(
+            Permissions.Granular.OrderBy(p => p, StringComparer.Ordinal),
+            flattened.OrderBy(p => p, StringComparer.Ordinal));
 
-        // Reports defines only View, so the grid must not offer it a Manage checkbox.
+        // Manage is an umbrella the built-in sets are written in terms of, not a box to tick when
+        // every action underneath it has one of its own.
+        Assert.DoesNotContain(matrix.Screens.SelectMany(s => s.Permissions), p => p.Action == "Manage");
+
+        // Reports defines only viewing, so it is one checkbox and no more.
         var reports = matrix.Screens.Single(s => s.Screen == "Reports");
-        Assert.DoesNotContain(reports.Permissions, p => p.Action == "Manage");
+        Assert.Equal("View", Assert.Single(reports.Permissions).Action);
     }
 
     [Fact]
@@ -162,7 +193,12 @@ public class RolePermissionServiceTests
 
         Assert.True(result.IsSuccess);
         Assert.False(result.Value.IsCustomised);
-        Assert.Equal(AppRoles.PermissionsFor([AppRoles.Tailor]), result.Value.Permissions);
+        // Individual actions only. The grid ticks those, and a Manage riding along in the set it
+        // sends back would expand into everything the next time it was saved.
+        Assert.Equal(
+            AppRoles.PermissionsFor([AppRoles.Tailor]).Where(Permissions.Granular.Contains),
+            result.Value.Permissions);
+        Assert.DoesNotContain(result.Value.Permissions, p => p.EndsWith(".Manage", StringComparison.Ordinal));
         _settings.Received(1).Remove(stored);
     }
 }

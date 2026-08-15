@@ -77,7 +77,7 @@ export function OccasionReport({
 }) {
   const { showToast } = useToast();
   const { can } = usePermissions();
-  const canRecord = can(PERMISSIONS.customersManage);
+  const canRecord = can(PERMISSIONS.customersEdit);
 
   const [scope, setScope] = useState<OccasionScope>("Upcoming");
   // Opens on the whole year rather than the next thirty days, so nothing is hidden behind a window
@@ -222,8 +222,8 @@ export function OccasionReport({
             : `Nobody contacted in the last ${windowDays} days.`}
         </p>
       ) : (
-        <div className="overflow-x-auto rounded-lg border border-border">
-          <table className="w-full text-left text-sm">
+        <div className="table-wrap overflow-x-auto rounded-lg border border-border">
+          <table className="stacked w-full text-left text-sm">
             <thead className="border-b border-border bg-surface">
               <tr>
                 <th className="px-4 py-3 font-medium">Customer</th>
@@ -238,15 +238,15 @@ export function OccasionReport({
             <tbody>
               {rows.map((row) => (
                 <tr key={row.customerId} className="border-b border-border align-top last:border-0">
-                  <td className="px-4 py-3">{row.fullName}</td>
-                  <td className="px-4 py-3 text-foreground/70">{row.phoneNumber}</td>
-                  <td className="px-4 py-3">{new Date(row.occasionOn).toLocaleDateString()}</td>
-                  <td className="px-4 py-3 text-foreground/70">{whenLabel(row.daysAway)}</td>
-                  <td className="px-4 py-3 text-foreground/70">{row.yearsCompleted ?? "—"}</td>
-                  <td className="px-4 py-3">
+                  <td data-label="Customer" className="px-4 py-3">{row.fullName}</td>
+                  <td data-label="Phone" className="px-4 py-3 text-foreground/70">{row.phoneNumber}</td>
+                  <td data-label="Date" className="px-4 py-3">{new Date(row.occasionOn).toLocaleDateString()}</td>
+                  <td data-label="When" className="px-4 py-3 text-foreground/70">{whenLabel(row.daysAway)}</td>
+                  <td data-label={milestoneLabel} className="px-4 py-3 text-foreground/70">{row.yearsCompleted ?? "—"}</td>
+                  <td data-label={scope === "Upcoming" ? "" : "Contacted"} className="px-4 py-3">
                     {row.contactedOn ? new Date(row.contactedOn).toLocaleDateString() : ""}
                   </td>
-                  <td className="px-4 py-3">
+                  <td data-label="Remarks" className="px-4 py-3">
                     {openRow === row.customerId ? (
                       <div className="flex flex-col gap-2">
                         <textarea

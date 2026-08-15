@@ -31,7 +31,7 @@ public sealed class InvoicesController : ApiControllerBase
 
     /// <summary>Issues a new invoice for an order.</summary>
     [HttpPost]
-    [Authorize(Policy = Permissions.InvoicesManage)]
+    [Authorize(Policy = Permissions.InvoicesCreate)]
     [ProducesResponseType(typeof(ApiResponse<InvoiceDto>), StatusCodes.Status200OK)]
     [ProducesResponseType(typeof(ApiErrorResponse), StatusCodes.Status400BadRequest)]
     [ProducesResponseType(typeof(ApiErrorResponse), StatusCodes.Status404NotFound)]
@@ -88,7 +88,7 @@ public sealed class InvoicesController : ApiControllerBase
 
     /// <summary>Records a payment against an invoice, supporting partial and multiple payments.</summary>
     [HttpPost("{id:guid}/payments")]
-    [Authorize(Policy = Permissions.InvoicesManage)]
+    [Authorize(Policy = Permissions.InvoicesPayment)]
     [ProducesResponseType(typeof(ApiResponse<InvoiceDto>), StatusCodes.Status200OK)]
     [ProducesResponseType(typeof(ApiErrorResponse), StatusCodes.Status400BadRequest)]
     [ProducesResponseType(typeof(ApiErrorResponse), StatusCodes.Status404NotFound)]
@@ -101,7 +101,7 @@ public sealed class InvoicesController : ApiControllerBase
 
     /// <summary>Voids an unpaid invoice with no recorded payments.</summary>
     [HttpPost("{id:guid}/void")]
-    [Authorize(Policy = Permissions.InvoicesManage)]
+    [Authorize(Policy = Permissions.InvoicesVoid)]
     [ProducesResponseType(StatusCodes.Status204NoContent)]
     [ProducesResponseType(typeof(ApiErrorResponse), StatusCodes.Status404NotFound)]
     [ProducesResponseType(typeof(ApiErrorResponse), StatusCodes.Status409Conflict)]

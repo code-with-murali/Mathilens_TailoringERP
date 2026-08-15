@@ -34,7 +34,7 @@ public sealed class MeasurementsController : ApiControllerBase
 
     /// <summary>Records a new garment-type measurement set for a customer.</summary>
     [HttpPost("customers/{customerId:guid}/measurements")]
-    [Authorize(Policy = Permissions.MeasurementsManage)]
+    [Authorize(Policy = Permissions.MeasurementsCreate)]
     [ProducesResponseType(typeof(ApiResponse<MeasurementDto>), StatusCodes.Status200OK)]
     [ProducesResponseType(typeof(ApiErrorResponse), StatusCodes.Status400BadRequest)]
     [ProducesResponseType(typeof(ApiErrorResponse), StatusCodes.Status404NotFound)]
@@ -67,7 +67,7 @@ public sealed class MeasurementsController : ApiControllerBase
 
     /// <summary>Updates a measurement's values, snapshotting the previous values into history first.</summary>
     [HttpPut("measurements/{id:guid}")]
-    [Authorize(Policy = Permissions.MeasurementsManage)]
+    [Authorize(Policy = Permissions.MeasurementsEdit)]
     [ProducesResponseType(typeof(ApiResponse<MeasurementDto>), StatusCodes.Status200OK)]
     [ProducesResponseType(typeof(ApiErrorResponse), StatusCodes.Status400BadRequest)]
     [ProducesResponseType(typeof(ApiErrorResponse), StatusCodes.Status404NotFound)]
@@ -106,7 +106,7 @@ public sealed class MeasurementsController : ApiControllerBase
 
     /// <summary>Replaces one garment type's measurement points and their order. Configuration, so it takes Settings.Manage.</summary>
     [HttpPut("measurements/templates/{garmentType}")]
-    [Authorize(Policy = Permissions.SettingsManage)]
+    [Authorize(Policy = Permissions.SettingsEdit)]
     [ProducesResponseType(typeof(ApiResponse<MeasurementTemplateDto>), StatusCodes.Status200OK)]
     [ProducesResponseType(typeof(ApiErrorResponse), StatusCodes.Status400BadRequest)]
     public async Task<IActionResult> SetTemplate(
@@ -120,7 +120,7 @@ public sealed class MeasurementsController : ApiControllerBase
 
     /// <summary>Restores a garment type to the built-in measurement points.</summary>
     [HttpDelete("measurements/templates/{garmentType}")]
-    [Authorize(Policy = Permissions.SettingsManage)]
+    [Authorize(Policy = Permissions.SettingsEdit)]
     [ProducesResponseType(typeof(ApiResponse<MeasurementTemplateDto>), StatusCodes.Status200OK)]
     public async Task<IActionResult> ResetTemplate(GarmentType garmentType, CancellationToken cancellationToken)
     {

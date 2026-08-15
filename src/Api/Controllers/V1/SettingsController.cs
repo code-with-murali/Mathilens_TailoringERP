@@ -29,7 +29,7 @@ public sealed class SettingsController : ApiControllerBase
 
     /// <summary>Creates or updates a setting's value — settings are written only through explicit administrative action (02_DATABASE.md § 10.12).</summary>
     [HttpPut("{key}")]
-    [Authorize(Policy = Permissions.SettingsManage)]
+    [Authorize(Policy = Permissions.SettingsEdit)]
     [ProducesResponseType(typeof(ApiResponse<SettingDto>), StatusCodes.Status200OK)]
     [ProducesResponseType(typeof(ApiErrorResponse), StatusCodes.Status400BadRequest)]
     public async Task<IActionResult> Upsert(string key, [FromBody] UpsertSettingRequest request, CancellationToken cancellationToken)
@@ -63,7 +63,7 @@ public sealed class SettingsController : ApiControllerBase
 
     /// <summary>Removes a setting entirely.</summary>
     [HttpDelete("{key}")]
-    [Authorize(Policy = Permissions.SettingsManage)]
+    [Authorize(Policy = Permissions.SettingsEdit)]
     [ProducesResponseType(StatusCodes.Status204NoContent)]
     [ProducesResponseType(typeof(ApiErrorResponse), StatusCodes.Status404NotFound)]
     public async Task<IActionResult> Delete(string key, CancellationToken cancellationToken)

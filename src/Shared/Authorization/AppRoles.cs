@@ -66,14 +66,19 @@ public static class AppRoles
         [Tailor] = TailorPermissions,
     };
 
-    /// <summary>What the given roles grant, combined. An unknown role contributes nothing rather than throwing — a stale role claim in an old token must not crash the request.</summary>
+    /// <summary>
+    /// What the given roles grant, combined. An unknown role contributes nothing rather than
+    /// throwing — a stale role claim in an old token must not crash the request, and a role the
+    /// shop created itself carries only what it has been given on the User Rights screen.
+    ///
+    /// The sets above are written in terms of <c>Manage</c>; this widens them to the individual
+    /// actions endpoints now demand.
+    /// </summary>
     public static IReadOnlyList<string> PermissionsFor(IEnumerable<string> roles) =>
-        roles
-            .Where(role => ByRole.ContainsKey(role))
-            .SelectMany(role => ByRole[role])
-            .Distinct(StringComparer.Ordinal)
-            .OrderBy(permission => permission, StringComparer.Ordinal)
-            .ToList();
+        Permissions.Expand(roles.Where(ByRole.ContainsKey).SelectMany(role => ByRole[role]));
+
+    /// <summary>True for the four roles shipped with the system, which cannot be renamed or removed.</summary>
+    public static bool IsBuiltIn(string role) => ByRole.ContainsKey(role);
 
     public static bool IsKnownRole(string role) => ByRole.ContainsKey(role);
 }

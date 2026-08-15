@@ -21,12 +21,21 @@ public sealed class UsersController : ApiControllerBase
 {
     private readonly IUserAdminService _userAdminService;
     private readonly IRolePermissionService _rolePermissions;
+    private readonly IRoleAdminService _roleAdmin;
+    private readonly IRoleCatalog _roleCatalog;
     private readonly ISender _sender;
 
-    public UsersController(IUserAdminService userAdminService, IRolePermissionService rolePermissions, ISender sender)
+    public UsersController(
+        IUserAdminService userAdminService,
+        IRolePermissionService rolePermissions,
+        IRoleAdminService roleAdmin,
+        IRoleCatalog roleCatalog,
+        ISender sender)
     {
         _userAdminService = userAdminService;
         _rolePermissions = rolePermissions;
+        _roleAdmin = roleAdmin;
+        _roleCatalog = roleCatalog;
         _sender = sender;
     }
 
@@ -63,15 +72,56 @@ public sealed class UsersController : ApiControllerBase
         return ToPagedActionResult(Result.Success(users));
     }
 
-    /// <summary>The roles that can be assigned, so the UI never offers one the server would reject.</summary>
+    /// <summary>
+    /// The roles that can be assigned, so the UI never offers one the server would reject.
+    /// Read from the role store rather than a fixed list — a shop's own roles belong in the
+    /// dropdown alongside the four that ship with the system.
+    /// </summary>
     [HttpGet("roles")]
     [Authorize(Policy = Permissions.UsersView)]
     [ProducesResponseType(typeof(ApiResponse<IReadOnlyList<string>>), StatusCodes.Status200OK)]
-    public IActionResult Roles() => Ok(ApiResponse<IReadOnlyList<string>>.Ok(AppRoles.All));
+    public async Task<IActionResult> Roles(CancellationToken cancellationToken) =>
+        Ok(ApiResponse<IReadOnlyList<string>>.Ok(await _roleCatalog.ListRoleNamesAsync(cancellationToken)));
+
+    /// <summary>Every role with whether it is built in and how many people hold it — the User Roles screen.</summary>
+    [HttpGet("roles/details")]
+    [Authorize(Policy = Permissions.UsersRoles)]
+    [ProducesResponseType(typeof(ApiResponse<IReadOnlyList<AppRoleDto>>), StatusCodes.Status200OK)]
+    public async Task<IActionResult> RoleDetails(CancellationToken cancellationToken) =>
+        Ok(ApiResponse<IReadOnlyList<AppRoleDto>>.Ok(await _roleAdmin.ListAsync(cancellationToken)));
+
+    /// <summary>Adds a role. It starts with no rights at all until User Rights says otherwise.</summary>
+    [HttpPost("roles")]
+    [Authorize(Policy = Permissions.UsersRoles)]
+    [ProducesResponseType(typeof(ApiResponse<AppRoleDto>), StatusCodes.Status200OK)]
+    [ProducesResponseType(typeof(ApiErrorResponse), StatusCodes.Status400BadRequest)]
+    [ProducesResponseType(typeof(ApiErrorResponse), StatusCodes.Status409Conflict)]
+    public async Task<IActionResult> CreateRole([FromBody] SaveRoleRequest request, CancellationToken cancellationToken) =>
+        ToActionResult(await _roleAdmin.CreateAsync(request.Name, cancellationToken));
+
+    /// <summary>Renames a role, carrying its configured rights across with it.</summary>
+    [HttpPut("roles/{id:guid}")]
+    [Authorize(Policy = Permissions.UsersRoles)]
+    [ProducesResponseType(typeof(ApiResponse<AppRoleDto>), StatusCodes.Status200OK)]
+    [ProducesResponseType(typeof(ApiErrorResponse), StatusCodes.Status400BadRequest)]
+    [ProducesResponseType(typeof(ApiErrorResponse), StatusCodes.Status404NotFound)]
+    [ProducesResponseType(typeof(ApiErrorResponse), StatusCodes.Status409Conflict)]
+    public async Task<IActionResult> RenameRole(Guid id, [FromBody] SaveRoleRequest request, CancellationToken cancellationToken) =>
+        ToActionResult(await _roleAdmin.RenameAsync(id, request.Name, cancellationToken));
+
+    /// <summary>Removes a role. Refused while anyone still holds it, and for the built-in four.</summary>
+    [HttpDelete("roles/{id:guid}")]
+    [Authorize(Policy = Permissions.UsersRoles)]
+    [ProducesResponseType(StatusCodes.Status204NoContent)]
+    [ProducesResponseType(typeof(ApiErrorResponse), StatusCodes.Status400BadRequest)]
+    [ProducesResponseType(typeof(ApiErrorResponse), StatusCodes.Status404NotFound)]
+    [ProducesResponseType(typeof(ApiErrorResponse), StatusCodes.Status409Conflict)]
+    public async Task<IActionResult> DeleteRole(Guid id, CancellationToken cancellationToken) =>
+        ToActionResult(await _roleAdmin.DeleteAsync(id, cancellationToken));
 
     /// <summary>Creates a login and assigns its role.</summary>
     [HttpPost]
-    [Authorize(Policy = Permissions.UsersManage)]
+    [Authorize(Policy = Permissions.UsersCreate)]
     [ProducesResponseType(typeof(ApiResponse<AppUserDto>), StatusCodes.Status200OK)]
     [ProducesResponseType(typeof(ApiErrorResponse), StatusCodes.Status400BadRequest)]
     [ProducesResponseType(typeof(ApiErrorResponse), StatusCodes.Status409Conflict)]
@@ -83,7 +133,7 @@ public sealed class UsersController : ApiControllerBase
 
     /// <summary>Changes a user's role. Refused if it would remove the last Owner.</summary>
     [HttpPut("{id:guid}/role")]
-    [Authorize(Policy = Permissions.UsersManage)]
+    [Authorize(Policy = Permissions.UsersEdit)]
     [ProducesResponseType(StatusCodes.Status204NoContent)]
     [ProducesResponseType(typeof(ApiErrorResponse), StatusCodes.Status400BadRequest)]
     [ProducesResponseType(typeof(ApiErrorResponse), StatusCodes.Status404NotFound)]
@@ -99,7 +149,7 @@ public sealed class UsersController : ApiControllerBase
     /// revoking their refresh tokens.
     /// </summary>
     [HttpPost("{id:guid}/password")]
-    [Authorize(Policy = Permissions.UsersManage)]
+    [Authorize(Policy = Permissions.UsersPassword)]
     [ProducesResponseType(StatusCodes.Status204NoContent)]
     [ProducesResponseType(typeof(ApiErrorResponse), StatusCodes.Status400BadRequest)]
     [ProducesResponseType(typeof(ApiErrorResponse), StatusCodes.Status404NotFound)]
@@ -135,7 +185,7 @@ public sealed class UsersController : ApiControllerBase
     /// stored, so reopening this screen cannot show it again.
     /// </summary>
     [HttpPost("{id:guid}/reset-code")]
-    [Authorize(Policy = Permissions.UsersManage)]
+    [Authorize(Policy = Permissions.UsersPassword)]
     [ProducesResponseType(typeof(ApiResponse<PasswordResetCodeDto>), StatusCodes.Status200OK)]
     [ProducesResponseType(typeof(ApiErrorResponse), StatusCodes.Status404NotFound)]
     public async Task<IActionResult> IssueResetCode(Guid id, CancellationToken cancellationToken)
@@ -165,7 +215,7 @@ public sealed class UsersController : ApiControllerBase
     }
 
     [HttpPut("role-permissions/{role}")]
-    [Authorize(Policy = Permissions.UsersManage)]
+    [Authorize(Policy = Permissions.UsersRights)]
     [ProducesResponseType(typeof(ApiResponse<RolePermissionsDto>), StatusCodes.Status200OK)]
     [ProducesResponseType(typeof(ApiErrorResponse), StatusCodes.Status400BadRequest)]
     public async Task<IActionResult> SetRolePermissions(
@@ -179,7 +229,7 @@ public sealed class UsersController : ApiControllerBase
 
     /// <summary>Restores a role to its built-in permissions.</summary>
     [HttpDelete("role-permissions/{role}")]
-    [Authorize(Policy = Permissions.UsersManage)]
+    [Authorize(Policy = Permissions.UsersRights)]
     [ProducesResponseType(typeof(ApiResponse<RolePermissionsDto>), StatusCodes.Status200OK)]
     [ProducesResponseType(typeof(ApiErrorResponse), StatusCodes.Status400BadRequest)]
     public async Task<IActionResult> ResetRolePermissions(string role, CancellationToken cancellationToken)

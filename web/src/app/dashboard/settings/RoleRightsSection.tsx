@@ -29,67 +29,89 @@ const SCREEN_LABELS: Record<string, string> = {
 };
 
 /**
- * What each tick actually permits, spelled out.
+ * What each tick actually permits, screen by screen and action by action.
  *
- * "Manage" on its own does not say whether it includes deleting, or assigning, or taking payment —
- * and an Owner handing out access is entitled to know before they tick it.
+ * Every action has its own box now, so this is no longer one sentence per column — it is what
+ * "Retire" means on Employees as against what "Delete" means on Orders. An Owner handing out
+ * access is entitled to know before they tick it, and "Status" on its own does not say whether
+ * that includes handing the garment over.
  */
-const SCREEN_ACTIONS: Record<string, { view: string; manage?: string }> = {
+const ACTION_LABELS: Record<string, Record<string, string>> = {
   Customers: {
-    view: "See customers and their history",
-    manage: "Add, edit and delete customers",
+    View: "See customers and their history",
+    Create: "Add a customer",
+    Edit: "Change a customer's details",
+    Delete: "Delete a customer",
+    Import: "Import customers from a file",
   },
   Measurements: {
-    view: "See measurements and past versions",
-    manage: "Record and correct measurements",
+    View: "See measurements and past versions",
+    Create: "Record a new measurement",
+    Edit: "Correct a measurement",
   },
   Employees: {
-    view: "See staff records and their order history",
-    manage: "Add and edit staff, and retire them",
+    View: "See staff records and their order history",
+    Create: "Add a member of staff",
+    Edit: "Change a staff record",
+    Retire: "Retire staff and bring them back",
+    Import: "Import staff from a file",
   },
   Orders: {
-    view: "See orders and where they stand",
-    manage: "Create and edit orders, assign staff, change status",
+    View: "See orders and where they stand",
+    Create: "Take a new order",
+    Edit: "Change an order and its items",
+    Delete: "Delete an order",
+    Assign: "Assign an order to a tailor",
+    Status: "Move an order along, including delivering it",
   },
   Invoices: {
-    view: "See invoices and what is owed",
-    manage: "Raise invoices, take payments, apply discounts",
+    View: "See invoices and what is owed",
+    Create: "Raise an invoice",
+    Payment: "Take payments",
+    Void: "Void an invoice",
   },
   WhatsApp: {
-    view: "See messages sent to customers",
-    manage: "Send messages",
+    View: "See messages sent to customers",
+    Send: "Send messages",
   },
   Reports: {
-    view: "Open every report, including birthdays and anniversaries",
+    View: "Open every report, including birthdays and anniversaries",
   },
   Pricing: {
-    view: "See the cloth price list",
-    manage: "Add and change prices",
+    View: "See the cloth price list",
+    Create: "Add a price",
+    Edit: "Change a price",
+    Delete: "Remove a price",
+    Import: "Import prices from a file",
   },
   Inventory: {
-    view: "See cloth receipts and stock levels",
-    manage: "Record cloth arriving",
+    View: "See cloth receipts and stock levels",
+    Create: "Record cloth arriving",
   },
   Settings: {
-    view: "Open settings screens",
-    manage: "Change order duration and measurement templates",
+    View: "Open settings screens",
+    Edit: "Change settings and measurement templates",
   },
   Activity: {
-    view: "See who did what, and when",
+    View: "See who did what, and when",
   },
   Users: {
-    view: "See who can sign in and their roles",
-    manage: "Create users, set roles, reset passwords, change these rights",
+    View: "See who can sign in and their roles",
+    Create: "Add a user",
+    Edit: "Change a user's role",
+    Password: "Set passwords and issue reset codes",
+    Rights: "Change these rights",
+    Roles: "Add, rename and delete roles",
   },
 };
 
 /**
- * Which screens a role may see, and whether it may change anything on them.
+ * Which screens a role may see, and which individual actions it may take on them.
  *
  * Owner is deliberately not editable — it always holds every permission. It is the only role
- * guaranteed to carry Users.Manage, so a shop that stripped it would have nobody left able to
- * grant access to anyone, including to undo that change. The server refuses it too; this just
- * makes the reason visible instead of the save failing.
+ * guaranteed to carry the right to hand out access, so a shop that stripped it would have nobody
+ * left able to grant access to anyone, including to undo that change. The server refuses it too;
+ * this just makes the reason visible instead of the save failing.
  */
 export function RoleRightsSection() {
   const { showToast } = useToast();
@@ -101,9 +123,9 @@ export function RoleRightsSection() {
   const [isSaving, setIsSaving] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
-  // Editing rights is access control, so it takes Users.Manage rather than Settings.Manage —
+  // Editing rights is access control, so it takes its own permission rather than Settings.Manage —
   // otherwise a Manager could grant themselves the right to hand out access.
-  const canEditRights = can(PERMISSIONS.usersManage);
+  const canEditRights = can(PERMISSIONS.usersRights);
 
   const load = useCallback(async () => {
     setIsLoading(true);
@@ -138,29 +160,36 @@ export function RoleRightsSection() {
     current !== undefined && JSON.stringify([...selected].sort()) !== JSON.stringify([...current.permissions].sort());
 
   /**
-   * Toggling one box can move the other, because the two are not independent.
+   * Toggling one box can move others, because they are not independent.
    *
-   * Manage without View is a role that may change things on a screen it cannot open — the menu
+   * An action without View is a role that may change things on a screen it cannot open — the menu
    * hides it, every list is unreachable, and the rights table still claims they can edit. So
-   * ticking Manage ticks View, and clearing View clears Manage with it. View is the base right;
-   * Manage is something added on top of it.
+   * ticking any action ticks View, and clearing View clears every action on that screen with it.
+   * View is the base right; everything else is added on top of it.
    */
   function toggle(permission: string) {
     const [screen, action] = permission.split(".");
     const view = `${screen}.View`;
-    const manage = `${screen}.Manage`;
 
     setSelected((previous) => {
-      const has = previous.includes(permission);
-      const without = previous.filter((p) => p !== permission);
-
-      if (has) {
-        return action === "View" ? without.filter((p) => p !== manage) : without;
+      if (previous.includes(permission)) {
+        return action === "View"
+          ? previous.filter((p) => !p.startsWith(`${screen}.`))
+          : previous.filter((p) => p !== permission);
       }
 
       const added = [...previous, permission];
-      return action === "Manage" && !added.includes(view) ? [...added, view] : added;
+      return action === "View" || added.includes(view) ? added : [...added, view];
     });
+  }
+
+  /** Every box on one screen at once — a twelve-action row is not something to tick one at a time. */
+  function toggleScreen(screen: string, permissions: string[], allOn: boolean) {
+    setSelected((previous) =>
+      allOn
+        ? previous.filter((p) => !p.startsWith(`${screen}.`))
+        : [...previous.filter((p) => !p.startsWith(`${screen}.`)), ...permissions],
+    );
   }
 
   async function handleSave() {
@@ -198,12 +227,12 @@ export function RoleRightsSection() {
   }
 
   return (
-    <div className="flex flex-col gap-4 rounded-lg border border-border bg-surface p-6">
+    <div className="flex flex-col gap-4 rounded-lg border border-border bg-surface p-4 sm:p-6">
       <div>
         <h2 className="text-lg font-semibold">Role &amp; Screen Rights</h2>
         <p className="text-sm text-foreground/70">
-          Which screens each role can open, and whether they can change anything there. Takes effect on their next
-          action — nobody has to sign out and back in.
+          Which screens each role can open, and which actions it can take there. Takes effect on their next action —
+          nobody has to sign out and back in.
         </p>
       </div>
 
@@ -215,7 +244,7 @@ export function RoleRightsSection() {
         </p>
       ) : (
         <>
-          <div className="flex flex-col gap-1">
+          <div className="flex flex-col gap-1 sm:max-w-xs">
             <label htmlFor="rightsRole" className="text-sm font-medium">
               Role
             </label>
@@ -242,54 +271,57 @@ export function RoleRightsSection() {
             </p>
           )}
 
-          <div className="overflow-x-auto rounded-lg border border-border">
-            <table className="w-full text-left text-sm">
-              <thead className="border-b border-border bg-background/40">
-                <tr>
-                  <th className="w-40 px-4 py-2 font-medium">Screen</th>
-                  <th className="px-4 py-2 font-medium">View</th>
-                  <th className="px-4 py-2 font-medium">Manage</th>
-                </tr>
-              </thead>
-              <tbody>
-                {matrix.screens.map((screen) => {
-                  const view = screen.permissions.find((p) => p.action === "View");
-                  const manage = screen.permissions.find((p) => p.action === "Manage");
-                  const actions = SCREEN_ACTIONS[screen.screen];
-                  return (
-                    <tr key={screen.screen} className="border-b border-border align-top last:border-0">
-                      <td className="px-4 py-3 font-medium">{SCREEN_LABELS[screen.screen] ?? screen.screen}</td>
-                      {([
-                        [view, actions?.view],
-                        [manage, actions?.manage],
-                      ] as const).map(([entry, described], index) => (
-                        <td key={index} className="px-4 py-3">
-                          {/* A screen that defines no Manage action shows nothing rather than a
-                              checkbox that could never mean anything. */}
-                          {entry ? (
-                            <label className="flex cursor-pointer items-start gap-2">
-                              <input
-                                type="checkbox"
-                                checked={selected.includes(entry.permission)}
-                                disabled={!isEditable || isSaving}
-                                onChange={() => toggle(entry.permission)}
-                                aria-label={`${entry.action} ${screen.screen}`}
-                                className="mt-0.5 h-4 w-4 shrink-0 accent-primary disabled:cursor-not-allowed disabled:opacity-50"
-                              />
-                              {/* What the tick actually permits, in the shop's words. "Manage" alone
-                                  does not say whether it includes deleting. */}
-                              <span className="text-foreground/70">{described ?? entry.action}</span>
-                            </label>
-                          ) : (
-                            <span className="text-foreground/30">—</span>
-                          )}
-                        </td>
-                      ))}
-                    </tr>
-                  );
-                })}
-              </tbody>
-            </table>
+          {/*
+            One block per screen rather than a row per screen with a column per action: the actions
+            differ from screen to screen — Orders has Assign and Status, Invoices has Payment and
+            Void — so a shared column header could only have been "Manage" again. Blocks also fit a
+            phone, where a twelve-column grid could not.
+          */}
+          <div className="flex flex-col gap-3">
+            {matrix.screens.map((screen) => {
+              const permissions = screen.permissions.map((p) => p.permission);
+              const allOn = permissions.every((p) => selected.includes(p));
+              const anyOn = permissions.some((p) => selected.includes(p));
+
+              return (
+                <div key={screen.screen} className="rounded-lg border border-border p-3 sm:p-4">
+                  <div className="flex flex-wrap items-center justify-between gap-2 border-b border-border pb-2">
+                    <h3 className="font-medium">{SCREEN_LABELS[screen.screen] ?? screen.screen}</h3>
+                    <button
+                      type="button"
+                      onClick={() => toggleScreen(screen.screen, permissions, allOn)}
+                      disabled={!isEditable || isSaving}
+                      className="text-sm text-primary hover:underline disabled:cursor-not-allowed disabled:text-foreground/30 disabled:no-underline"
+                    >
+                      {allOn ? "Clear all" : anyOn ? "Select all" : "Select all"}
+                    </button>
+                  </div>
+
+                  <div className="mt-3 grid gap-2 sm:grid-cols-2 lg:grid-cols-3">
+                    {screen.permissions.map((entry) => (
+                      <label key={entry.permission} className="flex cursor-pointer items-start gap-2 text-sm">
+                        <input
+                          type="checkbox"
+                          checked={selected.includes(entry.permission)}
+                          disabled={!isEditable || isSaving}
+                          onChange={() => toggle(entry.permission)}
+                          aria-label={`${entry.action} — ${SCREEN_LABELS[screen.screen] ?? screen.screen}`}
+                          className="mt-0.5 h-4 w-4 shrink-0 accent-primary disabled:cursor-not-allowed disabled:opacity-50"
+                        />
+                        <span className="min-w-0">
+                          <span className="font-medium">{entry.action}</span>
+                          {/* What the tick actually permits, in the shop's words. "Status" alone
+                              does not say whether it includes handing the garment over. */}
+                          <span className="block text-foreground/60">
+                            {ACTION_LABELS[screen.screen]?.[entry.action] ?? entry.action}
+                          </span>
+                        </span>
+                      </label>
+                    ))}
+                  </div>
+                </div>
+              );
+            })}
           </div>
 
           {error && (
@@ -299,7 +331,7 @@ export function RoleRightsSection() {
           )}
 
           {isEditable && (
-            <div className="flex items-center justify-between gap-3">
+            <div className="flex flex-wrap items-center justify-between gap-3">
               <button
                 type="button"
                 onClick={handleReset}

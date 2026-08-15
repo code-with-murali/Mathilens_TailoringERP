@@ -68,7 +68,7 @@ public sealed class EmployeesController : ApiControllerBase
     /// phone number and no Id has nothing to match on and is always inserted.
     /// </summary>
     [HttpPost("import")]
-    [Authorize(Policy = Permissions.EmployeesManage)]
+    [Authorize(Policy = Permissions.EmployeesImport)]
     [RequestSizeLimit(ImportLimits.MaxFileBytes)]
     [ProducesResponseType(typeof(ApiResponse<ImportResultDto>), StatusCodes.Status200OK)]
     [ProducesResponseType(typeof(ApiErrorResponse), StatusCodes.Status400BadRequest)]
@@ -108,7 +108,7 @@ public sealed class EmployeesController : ApiControllerBase
 
     /// <summary>Creates a new employee.</summary>
     [HttpPost]
-    [Authorize(Policy = Permissions.EmployeesManage)]
+    [Authorize(Policy = Permissions.EmployeesCreate)]
     [ProducesResponseType(typeof(ApiResponse<EmployeeDto>), StatusCodes.Status200OK)]
     [ProducesResponseType(typeof(ApiErrorResponse), StatusCodes.Status400BadRequest)]
     public async Task<IActionResult> Create([FromBody] CreateEmployeeRequest request, CancellationToken cancellationToken)
@@ -146,7 +146,7 @@ public sealed class EmployeesController : ApiControllerBase
 
     /// <summary>Updates an existing employee's details.</summary>
     [HttpPut("{id:guid}")]
-    [Authorize(Policy = Permissions.EmployeesManage)]
+    [Authorize(Policy = Permissions.EmployeesEdit)]
     [ProducesResponseType(typeof(ApiResponse<EmployeeDto>), StatusCodes.Status200OK)]
     [ProducesResponseType(typeof(ApiErrorResponse), StatusCodes.Status400BadRequest)]
     [ProducesResponseType(typeof(ApiErrorResponse), StatusCodes.Status404NotFound)]
@@ -169,7 +169,7 @@ public sealed class EmployeesController : ApiControllerBase
     /// does their code and phone number.
     /// </summary>
     [HttpPost("{id:guid}/retire")]
-    [Authorize(Policy = Permissions.EmployeesManage)]
+    [Authorize(Policy = Permissions.EmployeesRetire)]
     [ProducesResponseType(typeof(ApiResponse<EmployeeDto>), StatusCodes.Status200OK)]
     [ProducesResponseType(typeof(ApiErrorResponse), StatusCodes.Status400BadRequest)]
     [ProducesResponseType(typeof(ApiErrorResponse), StatusCodes.Status404NotFound)]

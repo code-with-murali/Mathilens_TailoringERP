@@ -29,7 +29,7 @@ public sealed class WhatsAppMessagesController : ApiControllerBase
 
     /// <summary>Sends a WhatsApp message to a customer and logs the attempt/outcome.</summary>
     [HttpPost]
-    [Authorize(Policy = Permissions.WhatsAppManage)]
+    [Authorize(Policy = Permissions.WhatsAppSend)]
     [ProducesResponseType(typeof(ApiResponse<WhatsAppMessageDto>), StatusCodes.Status200OK)]
     [ProducesResponseType(typeof(ApiErrorResponse), StatusCodes.Status400BadRequest)]
     [ProducesResponseType(typeof(ApiErrorResponse), StatusCodes.Status404NotFound)]

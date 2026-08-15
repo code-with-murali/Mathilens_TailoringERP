@@ -38,7 +38,7 @@ public sealed class OrdersController : ApiControllerBase
 
     /// <summary>Creates a new order with its initial garment items (and, optionally, their fabric details).</summary>
     [HttpPost]
-    [Authorize(Policy = Permissions.OrdersManage)]
+    [Authorize(Policy = Permissions.OrdersCreate)]
     [ProducesResponseType(typeof(ApiResponse<OrderDto>), StatusCodes.Status200OK)]
     [ProducesResponseType(typeof(ApiErrorResponse), StatusCodes.Status400BadRequest)]
     [ProducesResponseType(typeof(ApiErrorResponse), StatusCodes.Status404NotFound)]
@@ -63,7 +63,7 @@ public sealed class OrdersController : ApiControllerBase
 
     /// <summary>Updates an open order's header details — customer, assigned employee, due date and notes.</summary>
     [HttpPut("{id:guid}")]
-    [Authorize(Policy = Permissions.OrdersManage)]
+    [Authorize(Policy = Permissions.OrdersEdit)]
     [ProducesResponseType(typeof(ApiResponse<OrderDto>), StatusCodes.Status200OK)]
     [ProducesResponseType(typeof(ApiErrorResponse), StatusCodes.Status400BadRequest)]
     [ProducesResponseType(typeof(ApiErrorResponse), StatusCodes.Status404NotFound)]
@@ -77,7 +77,7 @@ public sealed class OrdersController : ApiControllerBase
 
     /// <summary>Soft-deletes an order. Refused with 409 once the order has been invoiced.</summary>
     [HttpDelete("{id:guid}")]
-    [Authorize(Policy = Permissions.OrdersManage)]
+    [Authorize(Policy = Permissions.OrdersDelete)]
     [ProducesResponseType(StatusCodes.Status204NoContent)]
     [ProducesResponseType(typeof(ApiErrorResponse), StatusCodes.Status404NotFound)]
     [ProducesResponseType(typeof(ApiErrorResponse), StatusCodes.Status409Conflict)]
@@ -133,7 +133,7 @@ public sealed class OrdersController : ApiControllerBase
 
     /// <summary>Adds a garment item to an existing (not yet delivered/cancelled) order.</summary>
     [HttpPost("{id:guid}/items")]
-    [Authorize(Policy = Permissions.OrdersManage)]
+    [Authorize(Policy = Permissions.OrdersEdit)]
     [ProducesResponseType(typeof(ApiResponse<OrderDto>), StatusCodes.Status200OK)]
     [ProducesResponseType(typeof(ApiErrorResponse), StatusCodes.Status400BadRequest)]
     [ProducesResponseType(typeof(ApiErrorResponse), StatusCodes.Status404NotFound)]
@@ -147,7 +147,7 @@ public sealed class OrdersController : ApiControllerBase
 
     /// <summary>Updates a garment item's type, quantity and price on an open order. Its fabric details are unaffected.</summary>
     [HttpPut("{id:guid}/items/{itemId:guid}")]
-    [Authorize(Policy = Permissions.OrdersManage)]
+    [Authorize(Policy = Permissions.OrdersEdit)]
     [ProducesResponseType(typeof(ApiResponse<OrderDto>), StatusCodes.Status200OK)]
     [ProducesResponseType(typeof(ApiErrorResponse), StatusCodes.Status400BadRequest)]
     [ProducesResponseType(typeof(ApiErrorResponse), StatusCodes.Status404NotFound)]
@@ -161,7 +161,7 @@ public sealed class OrdersController : ApiControllerBase
 
     /// <summary>Removes a garment item from an open order. An order must keep at least one item.</summary>
     [HttpDelete("{id:guid}/items/{itemId:guid}")]
-    [Authorize(Policy = Permissions.OrdersManage)]
+    [Authorize(Policy = Permissions.OrdersEdit)]
     [ProducesResponseType(typeof(ApiResponse<OrderDto>), StatusCodes.Status200OK)]
     [ProducesResponseType(typeof(ApiErrorResponse), StatusCodes.Status404NotFound)]
     [ProducesResponseType(typeof(ApiErrorResponse), StatusCodes.Status409Conflict)]
@@ -173,7 +173,7 @@ public sealed class OrdersController : ApiControllerBase
 
     /// <summary>Sets (or replaces) the fabric details for one of an order's items.</summary>
     [HttpPut("{id:guid}/items/{itemId:guid}/fabric")]
-    [Authorize(Policy = Permissions.OrdersManage)]
+    [Authorize(Policy = Permissions.OrdersEdit)]
     [ProducesResponseType(typeof(ApiResponse<OrderDto>), StatusCodes.Status200OK)]
     [ProducesResponseType(typeof(ApiErrorResponse), StatusCodes.Status400BadRequest)]
     [ProducesResponseType(typeof(ApiErrorResponse), StatusCodes.Status404NotFound)]
@@ -190,7 +190,7 @@ public sealed class OrdersController : ApiControllerBase
     /// Delivering requires a delivery date, and is refused with 409 while any amount is still outstanding on the order.
     /// </summary>
     [HttpPut("{id:guid}/status")]
-    [Authorize(Policy = Permissions.OrdersManage)]
+    [Authorize(Policy = Permissions.OrdersStatus)]
     [ProducesResponseType(typeof(ApiResponse<OrderDto>), StatusCodes.Status200OK)]
     [ProducesResponseType(typeof(ApiErrorResponse), StatusCodes.Status400BadRequest)]
     [ProducesResponseType(typeof(ApiErrorResponse), StatusCodes.Status404NotFound)]
@@ -203,7 +203,7 @@ public sealed class OrdersController : ApiControllerBase
 
     /// <summary>Assigns (or reassigns) the employee responsible for an order.</summary>
     [HttpPut("{id:guid}/employee")]
-    [Authorize(Policy = Permissions.OrdersManage)]
+    [Authorize(Policy = Permissions.OrdersAssign)]
     [ProducesResponseType(typeof(ApiResponse<OrderDto>), StatusCodes.Status200OK)]
     [ProducesResponseType(typeof(ApiErrorResponse), StatusCodes.Status400BadRequest)]
     [ProducesResponseType(typeof(ApiErrorResponse), StatusCodes.Status404NotFound)]

@@ -31,7 +31,7 @@ public sealed class InventoryController : ApiControllerBase
 
     /// <summary>Records a delivery of cloth against a price-list entry.</summary>
     [HttpPost("cloth-receipts")]
-    [Authorize(Policy = Permissions.InventoryManage)]
+    [Authorize(Policy = Permissions.InventoryCreate)]
     [ProducesResponseType(typeof(ApiResponse<ClothReceiptDto>), StatusCodes.Status200OK)]
     [ProducesResponseType(typeof(ApiErrorResponse), StatusCodes.Status400BadRequest)]
     [ProducesResponseType(typeof(ApiErrorResponse), StatusCodes.Status404NotFound)]

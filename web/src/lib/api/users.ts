@@ -11,26 +11,44 @@ export type CurrentUser = {
 
 export type AppUser = { id: string; email: string; role: string | null };
 
-/** Mirrors Permissions.cs. Kept as strings so a permission added server-side needs no client change to be enforced. */
+/**
+ * Mirrors Permissions.cs. Kept as strings so a permission added server-side needs no client change
+ * to be enforced.
+ *
+ * One entry per individual action, matching what the server now demands: a role can be allowed to
+ * add a customer without being allowed to delete one, so a screen asking "can they manage
+ * customers" could no longer answer the question a button needs answered. The `Manage` umbrellas
+ * still exist server-side — they are what the built-in roles are written in terms of, and holding
+ * one grants every action beneath it — but nothing here should check for them.
+ */
 export const PERMISSIONS = {
   customersView: "Customers.View",
-  customersManage: "Customers.Manage",
+  customersCreate: "Customers.Create",
+  customersEdit: "Customers.Edit",
+  customersDelete: "Customers.Delete",
   measurementsView: "Measurements.View",
   employeesView: "Employees.View",
-  employeesManage: "Employees.Manage",
+  employeesCreate: "Employees.Create",
+  employeesEdit: "Employees.Edit",
+  employeesRetire: "Employees.Retire",
   ordersView: "Orders.View",
-  ordersManage: "Orders.Manage",
+  ordersCreate: "Orders.Create",
+  ordersEdit: "Orders.Edit",
   invoicesView: "Invoices.View",
-  invoicesManage: "Invoices.Manage",
+  invoicesCreate: "Invoices.Create",
   whatsAppView: "WhatsApp.View",
   reportsView: "Reports.View",
   pricingView: "Pricing.View",
   inventoryView: "Inventory.View",
-  inventoryManage: "Inventory.Manage",
+  inventoryCreate: "Inventory.Create",
   settingsView: "Settings.View",
   activityView: "Activity.View",
   usersView: "Users.View",
-  usersManage: "Users.Manage",
+  usersCreate: "Users.Create",
+  usersEdit: "Users.Edit",
+  usersPassword: "Users.Password",
+  usersRights: "Users.Rights",
+  usersRoles: "Users.Roles",
 } as const;
 
 export function getCurrentUser(token: string | null) {
@@ -42,8 +60,33 @@ export function listUsers(page: number, pageSize: number, token: string | null) 
   return apiGetPaged<AppUser>(`/api/v1/users?${params}`, token);
 }
 
+/** Just the names, in the order the dropdowns should offer them. Needs only Users.View. */
 export function listRoles(token: string | null) {
   return apiGet<string[]>("/api/v1/users/roles", token);
+}
+
+/**
+ * One assignable role.
+ *
+ * @property isBuiltIn Shipped with the system: its rights can be changed, its name cannot, and it cannot be removed.
+ * @property userCount How many people hold it — a role in use cannot be deleted.
+ */
+export type AppRole = { id: string; name: string; isBuiltIn: boolean; userCount: number };
+
+export function listRoleDetails(token: string | null) {
+  return apiGet<AppRole[]>("/api/v1/users/roles/details", token);
+}
+
+export function createRole(name: string, token: string | null) {
+  return apiPost<AppRole>("/api/v1/users/roles", { name }, token);
+}
+
+export function renameRole(id: string, name: string, token: string | null) {
+  return apiPut<AppRole>(`/api/v1/users/roles/${id}`, { name }, token);
+}
+
+export function deleteRole(id: string, token: string | null) {
+  return apiDelete(`/api/v1/users/roles/${id}`, token);
 }
 
 /** Signs the user out everywhere as well as changing the password — see the API's ResetPassword. */
