@@ -55,6 +55,45 @@ export function getCustomer(id: string, token: string | null) {
   return apiGet<Customer>(`/api/v1/customers/${id}`, token);
 }
 
+/** An existing customer who already holds a contact detail being entered. */
+export type CustomerDuplicate = {
+  id: string;
+  fullName: string;
+  phoneNumber: string;
+  email: string | null;
+  /** Exact match on the normalized number — almost always the same person written down twice. */
+  matchesPhoneNumber: boolean;
+  /** Case-insensitive match. Common and often innocent: families share an address. */
+  matchesEmail: boolean;
+};
+
+/**
+ * Customers already holding this phone number or email.
+ *
+ * <p>Advisory — the server reports, the operator decides. The number is normalized server-side
+ * before comparing, so "8220070363" finds the "+918220070363" already on file.</p>
+ *
+ * @param excludeId the customer being edited, so it isn't reported as its own duplicate.
+ */
+export function findCustomerDuplicates(
+  phoneNumber: string,
+  email: string,
+  token: string | null,
+  excludeId?: string,
+) {
+  const params = new URLSearchParams();
+  if (phoneNumber.trim()) {
+    params.set("phone", phoneNumber.trim());
+  }
+  if (email.trim()) {
+    params.set("email", email.trim());
+  }
+  if (excludeId) {
+    params.set("excludeId", excludeId);
+  }
+  return apiGet<CustomerDuplicate[]>(`/api/v1/customers/duplicates?${params}`, token);
+}
+
 export function createCustomer(input: CustomerInput, token: string | null) {
   return apiPost<Customer>("/api/v1/customers", input, token);
 }

@@ -3,7 +3,9 @@
 import { useState, type FormEvent } from "react";
 import { Button } from "@/components/ui/Button";
 import { Input } from "@/components/ui/Input";
+import { PhoneNumberInput } from "@/components/ui/PhoneNumberInput";
 import { ApiError } from "@/lib/api-client";
+import { emailError, phoneNumberError, toNationalDigits } from "@/lib/contact";
 import {
   EMPLOYMENT_TYPES,
   EMPLOYMENT_TYPE_LABELS,
@@ -40,7 +42,8 @@ export function EmployeeForm({ initialValues = emptyValues, submitLabel, onSubmi
   const [employeeCode, setEmployeeCode] = useState(initialValues.employeeCode);
   const [fullName, setFullName] = useState(initialValues.fullName);
   const [jobTitle, setJobTitle] = useState(initialValues.jobTitle ?? "");
-  const [phoneNumber, setPhoneNumber] = useState(initialValues.phoneNumber ?? "");
+  // Shown as the ten digits the employee would recite; saved records hold "+919876543210".
+  const [phoneNumber, setPhoneNumber] = useState(toNationalDigits(initialValues.phoneNumber ?? ""));
   const [email, setEmail] = useState(initialValues.email ?? "");
   const [joiningDate, setJoiningDate] = useState(initialValues.joiningDate);
   const [employmentType, setEmploymentType] = useState<EmploymentType>(initialValues.employmentType);
@@ -52,6 +55,23 @@ export function EmployeeForm({ initialValues = emptyValues, submitLabel, onSubmi
     event.preventDefault();
     setFormError(null);
     setFieldErrors({});
+
+    // Checked here as well as on the server, so a mistyped number is caught under the cursor
+    // rather than after a round trip. The server is still the authority.
+    const clientErrors: Record<string, string> = {};
+    const phoneProblem = phoneNumberError(phoneNumber);
+    if (phoneProblem) {
+      clientErrors.phonenumber = phoneProblem;
+    }
+    const emailProblem = emailError(email);
+    if (emailProblem) {
+      clientErrors.email = emailProblem;
+    }
+    if (Object.keys(clientErrors).length > 0) {
+      setFieldErrors(clientErrors);
+      return;
+    }
+
     setIsSubmitting(true);
 
     try {
@@ -105,11 +125,10 @@ export function EmployeeForm({ initialValues = emptyValues, submitLabel, onSubmi
         onChange={(e) => setJobTitle(e.target.value)}
         error={fieldErrors.jobtitle}
       />
-      <Input
+      <PhoneNumberInput
         id="phoneNumber"
-        label="Phone number"
         value={phoneNumber}
-        onChange={(e) => setPhoneNumber(e.target.value)}
+        onChange={setPhoneNumber}
         error={fieldErrors.phonenumber}
       />
       <Input

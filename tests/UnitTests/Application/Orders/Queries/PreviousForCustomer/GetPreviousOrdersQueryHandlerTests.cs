@@ -25,7 +25,7 @@ public class GetPreviousOrdersQueryHandlerTests
         var earlier = Order.Create(Guid.NewGuid(), DateTime.UtcNow.AddMonths(-2), null);
         _orderRepository.GetByIdAsync(order.Id, Arg.Any<CancellationToken>()).Returns(order);
         _customerRepository.GetByIdAsync(customer.Id, Arg.Any<CancellationToken>()).Returns(customer);
-        _orderRepository.GetByCustomerPhoneAsync("+91 98765 43210", order.Id, Arg.Any<CancellationToken>())
+        _orderRepository.GetByCustomerPhoneAsync("+919876543210", order.Id, Arg.Any<CancellationToken>())
             .Returns([earlier]);
         _invoiceRepository.GetPaidAmountsForOrdersAsync(Arg.Any<IReadOnlyCollection<Guid>>(), Arg.Any<CancellationToken>())
             .Returns(new Dictionary<Guid, decimal>());
@@ -35,7 +35,7 @@ public class GetPreviousOrdersQueryHandlerTests
         Assert.True(result.IsSuccess);
         // The earlier order sits under a *different* customer id — the same person entered twice.
         Assert.Equal(earlier.Id, Assert.Single(result.Value).Id);
-        await _orderRepository.Received(1).GetByCustomerPhoneAsync("+91 98765 43210", order.Id, Arg.Any<CancellationToken>());
+        await _orderRepository.Received(1).GetByCustomerPhoneAsync("+919876543210", order.Id, Arg.Any<CancellationToken>());
     }
 
     [Fact]

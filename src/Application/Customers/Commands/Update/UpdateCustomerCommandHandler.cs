@@ -1,5 +1,6 @@
 using MathilensERP.Application.Common.Mediator;
 using MathilensERP.Application.Customers;
+using MathilensERP.Shared.Contact;
 using MathilensERP.Shared.Results;
 
 namespace MathilensERP.Application.Customers.Commands.Update;
@@ -22,18 +23,21 @@ public sealed class UpdateCustomerCommandHandler : ICommandHandler<UpdateCustome
                 Error.NotFound("Customer.NotFound", $"No customer was found with id '{command.Id}'."));
         }
 
+        // Canonical form before comparing, for the reason given in the create handler.
+        var phoneNumber = IndianPhoneNumber.Normalize(command.PhoneNumber);
+
         // Same uniqueness rule as create — but the customer's own current number is not a clash.
-        var duplicate = await _customerRepository.GetByPhoneNumberAsync(command.PhoneNumber, cancellationToken);
+        var duplicate = await _customerRepository.GetByPhoneNumberAsync(phoneNumber, cancellationToken);
         if (duplicate is not null && duplicate.Id != command.Id)
         {
             return Result.Failure<CustomerDto>(Error.Conflict(
                 "Customer.DuplicatePhoneNumber",
-                $"A customer with mobile number '{command.PhoneNumber}' already exists ({duplicate.FullName})."));
+                $"A customer with mobile number '{phoneNumber}' already exists ({duplicate.FullName})."));
         }
 
         customer.UpdateDetails(
             command.FullName,
-            command.PhoneNumber,
+            phoneNumber,
             command.Email,
             command.Address,
             command.Notes,

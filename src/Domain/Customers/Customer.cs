@@ -1,4 +1,5 @@
 using MathilensERP.Domain.Common;
+using MathilensERP.Shared.Contact;
 using MathilensERP.Shared.Guards;
 
 namespace MathilensERP.Domain.Customers;
@@ -82,10 +83,18 @@ public sealed class Customer : AuditableEntity
         DateOnly? weddingDate)
     {
         FullName = Guard.AgainstNullOrWhiteSpace(fullName, nameof(fullName));
-        // Trimmed because the phone number is compared for uniqueness — a trailing space must
-        // not be what makes a second customer "different".
-        PhoneNumber = Guard.AgainstNullOrWhiteSpace(phoneNumber, nameof(phoneNumber)).Trim();
-        Email = email;
+        // Stored in one canonical form because the number is compared for uniqueness: a trailing
+        // space, a hyphen, or a missing country code must not be what makes a second customer
+        // "different". Normalizing here rather than only in the handlers makes it structurally
+        // impossible for a write path to store some other shape — including one added later.
+        //
+        // A number that isn't recognized is kept exactly as given rather than mangled toward a
+        // shape it never had; the validators reject those before they reach the domain, and the
+        // rows already in the table predate the rule.
+        PhoneNumber = IndianPhoneNumber.Normalize(
+            Guard.AgainstNullOrWhiteSpace(phoneNumber, nameof(phoneNumber)));
+        // Blank and absent are the same absence, and only one of them can be compared.
+        Email = string.IsNullOrWhiteSpace(email) ? null : email.Trim();
         Address = address;
         Notes = notes;
         Gender = gender;

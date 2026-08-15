@@ -5,6 +5,7 @@ import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { Button } from "@/components/ui/Button";
 import { Input } from "@/components/ui/Input";
+import { PhoneNumberInput, cleanPhoneNumberInput } from "@/components/ui/PhoneNumberInput";
 import { SearchPicker } from "@/components/ui/SearchPicker";
 import { ConfirmDialog } from "@/components/ui/ConfirmDialog";
 import { OrderItemsEditor, type ItemRow } from "@/components/orders/OrderItemsEditor";
@@ -178,7 +179,9 @@ export default function NewOrderPage() {
 
   function startAddingNewCustomer(query: string, field: "name" | "phone" = "name") {
     setNewCustomerName(field === "name" ? query : "");
-    setNewCustomerPhone(field === "phone" ? query : "");
+    // Carried over from the search box, which accepts a name too — so it is cleaned to the same
+    // rule the field enforces rather than dropped in raw.
+    setNewCustomerPhone(field === "phone" ? cleanPhoneNumberInput(query) ?? "" : "");
     setNewCustomerEmail("");
     setNewCustomerError(null);
     setNewCustomerFieldErrors({});
@@ -714,7 +717,7 @@ export default function NewOrderPage() {
                 <div className="orderSection-customer flex flex-col gap-2">
                   <span className="order-heading text-sm font-medium">New customer</span>
                   <Input id="newCustomerName" label="Full name" value={newCustomerName} onChange={(e) => setNewCustomerName(e.target.value)} error={newCustomerFieldErrors.fullname} />
-                  <Input id="newCustomerPhone" label="Phone number" value={newCustomerPhone} onChange={(e) => setNewCustomerPhone(e.target.value)} error={newCustomerFieldErrors.phonenumber} />
+                  <PhoneNumberInput id="newCustomerPhone" value={newCustomerPhone} onChange={setNewCustomerPhone} error={newCustomerFieldErrors.phonenumber} />
                   <Input id="newCustomerEmail" label="Email (optional)" type="email" value={newCustomerEmail} onChange={(e) => setNewCustomerEmail(e.target.value)} error={newCustomerFieldErrors.email} />
                   {newCustomerError && (
                     <p role="alert" className="text-sm text-danger">

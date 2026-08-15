@@ -87,7 +87,7 @@ export default function CustomersPage() {
       <div className="flex items-start justify-between gap-4">
         <h1 className="text-2xl font-semibold">Customers</h1>
         <div className="flex items-start gap-2">
-          <ImportExportButtons resource="customers" label="customers" onImported={loadCustomers} />
+          <ImportExportButtons resource="customers" label="customers" onImported={loadCustomers} previewBeforeImport />
           {/* Opens in place rather than navigating. The list stays on screen behind it, so adding
               a customer no longer costs the page position, the search term and the filters.
               /dashboard/customers/new still works — bookmarks and older links keep resolving. */}

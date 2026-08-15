@@ -1,4 +1,5 @@
 using FluentValidation;
+using MathilensERP.Application.Common.Validation;
 
 namespace MathilensERP.Application.Customers.Commands.Update;
 
@@ -13,14 +14,14 @@ public sealed class UpdateCustomerCommandValidator : AbstractValidator<UpdateCus
             .NotEmpty()
             .MaximumLength(200);
 
+        // Identical to create's, from the one shared definition: a number the counter accepts and
+        // the edit screen then refuses would trap a customer who cannot be saved again.
         RuleFor(x => x.PhoneNumber)
-            .NotEmpty()
-            .Matches(@"^[0-9+\-\s()]{7,20}$")
-            .WithMessage("Phone number must be 7-20 characters and contain only digits, spaces, and + - ( ).");
+            .Cascade(CascadeMode.Stop)
+            .MustBeAnIndianMobileNumber();
 
         RuleFor(x => x.Email)
-            .EmailAddress()
-            .When(x => !string.IsNullOrWhiteSpace(x.Email));
+            .MustBeAnEmailAddressWhenGiven();
 
         RuleFor(x => x.Address)
             .MaximumLength(500);

@@ -39,6 +39,35 @@ export function uploadImport(resource: string, file: File, token: string | null)
   return apiPostFile<ImportResult>(`/api/v1/${resource}/import`, file, token);
 }
 
+/** A row in the upload that collides with an existing customer, or with another row of the file. */
+export type ImportDuplicate = {
+  rowNumber: number;
+  name: string;
+  phoneNumber: string;
+  /** One sentence naming who it collides with and what will happen to it. */
+  reason: string;
+};
+
+/** What an upload would do, worked out without doing it. */
+export type ImportPreview = {
+  totalRows: number;
+  willCreate: number;
+  willUpdate: number;
+  willFail: number;
+  errors: { rowNumber: number; message: string }[];
+  duplicates: ImportDuplicate[];
+};
+
+/**
+ * Dry-runs an upload so the operator sees what it will do before committing (FR-04).
+ *
+ * <p>Writes nothing. The server plans the rows with the same code the real import executes, so
+ * the counts shown here are what the import produces, not an estimate of them.</p>
+ */
+export function previewImport(resource: string, file: File, token: string | null): Promise<ImportPreview> {
+  return apiPostFile<ImportPreview>(`/api/v1/${resource}/import/preview`, file, token);
+}
+
 /** Turns an import result into the one-line summary the list pages toast. */
 export function summarizeImport(result: ImportResult): string {
   const parts = [`${result.created} added`, `${result.updated} updated`];

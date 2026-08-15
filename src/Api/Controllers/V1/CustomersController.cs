@@ -10,6 +10,7 @@ using MathilensERP.Application.Customers.Commands.Create;
 using MathilensERP.Application.Customers.Commands.Delete;
 using MathilensERP.Application.Customers.Commands.Import;
 using MathilensERP.Application.Customers.Commands.Update;
+using MathilensERP.Application.Customers.Queries.FindDuplicates;
 using MathilensERP.Application.Customers.Queries.GetById;
 using MathilensERP.Application.Customers.Queries.ListAll;
 using MathilensERP.Application.Customers.Queries.Search;
@@ -124,10 +125,46 @@ public sealed class CustomersController : ApiControllerBase
     [ProducesResponseType(typeof(ApiErrorResponse), StatusCodes.Status400BadRequest)]
     public async Task<IActionResult> Import(IFormFile file, CancellationToken cancellationToken)
     {
+        var (rows, failure) = await ReadImportRowsAsync(file);
+        if (failure is not null)
+        {
+            return ToActionResult(Result.Failure<ImportResultDto>(failure));
+        }
+
+        var result = await _sender.Send(new ImportCustomersCommand(rows!), cancellationToken);
+        return ToActionResult(result);
+    }
+
+    /// <summary>
+    /// Reports what <see cref="Import"/> would do with this file, without doing any of it (FR-04).
+    ///
+    /// <para>The same upload, sent to the same row planner, so the counts the operator approves are
+    /// the counts they get. Nothing here writes, which is why it is safe to call on every file
+    /// chosen — including the ones the operator then thinks better of.</para>
+    /// </summary>
+    [HttpPost("import/preview")]
+    [Authorize(Policy = Permissions.CustomersManage)]
+    [RequestSizeLimit(ImportLimits.MaxFileBytes)]
+    [ProducesResponseType(typeof(ApiResponse<CustomerImportPreviewDto>), StatusCodes.Status200OK)]
+    [ProducesResponseType(typeof(ApiErrorResponse), StatusCodes.Status400BadRequest)]
+    public async Task<IActionResult> PreviewImport(IFormFile file, CancellationToken cancellationToken)
+    {
+        var (rows, failure) = await ReadImportRowsAsync(file);
+        if (failure is not null)
+        {
+            return ToActionResult(Result.Failure<CustomerImportPreviewDto>(failure));
+        }
+
+        var result = await _sender.Send(new PreviewCustomerImportQuery(rows!), cancellationToken);
+        return ToActionResult(result);
+    }
+
+    /// <summary>Shared by the import and its preview so the two can never read a file differently.</summary>
+    private static async Task<(IReadOnlyList<CustomerImportRow>? Rows, Error? Failure)> ReadImportRowsAsync(IFormFile file)
+    {
         if (file is null || file.Length == 0)
         {
-            return ToActionResult(Result.Failure<ImportResultDto>(
-                Error.Validation("Import.NoFile", "Select an .xlsx file to import.")));
+            return (null, Error.Validation("Import.NoFile", "Select an .xlsx file to import."));
         }
 
         IReadOnlyList<ExcelRow> rows;
@@ -138,10 +175,10 @@ public sealed class CustomersController : ApiControllerBase
         }
         catch (InvalidDataException ex)
         {
-            return ToActionResult(Result.Failure<ImportResultDto>(Error.Validation("Import.InvalidFile", ex.Message)));
+            return (null, Error.Validation("Import.InvalidFile", ex.Message));
         }
 
-        var command = new ImportCustomersCommand(rows
+        return (rows
             .Select(r => new CustomerImportRow(
                 r.RowNumber,
                 r.GetGuid(CustomerSheet.Id),
@@ -150,9 +187,25 @@ public sealed class CustomersController : ApiControllerBase
                 r.GetString(CustomerSheet.Email),
                 r.GetString(CustomerSheet.Address),
                 r.GetString(CustomerSheet.Notes)))
-            .ToList());
+            .ToList(), null);
+    }
 
-        var result = await _sender.Send(command, cancellationToken);
+    /// <summary>
+    /// Customers already holding this phone number or email (FR-04).
+    ///
+    /// <para>Advisory — it reports, it does not refuse. The form calls it as the operator leaves
+    /// the phone or email field so a second record for someone already on the books can be caught
+    /// while there is still nothing to undo.</para>
+    /// </summary>
+    [HttpGet("duplicates")]
+    [ProducesResponseType(typeof(ApiResponse<IReadOnlyList<CustomerDuplicateDto>>), StatusCodes.Status200OK)]
+    public async Task<IActionResult> FindDuplicates(
+        [FromQuery] string? phone,
+        [FromQuery] string? email,
+        [FromQuery] Guid? excludeId,
+        CancellationToken cancellationToken)
+    {
+        var result = await _sender.Send(new FindCustomerDuplicatesQuery(phone, email, excludeId), cancellationToken);
         return ToActionResult(result);
     }
 

@@ -49,6 +49,42 @@ public class CustomerRepository : ICustomerRepository
     public Task<Customer?> GetByPhoneNumberAsync(string phoneNumber, CancellationToken cancellationToken) =>
         _dbContext.Customers.FirstOrDefaultAsync(c => c.PhoneNumber == phoneNumber, cancellationToken);
 
+    public async Task<IReadOnlyList<Customer>> FindPotentialDuplicatesAsync(
+        string? phoneNumber,
+        string? email,
+        Guid? excludeId,
+        CancellationToken cancellationToken)
+    {
+        var phone = string.IsNullOrWhiteSpace(phoneNumber) ? null : phoneNumber.Trim();
+        // Compared lowered on both sides rather than with ILIKE: an email may legitimately contain
+        // an underscore, which ILIKE would read as a single-character wildcard and match addresses
+        // that are not this one.
+        var loweredEmail = string.IsNullOrWhiteSpace(email) ? null : email.Trim().ToLowerInvariant();
+
+        if (phone is null && loweredEmail is null)
+        {
+            return [];
+        }
+
+        var query = _dbContext.Customers.Where(c =>
+            (phone != null && c.PhoneNumber == phone)
+            || (loweredEmail != null && c.Email != null && c.Email.ToLower() == loweredEmail));
+
+        if (excludeId is { } id)
+        {
+            query = query.Where(c => c.Id != id);
+        }
+
+        return await query
+            .OrderBy(c => c.FullName)
+            .Take(MaxDuplicatesReported)
+            .ToListAsync(cancellationToken);
+    }
+
+    /// <summary>A warning, not a report — the operator needs to see that the detail is taken and by
+    /// whom, and a shared family email must not turn that into an unbounded query.</summary>
+    private const int MaxDuplicatesReported = 10;
+
     public void Add(Customer customer) => _dbContext.Customers.Add(customer);
 
     public Task SaveChangesAsync(CancellationToken cancellationToken) => _dbContext.SaveChangesAsync(cancellationToken);

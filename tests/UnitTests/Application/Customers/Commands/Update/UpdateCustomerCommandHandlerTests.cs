@@ -20,7 +20,7 @@ public class UpdateCustomerCommandHandlerTests
 
         Assert.True(result.IsSuccess);
         Assert.Equal("Asha K. Rao", result.Value.FullName);
-        Assert.Equal("+91 90000 00000", result.Value.PhoneNumber);
+        Assert.Equal("+919000000000", result.Value.PhoneNumber);
         await repository.Received(1).SaveChangesAsync(Arg.Any<CancellationToken>());
     }
 
@@ -46,7 +46,8 @@ public class UpdateCustomerCommandHandlerTests
         var other = Customer.Create("Ravi Kumar", "+91 90000 00000", null, null, null);
         var repository = Substitute.For<ICustomerRepository>();
         repository.GetByIdAsync(customer.Id, Arg.Any<CancellationToken>()).Returns(customer);
-        repository.GetByPhoneNumberAsync("+91 90000 00000", Arg.Any<CancellationToken>()).Returns(other);
+        // Stubbed on the canonical form, because that is what the handler looks up.
+        repository.GetByPhoneNumberAsync("+919000000000", Arg.Any<CancellationToken>()).Returns(other);
         var handler = new UpdateCustomerCommandHandler(repository);
         var command = new UpdateCustomerCommand(customer.Id, "Asha Rao", "+91 90000 00000", null, null, null);
 
@@ -64,7 +65,9 @@ public class UpdateCustomerCommandHandlerTests
         var repository = Substitute.For<ICustomerRepository>();
         repository.GetByIdAsync(customer.Id, Arg.Any<CancellationToken>()).Returns(customer);
         // The lookup finds the customer being edited — its own number must not block its own save.
-        repository.GetByPhoneNumberAsync("+91 98765 43210", Arg.Any<CancellationToken>()).Returns(customer);
+        // Keyed canonically so the stub actually fires; on the raw string it would return null and
+        // the test would pass without ever reaching the self-match it exists to cover.
+        repository.GetByPhoneNumberAsync("+919876543210", Arg.Any<CancellationToken>()).Returns(customer);
         var handler = new UpdateCustomerCommandHandler(repository);
         var command = new UpdateCustomerCommand(customer.Id, "Asha K. Rao", "+91 98765 43210", null, null, null);
 

@@ -1,4 +1,5 @@
 using MathilensERP.Domain.Common;
+using MathilensERP.Shared.Contact;
 using MathilensERP.Shared.Guards;
 
 namespace MathilensERP.Domain.Employees;
@@ -122,8 +123,11 @@ public sealed class Employee : AuditableEntity
         EmployeeCode = Guard.AgainstNullOrWhiteSpace(employeeCode, nameof(employeeCode)).Trim();
         FullName = Guard.AgainstNullOrWhiteSpace(fullName, nameof(fullName));
         JobTitle = jobTitle;
-        PhoneNumber = Guard.AgainstNullOrWhiteSpace(phoneNumber, nameof(phoneNumber)).Trim();
-        Email = email;
+        // Stored canonically, by the same rule as a customer's and for the same reason: a missing
+        // country code must not be what makes a second record for one person.
+        PhoneNumber = IndianPhoneNumber.Normalize(
+            Guard.AgainstNullOrWhiteSpace(phoneNumber, nameof(phoneNumber)));
+        Email = string.IsNullOrWhiteSpace(email) ? null : email.Trim();
 
         if (LastWorkingDate is { } last && joiningDate > last)
         {

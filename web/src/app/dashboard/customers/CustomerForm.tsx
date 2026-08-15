@@ -1,16 +1,33 @@
 "use client";
 
-import { useState, type FormEvent } from "react";
+import { useEffect, useRef, useState, type FormEvent } from "react";
 import { Button } from "@/components/ui/Button";
 import { Input, Textarea } from "@/components/ui/Input";
+import { PhoneNumberInput } from "@/components/ui/PhoneNumberInput";
+import { DuplicateWarningModal } from "@/components/customers/DuplicateWarningModal";
+import { getAccessToken } from "@/lib/auth";
 import { ApiError } from "@/lib/api-client";
-import { GENDERS, RELIGIONS, type CustomerInput, type Gender, type Religion } from "@/lib/api/customers";
+import { emailError, normalizePhoneNumber, phoneNumberError, toNationalDigits } from "@/lib/contact";
+import {
+  findCustomerDuplicates,
+  GENDERS,
+  RELIGIONS,
+  type CustomerDuplicate,
+  type CustomerInput,
+  type Gender,
+  type Religion,
+} from "@/lib/api/customers";
 
 type CustomerFormProps = {
   initialValues?: CustomerInput;
   submitLabel: string;
   onSubmit: (input: CustomerInput) => Promise<void>;
+  /** The customer being edited, so the duplicate check doesn't report them against themselves. */
+  customerId?: string;
 };
+
+/** Long enough that tabbing straight through phone and email asks once, not twice. */
+const DUPLICATE_CHECK_DELAY_MS = 350;
 
 const emptyValues: CustomerInput = {
   fullName: "",
@@ -28,9 +45,11 @@ const selectClassName =
   "rounded-md border border-border bg-surface px-3 py-2 text-sm outline-none transition-colors focus:border-primary focus:ring-2 focus:ring-primary/25";
 
 /** Shared by the create and edit customer pages — preserves user input on validation failure (00_MASTER_SPEC.md § 9.5 Forms). */
-export function CustomerForm({ initialValues = emptyValues, submitLabel, onSubmit }: CustomerFormProps) {
+export function CustomerForm({ initialValues = emptyValues, submitLabel, onSubmit, customerId }: CustomerFormProps) {
   const [fullName, setFullName] = useState(initialValues.fullName);
-  const [phoneNumber, setPhoneNumber] = useState(initialValues.phoneNumber);
+  // Shown as the ten digits the customer would recite. Saved records hold "+918220070363"; the
+  // country code is the database's business, not something to make staff read past on every edit.
+  const [phoneNumber, setPhoneNumber] = useState(toNationalDigits(initialValues.phoneNumber));
   const [email, setEmail] = useState(initialValues.email ?? "");
   const [address, setAddress] = useState(initialValues.address ?? "");
   const [notes, setNotes] = useState(initialValues.notes ?? "");
@@ -41,11 +60,79 @@ export function CustomerForm({ initialValues = emptyValues, submitLabel, onSubmi
   const [fieldErrors, setFieldErrors] = useState<Record<string, string>>({});
   const [formError, setFormError] = useState<string | null>(null);
   const [isSubmitting, setIsSubmitting] = useState(false);
+  const [duplicates, setDuplicates] = useState<CustomerDuplicate[]>([]);
+
+  const duplicateTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
+  // Contact details the operator has already been warned about and chosen to keep. Without this
+  // the dialog reappears every time the cursor leaves the field, which trains people to dismiss
+  // it without reading — the one habit a duplicate warning cannot afford.
+  const acknowledged = useRef(new Set<string>());
+
+  useEffect(() => () => {
+    if (duplicateTimer.current) {
+      clearTimeout(duplicateTimer.current);
+    }
+  }, []);
+
+  /**
+   * Asks the server who else holds this number or email, once the operator has left the field.
+   *
+   * Failures are swallowed on purpose: this is an advisory check running while a form is being
+   * filled in, and an error toast about a background lookup would interrupt the typing it exists
+   * to protect. The save itself still enforces the rule.
+   */
+  function scheduleDuplicateCheck(phone: string, address: string) {
+    if (duplicateTimer.current) {
+      clearTimeout(duplicateTimer.current);
+    }
+
+    duplicateTimer.current = setTimeout(async () => {
+      // A half-typed number matches nothing, so there is no point asking until it is one.
+      const normalized = normalizePhoneNumber(phone);
+      const searchPhone = normalized ?? "";
+      const searchEmail = emailError(address) === null ? address.trim() : "";
+      if (searchPhone === "" && searchEmail === "") {
+        return;
+      }
+
+      const key = `${searchPhone}|${searchEmail.toLowerCase()}`;
+      if (acknowledged.current.has(key)) {
+        return;
+      }
+
+      try {
+        const matches = await findCustomerDuplicates(searchPhone, searchEmail, getAccessToken(), customerId);
+        if (matches.length > 0) {
+          acknowledged.current.add(key);
+          setDuplicates(matches);
+        }
+      } catch {
+        // See above — an advisory check stays quiet when it cannot run.
+      }
+    }, DUPLICATE_CHECK_DELAY_MS);
+  }
 
   async function handleSubmit(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
     setFormError(null);
     setFieldErrors({});
+
+    // Checked here as well as on the server so a mistyped number is caught under the cursor
+    // rather than after a round trip. The server is still the authority.
+    const clientErrors: Record<string, string> = {};
+    const phoneProblem = phoneNumberError(phoneNumber);
+    if (phoneProblem) {
+      clientErrors.phonenumber = phoneProblem;
+    }
+    const emailProblem = emailError(email);
+    if (emailProblem) {
+      clientErrors.email = emailProblem;
+    }
+    if (Object.keys(clientErrors).length > 0) {
+      setFieldErrors(clientErrors);
+      return;
+    }
+
     setIsSubmitting(true);
 
     try {
@@ -85,19 +172,21 @@ export function CustomerForm({ initialValues = emptyValues, submitLabel, onSubmi
         onChange={(e) => setFullName(e.target.value)}
         error={fieldErrors.fullname}
       />
-      <Input
+      <PhoneNumberInput
         id="phoneNumber"
-        label="Phone number"
         value={phoneNumber}
-        onChange={(e) => setPhoneNumber(e.target.value)}
+        onChange={setPhoneNumber}
+        onBlur={() => scheduleDuplicateCheck(phoneNumber, email)}
         error={fieldErrors.phonenumber}
       />
       <Input
         id="email"
         label="Email"
         type="email"
+        autoComplete="email"
         value={email}
         onChange={(e) => setEmail(e.target.value)}
+        onBlur={() => scheduleDuplicateCheck(phoneNumber, email)}
         error={fieldErrors.email}
       />
       <div className="grid gap-4 sm:grid-cols-2">
@@ -181,6 +270,14 @@ export function CustomerForm({ initialValues = emptyValues, submitLabel, onSubmi
           {isSubmitting ? "Saving…" : submitLabel}
         </Button>
       </div>
+
+      {/* Outside the field flow: the warning is about the record as a whole, and it must not push
+          the form around while someone is typing in it. */}
+      <DuplicateWarningModal
+        matches={duplicates}
+        onCreateAnyway={() => setDuplicates([])}
+        onClose={() => setDuplicates([])}
+      />
     </form>
   );
 }

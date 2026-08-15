@@ -14,6 +14,9 @@ namespace MathilensERP.Application.Customers.Commands.Import;
 /// Every row is attempted; invalid ones are collected against their spreadsheet row number
 /// rather than aborting the upload, so a 500-row file with three typos still lands 497 records
 /// and hands back a short, actionable list.
+///
+/// What each row will do is decided by <see cref="CustomerImportPlanner"/>, the same code behind
+/// the pre-import summary — this handler only carries the plan out.
 /// </summary>
 public sealed class ImportCustomersCommandHandler : ICommandHandler<ImportCustomersCommand, Result<ImportResultDto>>
 {
@@ -28,39 +31,45 @@ public sealed class ImportCustomersCommandHandler : ICommandHandler<ImportCustom
 
     public async Task<Result<ImportResultDto>> Handle(ImportCustomersCommand command, CancellationToken cancellationToken)
     {
+        var plan = await CustomerImportPlanner.PlanAsync(
+            command.Rows, _customerRepository, _rowValidator, includeEmailWarnings: false, cancellationToken);
+
         var errors = new List<ImportRowErrorDto>();
         var created = 0;
         var updated = 0;
 
-        // Rows added in this batch aren't visible to a repository query until SaveChanges, so
-        // without this a file listing the same phone number twice would insert it twice.
-        var addedThisBatch = new Dictionary<string, Customer>(StringComparer.OrdinalIgnoreCase);
+        // The rows this pass created, so a later row matching an earlier one updates that record
+        // instead of inserting the same person a second time.
+        var createdByRow = new Dictionary<int, Customer>();
 
-        foreach (var row in command.Rows)
+        foreach (var step in plan)
         {
-            // Reuses the create command's rules so the spreadsheet and the form can never drift apart.
-            var candidate = new CreateCustomerCommand(row.FullName, row.PhoneNumber, row.Email, row.Address, row.Notes);
-            var validation = await _rowValidator.ValidateAsync(candidate, cancellationToken);
-            if (!validation.IsValid)
+            if (step.Action == CustomerImportAction.Fail)
             {
-                errors.Add(new ImportRowErrorDto(row.RowNumber, string.Join(" ", validation.Errors.Select(e => e.ErrorMessage))));
+                errors.Add(new ImportRowErrorDto(step.Row.RowNumber, step.Error!));
                 continue;
             }
 
+            var row = step.Row;
             try
             {
-                var existing = await FindExistingAsync(row, addedThisBatch, cancellationToken);
-
-                if (existing is null)
+                var target = step.Action switch
                 {
-                    var customer = Customer.Create(row.FullName, row.PhoneNumber, row.Email, row.Address, row.Notes);
+                    CustomerImportAction.UpdateExisting => step.ExistingMatch,
+                    CustomerImportAction.UpdateEarlierRow => createdByRow.GetValueOrDefault(step.EarlierRowNumber!.Value),
+                    _ => null,
+                };
+
+                if (target is null)
+                {
+                    var customer = Customer.Create(row.FullName, step.PhoneNumber, row.Email, row.Address, row.Notes);
                     _customerRepository.Add(customer);
-                    addedThisBatch[row.PhoneNumber] = customer;
+                    createdByRow[row.RowNumber] = customer;
                     created++;
                 }
                 else
                 {
-                    existing.UpdateDetails(row.FullName, row.PhoneNumber, row.Email, row.Address, row.Notes);
+                    target.UpdateDetails(row.FullName, step.PhoneNumber, row.Email, row.Address, row.Notes);
                     updated++;
                 }
             }
@@ -78,22 +87,5 @@ public sealed class ImportCustomersCommandHandler : ICommandHandler<ImportCustom
         }
 
         return Result.Success(new ImportResultDto(created, updated, errors));
-    }
-
-    private async Task<Customer?> FindExistingAsync(
-        CustomerImportRow row,
-        Dictionary<string, Customer> addedThisBatch,
-        CancellationToken cancellationToken)
-    {
-        // An id that no longer resolves (stale export, since-deleted record) falls through to
-        // the phone number rather than failing the row.
-        if (row.Id is { } id && await _customerRepository.GetByIdAsync(id, cancellationToken) is { } byId)
-        {
-            return byId;
-        }
-
-        return addedThisBatch.TryGetValue(row.PhoneNumber, out var pending)
-            ? pending
-            : await _customerRepository.GetByPhoneNumberAsync(row.PhoneNumber, cancellationToken);
     }
 }

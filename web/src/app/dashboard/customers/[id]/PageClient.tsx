@@ -64,6 +64,7 @@ export default function EditCustomerPage() {
         <div className="flex max-w-xl flex-col gap-6">
           <div className="rounded-lg border border-border bg-surface p-6">
             <CustomerForm
+              customerId={customerId}
               initialValues={{
                 fullName: customer.fullName,
                 phoneNumber: customer.phoneNumber,

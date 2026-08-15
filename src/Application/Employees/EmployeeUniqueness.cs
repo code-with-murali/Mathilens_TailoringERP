@@ -1,3 +1,4 @@
+using MathilensERP.Shared.Contact;
 using MathilensERP.Shared.Results;
 
 namespace MathilensERP.Application.Employees;
@@ -35,12 +36,18 @@ internal static class EmployeeUniqueness
             return null;
         }
 
-        var byPhone = await employeeRepository.GetByPhoneNumberAsync(phoneNumber.Trim(), cancellationToken);
+        // Compared in canonical form, not as typed. Stored numbers are all +91XXXXXXXXXX, so
+        // looking up a raw "8220070363" would find nothing and let the duplicate through — which
+        // is the one thing this method exists to stop. Normalizing here covers the create and
+        // update handlers and the spreadsheet import, since all three ask through here.
+        var canonical = IndianPhoneNumber.Normalize(phoneNumber);
+
+        var byPhone = await employeeRepository.GetByPhoneNumberAsync(canonical, cancellationToken);
         if (byPhone is not null && byPhone.Id != excludeId)
         {
             return Error.Conflict(
                 "Employee.DuplicatePhoneNumber",
-                $"An employee with mobile number '{phoneNumber.Trim()}' already exists ({byPhone.FullName}).");
+                $"An employee with mobile number '{canonical}' already exists ({byPhone.FullName}).");
         }
 
         return null;

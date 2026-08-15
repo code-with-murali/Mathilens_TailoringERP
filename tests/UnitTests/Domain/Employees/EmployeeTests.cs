@@ -13,7 +13,8 @@ public class EmployeeTests
         Assert.Equal("EMP-001", employee.EmployeeCode);
         Assert.Equal("Ravi Kumar", employee.FullName);
         Assert.Equal("Master Tailor", employee.JobTitle);
-        Assert.Equal("+91 98765 43210", employee.PhoneNumber);
+        // Stored canonically however it was typed, by the same rule as a customer's.
+        Assert.Equal("+919876543210", employee.PhoneNumber);
         Assert.Equal("ravi@example.com", employee.Email);
         Assert.Null(employee.UserId);
     }
@@ -53,7 +54,8 @@ public class EmployeeTests
         var employee = Employee.Create("  EMP-001  ", "Ravi Kumar", null, "  +91 98765 43210  ", null, new DateOnly(2024, 1, 15), EmploymentType.FullTime);
 
         Assert.Equal("EMP-001", employee.EmployeeCode);
-        Assert.Equal("+91 98765 43210", employee.PhoneNumber);
+        // Stored canonically however it was typed, by the same rule as a customer's.
+        Assert.Equal("+919876543210", employee.PhoneNumber);
     }
 
     [Fact]
@@ -66,7 +68,7 @@ public class EmployeeTests
         Assert.Equal("EMP-002", employee.EmployeeCode);
         Assert.Equal("Ravi K.", employee.FullName);
         Assert.Equal("Master Tailor", employee.JobTitle);
-        Assert.Equal("+91 90000 00000", employee.PhoneNumber);
+        Assert.Equal("+919000000000", employee.PhoneNumber);
         Assert.Equal("ravi.k@example.com", employee.Email);
     }
 
