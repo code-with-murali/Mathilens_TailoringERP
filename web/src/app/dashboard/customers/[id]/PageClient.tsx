@@ -47,8 +47,11 @@ export default function EditCustomerPage() {
 
   return (
     <div className="flex flex-col gap-6">
-      <div className="flex items-center justify-between">
-        <h1 className="text-2xl font-semibold">Edit Customer</h1>
+      <div className="flex flex-wrap items-center justify-between gap-3">
+        {/* Not "Edit Customer" any more: editing happens in a dialog on the list, and this page is
+            what the list links to for measurements. Their details are still here and still
+            editable — it is just no longer the only way in. */}
+        <h1 className="text-2xl font-semibold">{customer?.fullName ?? "Customer"}</h1>
         <Link href="/dashboard/customers" className="text-sm text-foreground/70 hover:text-foreground">
           Back to customers
         </Link>
@@ -61,8 +64,8 @@ export default function EditCustomerPage() {
       ) : !customer ? (
         <p className="text-sm text-foreground/70">Loading…</p>
       ) : (
-        <div className="flex max-w-xl flex-col gap-6">
-          <div className="rounded-lg border border-border bg-surface p-6">
+        <div className="flex max-w-2xl flex-col gap-6">
+          <div className="rounded-lg border border-border bg-surface p-4 sm:p-6">
             <CustomerForm
               customerId={customerId}
               initialValues={{
@@ -76,8 +79,8 @@ export default function EditCustomerPage() {
                 dateOfBirth: customer.dateOfBirth,
                 weddingDate: customer.weddingDate,
               }}
-              submitLabel="Save changes"
               onSubmit={handleUpdate}
+              onCancel={() => router.push("/dashboard/customers")}
             />
           </div>
 

@@ -2,6 +2,7 @@
 
 import { useEffect, useRef, useState, type FormEvent } from "react";
 import { Button } from "@/components/ui/Button";
+import { ModalActions } from "@/components/ui/Modal";
 import { Input, Textarea } from "@/components/ui/Input";
 import { PhoneNumberInput } from "@/components/ui/PhoneNumberInput";
 import { DuplicateWarningModal } from "@/components/customers/DuplicateWarningModal";
@@ -20,8 +21,9 @@ import {
 
 type CustomerFormProps = {
   initialValues?: CustomerInput;
-  submitLabel: string;
   onSubmit: (input: CustomerInput) => Promise<void>;
+  /** Closes the dialog, or navigates back on the standalone pages. */
+  onCancel: () => void;
   /** The customer being edited, so the duplicate check doesn't report them against themselves. */
   customerId?: string;
 };
@@ -44,8 +46,15 @@ const emptyValues: CustomerInput = {
 const selectClassName =
   "rounded-md border border-border bg-surface px-3 py-2 text-sm outline-none transition-colors focus:border-primary focus:ring-2 focus:ring-primary/25";
 
-/** Shared by the create and edit customer pages — preserves user input on validation failure (00_MASTER_SPEC.md § 9.5 Forms). */
-export function CustomerForm({ initialValues = emptyValues, submitLabel, onSubmit, customerId }: CustomerFormProps) {
+/**
+ * Shared by the create and edit customer dialogs — preserves user input on validation failure
+ * (00_MASTER_SPEC.md § 9.5 Forms).
+ *
+ * Two columns from the small breakpoint up, one below it. That is what keeps the dialog short
+ * enough to need no scrollbar of its own on a laptop, and stacked and full width on a phone, where
+ * side-by-side fields would be the thing forcing a sideways scroll.
+ */
+export function CustomerForm({ initialValues = emptyValues, onSubmit, onCancel, customerId }: CustomerFormProps) {
   const [fullName, setFullName] = useState(initialValues.fullName);
   // Shown as the ten digits the customer would recite. Saved records hold "+918220070363"; the
   // country code is the database's business, not something to make staff read past on every edit.
@@ -164,32 +173,32 @@ export function CustomerForm({ initialValues = emptyValues, submitLabel, onSubmi
   }
 
   return (
-    <form onSubmit={handleSubmit} noValidate className="flex flex-col gap-4">
-      <Input
-        id="fullName"
-        label="Full name"
-        value={fullName}
-        onChange={(e) => setFullName(e.target.value)}
-        error={fieldErrors.fullname}
-      />
-      <PhoneNumberInput
-        id="phoneNumber"
-        value={phoneNumber}
-        onChange={setPhoneNumber}
-        onBlur={() => scheduleDuplicateCheck(phoneNumber, email)}
-        error={fieldErrors.phonenumber}
-      />
-      <Input
-        id="email"
-        label="Email"
-        type="email"
-        autoComplete="email"
-        value={email}
-        onChange={(e) => setEmail(e.target.value)}
-        onBlur={() => scheduleDuplicateCheck(phoneNumber, email)}
-        error={fieldErrors.email}
-      />
-      <div className="grid gap-4 sm:grid-cols-2">
+    <form onSubmit={handleSubmit} noValidate className="flex flex-col">
+      <div className="grid gap-3 sm:grid-cols-2">
+        <Input
+          id="fullName"
+          label="Full name"
+          value={fullName}
+          onChange={(e) => setFullName(e.target.value)}
+          error={fieldErrors.fullname}
+        />
+        <PhoneNumberInput
+          id="phoneNumber"
+          value={phoneNumber}
+          onChange={setPhoneNumber}
+          onBlur={() => scheduleDuplicateCheck(phoneNumber, email)}
+          error={fieldErrors.phonenumber}
+        />
+        <Input
+          id="email"
+          label="Email"
+          type="email"
+          autoComplete="email"
+          value={email}
+          onChange={(e) => setEmail(e.target.value)}
+          onBlur={() => scheduleDuplicateCheck(phoneNumber, email)}
+          error={fieldErrors.email}
+        />
         <div className="flex flex-col gap-1">
           <label htmlFor="gender" className="text-sm font-medium">
             Gender
@@ -240,36 +249,45 @@ export function CustomerForm({ initialValues = emptyValues, submitLabel, onSubmi
             className={selectClassName}
           />
         </div>
+
+        {/* Free text runs the full width in both layouts — an address squeezed into half a dialog
+            wraps after three words. */}
+        <div className="sm:col-span-2">
+          <Textarea
+            id="address"
+            label="Address"
+            rows={2}
+            value={address}
+            onChange={(e) => setAddress(e.target.value)}
+            error={fieldErrors.address}
+          />
+        </div>
+        <div className="sm:col-span-2">
+          <Textarea
+            id="notes"
+            label="Notes"
+            rows={2}
+            value={notes}
+            onChange={(e) => setNotes(e.target.value)}
+            error={fieldErrors.notes}
+          />
+        </div>
       </div>
 
-      <Textarea
-        id="address"
-        label="Address"
-        rows={2}
-        value={address}
-        onChange={(e) => setAddress(e.target.value)}
-        error={fieldErrors.address}
-      />
-      <Textarea
-        id="notes"
-        label="Notes"
-        rows={3}
-        value={notes}
-        onChange={(e) => setNotes(e.target.value)}
-        error={fieldErrors.notes}
-      />
-
       {formError && (
-        <p role="alert" className="text-sm text-danger">
+        <p role="alert" className="mt-3 text-sm text-danger">
           {formError}
         </p>
       )}
 
-      <div className="flex justify-end gap-3">
-        <Button type="submit" disabled={isSubmitting}>
-          {isSubmitting ? "Saving…" : submitLabel}
+      <ModalActions>
+        <Button type="button" variant="secondary" onClick={onCancel} disabled={isSubmitting}>
+          CANCEL
         </Button>
-      </div>
+        <Button type="submit" disabled={isSubmitting}>
+          {isSubmitting ? "Saving…" : "SUBMIT"}
+        </Button>
+      </ModalActions>
 
       {/* Outside the field flow: the warning is about the record as a whole, and it must not push
           the form around while someone is typing in it. */}

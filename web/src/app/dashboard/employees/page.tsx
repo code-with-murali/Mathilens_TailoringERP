@@ -12,7 +12,14 @@ import { useToast } from "@/components/ui/ToastProvider";
 import { useDebouncedValue } from "@/lib/use-debounced-value";
 import { getAccessToken } from "@/lib/auth";
 import { ApiError, type PaginationMeta } from "@/lib/api-client";
-import { createEmployee, searchEmployees, retireEmployee, EMPLOYMENT_TYPE_LABELS, type Employee } from "@/lib/api/employees";
+import {
+  createEmployee,
+  searchEmployees,
+  retireEmployee,
+  updateEmployee,
+  EMPLOYMENT_TYPE_LABELS,
+  type Employee,
+} from "@/lib/api/employees";
 
 /** yyyy-MM-dd off the local calendar — a last working day is a day in the shop, not a UTC instant. */
 function todayIsoDate(): string {
@@ -25,6 +32,9 @@ export default function EmployeesPage() {
   const { showToast } = useToast();
   const [searchInput, setSearchInput] = useState("");
   const [isAdding, setIsAdding] = useState(false);
+  // Held whole rather than by id: the list already carries every field the form asks for, so
+  // opening the dialog costs no request and shows no loading state.
+  const [editing, setEditing] = useState<Employee | null>(null);
   const debouncedSearch = useDebouncedValue(searchInput, 300);
   const [page, setPage] = useState(1);
   const [pageSize, setPageSize] = useState(DEFAULT_PAGE_SIZE);
@@ -95,9 +105,9 @@ export default function EmployeesPage() {
 
   return (
     <div className="flex flex-col gap-6">
-      <div className="flex items-start justify-between gap-4">
+      <div className="flex flex-wrap items-start justify-between gap-3">
         <h1 className="text-2xl font-semibold">Employees</h1>
-        <div className="flex items-start gap-2">
+        <div className="flex flex-wrap items-start gap-2">
           <ImportExportButtons resource="employees" label="employees" onImported={loadEmployees} />
           {/* Opens in place rather than navigating, so adding a member of staff does not cost the
               page position and filters. /dashboard/employees/new still works. */}
@@ -124,8 +134,8 @@ export default function EmployeesPage() {
       ) : employees.length === 0 ? (
         <p className="text-sm text-foreground/70">No employees found.</p>
       ) : (
-        <div className="overflow-x-auto rounded-lg border border-border">
-          <table className="w-full text-left text-sm">
+        <div className="table-wrap overflow-x-auto rounded-lg border border-border">
+          <table className="stacked w-full text-left text-sm">
             <thead className="border-b border-border bg-surface">
               <tr>
                 <th className="px-4 py-3 font-medium">Code</th>
@@ -143,15 +153,25 @@ export default function EmployeesPage() {
             <tbody>
               {employees.map((employee) => (
                 <tr key={employee.id} className="border-b border-border last:border-0">
-                  <td className="px-4 py-3 font-mono">{employee.employeeCode}</td>
-                  <td className="px-4 py-3">{employee.fullName}</td>
-                  <td className="px-4 py-3">{employee.jobTitle ?? "—"}</td>
-                  <td className="px-4 py-3">{employee.phoneNumber}</td>
-                  <td className="px-4 py-3 whitespace-nowrap">{EMPLOYMENT_TYPE_LABELS[employee.employmentType]}</td>
-                  <td className="px-4 py-3 whitespace-nowrap">
+                  <td data-label="Code" className="px-4 py-3 font-mono">
+                    {employee.employeeCode}
+                  </td>
+                  <td data-label="Name" className="px-4 py-3 font-medium">
+                    {employee.fullName}
+                  </td>
+                  <td data-label="Job Title" className="px-4 py-3">
+                    {employee.jobTitle ?? "—"}
+                  </td>
+                  <td data-label="Phone" className="px-4 py-3">
+                    {employee.phoneNumber}
+                  </td>
+                  <td data-label="Type" className="px-4 py-3 whitespace-nowrap">
+                    {EMPLOYMENT_TYPE_LABELS[employee.employmentType]}
+                  </td>
+                  <td data-label="Joined" className="px-4 py-3 whitespace-nowrap">
                     {new Date(`${employee.joiningDate}T00:00:00Z`).toLocaleDateString()}
                   </td>
-                  <td className="px-4 py-3 whitespace-nowrap">
+                  <td data-label="Status" className="px-4 py-3 whitespace-nowrap">
                     {employee.isActive ? (
                       <span className="text-success">Active</span>
                     ) : (
@@ -160,14 +180,20 @@ export default function EmployeesPage() {
                       </span>
                     )}
                   </td>
-                  <td className="px-4 py-3">
-                    <div className="flex justify-end gap-3">
+                  <td data-label="" className="px-4 py-3">
+                    <div className="flex flex-wrap justify-end gap-3">
                       <Link href={`/dashboard/employee/${employee.id}`} className="text-foreground/70 hover:text-foreground">
                         View
                       </Link>
-                      <Link href={`/dashboard/employees/${employee.id}`} className="text-foreground/70 hover:text-foreground">
+                      {/* In place, like New — editing from the list no longer costs the page
+                          position and the search term. */}
+                      <button
+                        type="button"
+                        onClick={() => setEditing(employee)}
+                        className="text-foreground/70 hover:text-foreground"
+                      >
                         Edit
-                      </Link>
+                      </button>
                       {employee.isActive ? (
                         <button
                           type="button"
@@ -208,8 +234,13 @@ export default function EmployeesPage() {
 
       {/* Retiring needs a date, which a plain confirm dialog cannot ask for. */}
       {pendingRetire && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 p-4">
-          <div role="dialog" aria-modal="true" aria-labelledby="retireTitle" className="w-full max-w-md rounded-lg border border-border bg-surface p-6">
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 p-3 sm:p-4">
+          <div
+            role="dialog"
+            aria-modal="true"
+            aria-labelledby="retireTitle"
+            className="max-h-[92dvh] w-full max-w-md overflow-y-auto rounded-lg border border-border bg-surface p-4 sm:p-6"
+          >
             <h2 id="retireTitle" className="text-lg font-semibold">
               Retire {pendingRetire.fullName}
             </h2>
@@ -246,14 +277,9 @@ export default function EmployeesPage() {
         </div>
       )}
 
-      <Modal
-        open={isAdding}
-        title="New Employee"
-        description="Code, name and phone number are required."
-        onClose={() => setIsAdding(false)}
-      >
+      <Modal open={isAdding} title="New Employee" onClose={() => setIsAdding(false)}>
         <EmployeeForm
-          submitLabel="Create employee"
+          onCancel={() => setIsAdding(false)}
           onSubmit={async (input) => {
             await createEmployee(input, getAccessToken());
             showToast("Employee created.");
@@ -261,6 +287,32 @@ export default function EmployeesPage() {
             await loadEmployees();
           }}
         />
+      </Modal>
+
+      {/* Keyed on the employee so the form remounts per row — without it, opening a second person
+          would show the first one's values, since the fields are seeded from props on mount only. */}
+      <Modal open={editing !== null} title="Edit Employee" onClose={() => setEditing(null)}>
+        {editing && (
+          <EmployeeForm
+            key={editing.id}
+            initialValues={{
+              employeeCode: editing.employeeCode,
+              joiningDate: editing.joiningDate,
+              employmentType: editing.employmentType,
+              fullName: editing.fullName,
+              jobTitle: editing.jobTitle,
+              phoneNumber: editing.phoneNumber,
+              email: editing.email,
+            }}
+            onCancel={() => setEditing(null)}
+            onSubmit={async (input) => {
+              await updateEmployee(editing.id, input, getAccessToken());
+              showToast("Employee updated.");
+              setEditing(null);
+              await loadEmployees();
+            }}
+          />
+        )}
       </Modal>
     </div>
   );

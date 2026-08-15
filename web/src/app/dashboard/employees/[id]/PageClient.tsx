@@ -60,7 +60,7 @@ export default function EditEmployeePage() {
       ) : !employee ? (
         <p className="text-sm text-foreground/70">Loading…</p>
       ) : (
-        <div className="max-w-xl rounded-lg border border-border bg-surface p-6">
+        <div className="max-w-2xl rounded-lg border border-border bg-surface p-4 sm:p-6">
           <EmployeeForm
             initialValues={{
               employeeCode: employee.employeeCode,
@@ -71,8 +71,8 @@ export default function EditEmployeePage() {
               phoneNumber: employee.phoneNumber,
               email: employee.email,
             }}
-            submitLabel="Save changes"
             onSubmit={handleUpdate}
+            onCancel={() => router.push("/dashboard/employees")}
           />
         </div>
       )}

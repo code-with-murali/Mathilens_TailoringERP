@@ -25,8 +25,8 @@ export default function NewCustomerPage() {
           Back to customers
         </Link>
       </div>
-      <div className="max-w-xl rounded-lg border border-border bg-surface p-6">
-        <CustomerForm submitLabel="Create customer" onSubmit={handleCreate} />
+      <div className="max-w-2xl rounded-lg border border-border bg-surface p-4 sm:p-6">
+        <CustomerForm onSubmit={handleCreate} onCancel={() => router.push("/dashboard/customers")} />
       </div>
     </div>
   );

@@ -25,8 +25,8 @@ export default function NewEmployeePage() {
           Back to employees
         </Link>
       </div>
-      <div className="max-w-xl rounded-lg border border-border bg-surface p-6">
-        <EmployeeForm submitLabel="Create employee" onSubmit={handleCreate} />
+      <div className="max-w-2xl rounded-lg border border-border bg-surface p-4 sm:p-6">
+        <EmployeeForm onSubmit={handleCreate} onCancel={() => router.push("/dashboard/employees")} />
       </div>
     </div>
   );

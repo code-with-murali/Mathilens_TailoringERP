@@ -13,7 +13,15 @@ import { useToast } from "@/components/ui/ToastProvider";
 import { useDebouncedValue } from "@/lib/use-debounced-value";
 import { getAccessToken } from "@/lib/auth";
 import { ApiError, type PaginationMeta } from "@/lib/api-client";
-import { createCustomer, searchCustomers, deleteCustomer, RELIGIONS, type Customer, type Religion } from "@/lib/api/customers";
+import {
+  createCustomer,
+  searchCustomers,
+  deleteCustomer,
+  updateCustomer,
+  RELIGIONS,
+  type Customer,
+  type Religion,
+} from "@/lib/api/customers";
 
 const filterClassName =
   "rounded-md border border-border bg-surface px-3 py-2 text-sm outline-none transition-colors focus:border-primary focus:ring-2 focus:ring-primary/25";
@@ -27,6 +35,9 @@ export default function CustomersPage() {
   // sits behind a disclosure rather than taking permanent space next to the search box.
   const [isAdvancedOpen, setIsAdvancedOpen] = useState(false);
   const [isAdding, setIsAdding] = useState(false);
+  // The customer being edited, held whole rather than by id: the list already carries every field
+  // the form asks for, so opening the dialog costs no request and shows no loading state.
+  const [editing, setEditing] = useState<Customer | null>(null);
   const [page, setPage] = useState(1);
   const [pageSize, setPageSize] = useState(DEFAULT_PAGE_SIZE);
   const [customers, setCustomers] = useState<Customer[]>([]);
@@ -84,9 +95,9 @@ export default function CustomersPage() {
 
   return (
     <div className="flex flex-col gap-6">
-      <div className="flex items-start justify-between gap-4">
+      <div className="flex flex-wrap items-start justify-between gap-3">
         <h1 className="text-2xl font-semibold">Customers</h1>
-        <div className="flex items-start gap-2">
+        <div className="flex flex-wrap items-start gap-2">
           <ImportExportButtons resource="customers" label="customers" onImported={loadCustomers} previewBeforeImport />
           {/* Opens in place rather than navigating. The list stays on screen behind it, so adding
               a customer no longer costs the page position, the search term and the filters.
@@ -98,14 +109,15 @@ export default function CustomersPage() {
       </div>
 
       <div className="flex flex-col gap-3">
-        <div className="flex flex-wrap items-end gap-4">
-          <div className="min-w-[16rem] flex-1">
+        <div className="flex flex-wrap items-end gap-3">
+          <div className="min-w-0 flex-1 basis-64">
             <Input
               id="search"
               label="Search by name or phone"
               value={searchInput}
               onChange={(e) => handleSearchChange(e.target.value)}
               placeholder="Search customers…"
+              className="w-full"
             />
           </div>
           <button
@@ -113,7 +125,7 @@ export default function CustomersPage() {
             onClick={() => setIsAdvancedOpen((open) => !open)}
             aria-expanded={isAdvancedOpen}
             aria-controls="advancedFilters"
-            className="rounded-md border border-border px-3 py-2 text-sm text-foreground/70 transition-colors hover:bg-surface-hover hover:text-foreground"
+            className="shrink-0 rounded-md border border-border px-3 py-2 text-sm text-foreground/70 transition-colors hover:bg-surface-hover hover:text-foreground"
           >
             {/* The count keeps a collapsed-but-active filter from silently narrowing the list. */}
             Advanced filter{religion ? " (1)" : ""}
@@ -122,7 +134,7 @@ export default function CustomersPage() {
 
         {isAdvancedOpen && (
           <div id="advancedFilters" className="flex flex-wrap items-end gap-4 rounded-lg border border-border bg-surface p-4">
-            <div className="flex flex-col gap-1">
+            <div className="flex min-w-0 flex-col gap-1">
               <label htmlFor="religionFilter" className="text-sm font-medium">
                 Religion
               </label>
@@ -169,8 +181,8 @@ export default function CustomersPage() {
       ) : customers.length === 0 ? (
         <p className="text-sm text-foreground/70">No customers found.</p>
       ) : (
-        <div className="overflow-x-auto rounded-lg border border-border">
-          <table className="w-full text-left text-sm">
+        <div className="table-wrap rounded-lg border border-border">
+          <table className="stacked w-full text-left text-sm">
             <thead className="border-b border-border bg-surface">
               <tr>
                 <th className="px-4 py-3 font-medium">Name</th>
@@ -184,13 +196,29 @@ export default function CustomersPage() {
             <tbody>
               {customers.map((customer) => (
                 <tr key={customer.id} className="border-b border-border last:border-0">
-                  <td className="px-4 py-3">{customer.fullName}</td>
-                  <td className="px-4 py-3">{customer.phoneNumber}</td>
-                  <td className="px-4 py-3">{customer.email ?? "—"}</td>
-                  <td className="px-4 py-3">
-                    <div className="flex justify-end gap-3">
-                      <Link href={`/dashboard/customers/${customer.id}`} className="text-foreground/70 hover:text-foreground">
+                  <td data-label="Name" className="px-4 py-3 font-medium">
+                    {customer.fullName}
+                  </td>
+                  <td data-label="Phone" className="px-4 py-3">
+                    {customer.phoneNumber}
+                  </td>
+                  <td data-label="Email" className="px-4 py-3">
+                    {customer.email ?? "—"}
+                  </td>
+                  <td data-label="" className="px-4 py-3">
+                    <div className="flex justify-end gap-4">
+                      {/* In place, like New. Editing from the list no longer means losing the page
+                          and the search term — the record's own page is still there for
+                          measurements, and its link is the name of the customer. */}
+                      <button
+                        type="button"
+                        onClick={() => setEditing(customer)}
+                        className="text-foreground/70 hover:text-foreground"
+                      >
                         Edit
+                      </button>
+                      <Link href={`/dashboard/customers/${customer.id}`} className="text-foreground/70 hover:text-foreground">
+                        Measurements
                       </Link>
                       <button
                         type="button"
@@ -226,14 +254,9 @@ export default function CustomersPage() {
         onCancel={() => setPendingDelete(null)}
       />
 
-      <Modal
-        open={isAdding}
-        title="New Customer"
-        description="Name and phone number are required; the rest can be filled in later."
-        onClose={() => setIsAdding(false)}
-      >
+      <Modal open={isAdding} title="New Customer" onClose={() => setIsAdding(false)}>
         <CustomerForm
-          submitLabel="Create customer"
+          onCancel={() => setIsAdding(false)}
           onSubmit={async (input) => {
             await createCustomer(input, getAccessToken());
             showToast("Customer created.");
@@ -244,6 +267,35 @@ export default function CustomersPage() {
             await loadCustomers();
           }}
         />
+      </Modal>
+
+      {/* Keyed on the customer so the form remounts per row — without it, opening a second customer
+          would show the first one's values, since the fields are seeded from props on mount only. */}
+      <Modal open={editing !== null} title="Edit Customer" onClose={() => setEditing(null)}>
+        {editing && (
+          <CustomerForm
+            key={editing.id}
+            customerId={editing.id}
+            initialValues={{
+              fullName: editing.fullName,
+              phoneNumber: editing.phoneNumber,
+              email: editing.email,
+              address: editing.address,
+              notes: editing.notes,
+              gender: editing.gender,
+              religion: editing.religion,
+              dateOfBirth: editing.dateOfBirth,
+              weddingDate: editing.weddingDate,
+            }}
+            onCancel={() => setEditing(null)}
+            onSubmit={async (input) => {
+              await updateCustomer(editing.id, input, getAccessToken());
+              showToast("Customer updated.");
+              setEditing(null);
+              await loadCustomers();
+            }}
+          />
+        )}
       </Modal>
     </div>
   );

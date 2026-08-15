@@ -2,6 +2,7 @@
 
 import { useState, type FormEvent } from "react";
 import { Button } from "@/components/ui/Button";
+import { ModalActions } from "@/components/ui/Modal";
 import { Input } from "@/components/ui/Input";
 import { PhoneNumberInput } from "@/components/ui/PhoneNumberInput";
 import { ApiError } from "@/lib/api-client";
@@ -15,8 +16,9 @@ import {
 
 type EmployeeFormProps = {
   initialValues?: EmployeeInput;
-  submitLabel: string;
   onSubmit: (input: EmployeeInput) => Promise<void>;
+  /** Closes the dialog, or navigates back on the standalone pages. */
+  onCancel: () => void;
 };
 
 /** yyyy-MM-dd off the local calendar — a joining date is a day in the shop, not a UTC instant. */
@@ -37,8 +39,15 @@ const emptyValues: EmployeeInput = {
   employmentType: "FullTime",
 };
 
-/** Shared by the create and edit employee pages — preserves user input on validation failure (00_MASTER_SPEC.md § 9.5 Forms). */
-export function EmployeeForm({ initialValues = emptyValues, submitLabel, onSubmit }: EmployeeFormProps) {
+/**
+ * Shared by the create and edit employee dialogs — preserves user input on validation failure
+ * (00_MASTER_SPEC.md § 9.5 Forms).
+ *
+ * Two columns from the small breakpoint up, so the seven fields are four rows deep and the dialog
+ * needs no scrollbar of its own; stacked and full width below it, where side-by-side fields are
+ * what would force a sideways scroll.
+ */
+export function EmployeeForm({ initialValues = emptyValues, onSubmit, onCancel }: EmployeeFormProps) {
   const [employeeCode, setEmployeeCode] = useState(initialValues.employeeCode);
   const [fullName, setFullName] = useState(initialValues.fullName);
   const [jobTitle, setJobTitle] = useState(initialValues.jobTitle ?? "");
@@ -101,58 +110,45 @@ export function EmployeeForm({ initialValues = emptyValues, submitLabel, onSubmi
   }
 
   return (
-    <form onSubmit={handleSubmit} noValidate className="flex flex-col gap-4">
-      <Input
-        id="employeeCode"
-        label="Employee code"
-        placeholder="e.g. EMP-014"
-        value={employeeCode}
-        onChange={(e) => setEmployeeCode(e.target.value)}
-        error={fieldErrors.employeecode}
-      />
-      <Input
-        id="fullName"
-        label="Full name"
-        value={fullName}
-        onChange={(e) => setFullName(e.target.value)}
-        error={fieldErrors.fullname}
-      />
-      <Input
-        id="jobTitle"
-        label="Job title"
-        placeholder="e.g. Master Tailor"
-        value={jobTitle}
-        onChange={(e) => setJobTitle(e.target.value)}
-        error={fieldErrors.jobtitle}
-      />
-      <PhoneNumberInput
-        id="phoneNumber"
-        value={phoneNumber}
-        onChange={setPhoneNumber}
-        error={fieldErrors.phonenumber}
-      />
-      <Input
-        id="email"
-        label="Email"
-        type="email"
-        value={email}
-        onChange={(e) => setEmail(e.target.value)}
-        error={fieldErrors.email}
-      />
-      <div className="grid gap-4 sm:grid-cols-2">
-        <div className="flex flex-col gap-1">
-          <label htmlFor="joiningDate" className="text-sm font-medium">
-            Joining date
-          </label>
-          <input
-            id="joiningDate"
-            type="date"
-            value={joiningDate}
-            onChange={(e) => setJoiningDate(e.target.value)}
-            className="rounded-md border border-border bg-surface px-3 py-2 text-sm outline-none transition-colors focus:border-primary focus:ring-2 focus:ring-primary/25"
-          />
-          {fieldErrors.joiningdate && <p className="text-sm text-danger">{fieldErrors.joiningdate}</p>}
-        </div>
+    <form onSubmit={handleSubmit} noValidate className="flex flex-col">
+      <div className="grid gap-3 sm:grid-cols-2">
+        <Input
+          id="employeeCode"
+          label="Employee code"
+          placeholder="e.g. EMP-014"
+          value={employeeCode}
+          onChange={(e) => setEmployeeCode(e.target.value)}
+          error={fieldErrors.employeecode}
+        />
+        <Input
+          id="fullName"
+          label="Full name"
+          value={fullName}
+          onChange={(e) => setFullName(e.target.value)}
+          error={fieldErrors.fullname}
+        />
+        <PhoneNumberInput
+          id="phoneNumber"
+          value={phoneNumber}
+          onChange={setPhoneNumber}
+          error={fieldErrors.phonenumber}
+        />
+        <Input
+          id="email"
+          label="Email"
+          type="email"
+          value={email}
+          onChange={(e) => setEmail(e.target.value)}
+          error={fieldErrors.email}
+        />
+        <Input
+          id="jobTitle"
+          label="Job title"
+          placeholder="e.g. Master Tailor"
+          value={jobTitle}
+          onChange={(e) => setJobTitle(e.target.value)}
+          error={fieldErrors.jobtitle}
+        />
         <div className="flex flex-col gap-1">
           <label htmlFor="employmentType" className="text-sm font-medium">
             Employment type
@@ -170,19 +166,35 @@ export function EmployeeForm({ initialValues = emptyValues, submitLabel, onSubmi
             ))}
           </select>
         </div>
+        <div className="flex flex-col gap-1">
+          <label htmlFor="joiningDate" className="text-sm font-medium">
+            Joining date
+          </label>
+          <input
+            id="joiningDate"
+            type="date"
+            value={joiningDate}
+            onChange={(e) => setJoiningDate(e.target.value)}
+            className="rounded-md border border-border bg-surface px-3 py-2 text-sm outline-none transition-colors focus:border-primary focus:ring-2 focus:ring-primary/25"
+          />
+          {fieldErrors.joiningdate && <p className="text-sm text-danger">{fieldErrors.joiningdate}</p>}
+        </div>
       </div>
 
       {formError && (
-        <p role="alert" className="text-sm text-danger">
+        <p role="alert" className="mt-3 text-sm text-danger">
           {formError}
         </p>
       )}
 
-      <div className="flex justify-end gap-3">
-        <Button type="submit" disabled={isSubmitting}>
-          {isSubmitting ? "Saving…" : submitLabel}
+      <ModalActions>
+        <Button type="button" variant="secondary" onClick={onCancel} disabled={isSubmitting}>
+          CANCEL
         </Button>
-      </div>
+        <Button type="submit" disabled={isSubmitting}>
+          {isSubmitting ? "Saving…" : "SUBMIT"}
+        </Button>
+      </ModalActions>
     </form>
   );
 }
