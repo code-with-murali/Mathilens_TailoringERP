@@ -9,27 +9,41 @@ const fieldClassName =
  * Far enough back to predate any record the shop holds, so "All" needs no special case downstream.
  *
  * The reports take a required from-and-to; a sentinel keeps that contract intact rather than making
- * both ends nullable through the query, the handler and the export for the sake of one chip.
+ * both ends nullable through the query, the handler and the export for the sake of one option.
  */
 export const ALL_TIME_FROM = "1900-01-01";
 
 /**
  * Ranges the shop actually thinks in — everything at the top, then day-to-day operations at the
  * short end and season-over-season comparison at the long end.
+ *
+ * Every one of them lives in the dropdown. They were a row of chips beside a permanently visible
+ * From/To pair, which put three ways of saying the same thing on screen at once and let the chips
+ * and the boxes disagree about the period being shown.
  */
 export const RANGE_PRESETS = [
   { key: "all", label: "All" },
   { key: "today", label: "Today", days: 1 },
-  { key: "7d", label: "Last 7 days", days: 7 },
-  { key: "30d", label: "Last 30 days", days: 30 },
-  { key: "3m", label: "Last 3 months", months: 3 },
-  { key: "6m", label: "Last 6 months", months: 6 },
-  { key: "9m", label: "Last 9 months", months: 9 },
-  { key: "1y", label: "Last 1 year", months: 12 },
+  { key: "7d", label: "Last 7 Days", days: 7 },
+  { key: "30d", label: "Last 30 Days", days: 30 },
+  { key: "3m", label: "Last 3 Months", months: 3 },
+  { key: "6m", label: "Last 6 Months", months: 6 },
+  { key: "9m", label: "Last 9 Months", months: 9 },
+  { key: "1y", label: "Last 1 Year", months: 12 },
 ] as const;
 
-type RangePreset = (typeof RANGE_PRESETS)[number];
-export type PresetKey = RangePreset["key"] | "custom";
+/**
+ * The three the counter asks for by name, put within one tap of the screen opening.
+ *
+ * They are shortcuts into the dropdown beside them, not a second control: both write the same
+ * selection, so whichever is used, the other shows it. The remaining windows stay in the dropdown
+ * alone — a row of eight buttons is the chip row this replaced.
+ */
+const QUICK_PRESETS = ["today", "7d", "30d"] as const;
+
+/** The windows that know their own dates — everything except Custom, which is told them. */
+export type PresetOptionKey = (typeof RANGE_PRESETS)[number]["key"];
+export type PresetKey = PresetOptionKey | "custom";
 
 /**
  * Every report opens on the full history. A shop opening Revenue is asking what the business has
@@ -47,7 +61,7 @@ export function toIsoDate(date: Date): string {
 }
 
 /** Both ends inclusive: "Last 7 days" is today and the six before it, not today minus seven. */
-export function presetRange(key: PresetKey): { from: string; to: string } {
+export function presetRange(key: PresetOptionKey): { from: string; to: string } {
   const to = new Date();
 
   // Handled before the arithmetic because it is the one preset with no length to subtract.
@@ -81,11 +95,28 @@ export function toUtcRange(fromDate: string, toDate: string): { fromUtc: string;
   };
 }
 
-export function StatTile({ label, value }: { label: string; value: string }) {
+/**
+ * One figure, with a line saying what it counts.
+ *
+ * The explanation sits on the tile rather than in a paragraph at the top of the screen. A block of
+ * prose above seven numbers has to name each of them before it can describe them, and nobody reads
+ * it twice; a line under the number answers the question at the moment it gets asked.
+ *
+ * justify-between rather than a margin, so those lines sit on a common baseline across the row —
+ * the grid already stretches every tile to the tallest, and without it a one-line description
+ * floated up under its value while its neighbour's two-line one stayed put.
+ */
+export function StatTile({ label, value, description }: { label: string; value: string; description?: string }) {
   return (
-    <div className="rounded-md border border-border p-4">
-      <div className="text-sm text-foreground/70">{label}</div>
-      <div className="mt-1 text-xl font-semibold">{value}</div>
+    <div className="flex h-full flex-col justify-between gap-3 rounded-md border border-border bg-surface p-4">
+      <div>
+        <div className="text-sm text-foreground/70">{label}</div>
+        {/* tabular-nums so the figures line up down the column instead of shifting with the digits. */}
+        <div className="mt-1 text-xl font-semibold tabular-nums">{value}</div>
+      </div>
+      {description && (
+        <p className="border-t border-border pt-3 text-xs leading-snug text-foreground/60">{description}</p>
+      )}
     </div>
   );
 }
@@ -95,91 +126,125 @@ export type ReportRange = ReturnType<typeof useReportRange>;
 /**
  * The date range a report screen is showing.
  *
- * Held here rather than in each screen so the six reports cannot drift into describing different
+ * Held here rather than in each screen so the three reports cannot drift into describing different
  * periods with the same words — they were one page with one control until they were split apart,
  * and this keeps that guarantee.
+ *
+ * A named window derives its dates rather than storing them; only Custom keeps a pair, because only
+ * Custom has dates that cannot be worked out from the choice. That is what stops the old failure
+ * where the chip said "Last 7 days" while the boxes beside it held something else entirely.
  */
 export function useReportRange(initial: PresetKey = DEFAULT_PRESET) {
   const [preset, setPreset] = useState<PresetKey>(initial);
-  const [fromDate, setFromDate] = useState(() => presetRange(initial).from);
-  const [toDate, setToDate] = useState(() => presetRange(initial).to);
+  const [customFrom, setCustomFrom] = useState(() => presetRange("today").from);
+  const [customTo, setCustomTo] = useState(() => presetRange("today").to);
+
+  const window = preset === "custom" ? { from: customFrom, to: customTo } : presetRange(preset);
 
   function applyPreset(key: PresetKey) {
-    const { from, to } = presetRange(key);
+    // Switching to Custom seeds the boxes with the window already on screen, so the report does not
+    // jump to some unrelated period the moment the option is picked.
+    if (key === "custom" && preset !== "custom") {
+      setCustomFrom(window.from === ALL_TIME_FROM ? presetRange("30d").from : window.from);
+      setCustomTo(window.to);
+    }
     setPreset(key);
-    setFromDate(from);
-    setToDate(to);
   }
 
-  return { preset, fromDate, toDate, applyPreset, setPreset, setFromDate, setToDate };
+  return {
+    preset,
+    fromDate: window.from,
+    toDate: window.to,
+    applyPreset,
+    setCustomFrom,
+    setCustomTo,
+  };
 }
 
-/** The preset chips and the two date boxes. Editing either date is itself the way into Custom. */
+/**
+ * One dropdown. The two date boxes belong to Custom alone and appear with it — every other window
+ * already knows its own dates, and showing them empty-handed beside a preset was the thing that
+ * made the old control ambiguous.
+ */
 export function ReportRangeFilter({ range }: { range: ReportRange }) {
-  const { preset, fromDate, toDate, applyPreset, setPreset, setFromDate, setToDate } = range;
+  const { preset, fromDate, toDate, applyPreset, setCustomFrom, setCustomTo } = range;
 
   return (
-    <div className="flex flex-col gap-4">
-      <div className="flex flex-wrap gap-2">
-        {RANGE_PRESETS.map((option) => (
-          <button
-            key={option.key}
-            type="button"
-            onClick={() => applyPreset(option.key)}
-            aria-pressed={preset === option.key}
-            className={
-              preset === option.key
-                ? "rounded-full border border-primary bg-primary px-3 py-1.5 text-sm font-medium text-white"
-                : "rounded-full border border-border px-3 py-1.5 text-sm text-foreground/70 transition-colors hover:border-primary hover:text-foreground"
-            }
-          >
-            {option.label}
-          </button>
-        ))}
-        <span
-          aria-hidden="true"
-          className={
-            preset === "custom"
-              ? "rounded-full border border-primary bg-primary px-3 py-1.5 text-sm font-medium text-white"
-              : "rounded-full border border-border px-3 py-1.5 text-sm text-foreground/50"
-          }
+    <div className="flex flex-wrap items-end gap-4">
+      <div className="flex flex-col gap-1">
+        <label htmlFor="reportRange" className="text-sm font-medium">
+          Filter by date
+        </label>
+        <select
+          id="reportRange"
+          value={preset}
+          onChange={(e) => applyPreset(e.target.value as PresetKey)}
+          className={`max-w-xs ${fieldClassName}`}
         >
-          Custom
-        </span>
+          {RANGE_PRESETS.map((option) => (
+            <option key={option.key} value={option.key}>
+              {option.label}
+            </option>
+          ))}
+          <option value="custom">Custom range…</option>
+        </select>
       </div>
 
-      <div className="flex flex-wrap items-end gap-4">
-        <div className="flex flex-col gap-1">
-          <label htmlFor="fromDate" className="text-sm font-medium">
-            From
-          </label>
-          <input
-            id="fromDate"
-            type="date"
-            value={fromDate}
-            onChange={(e) => {
-              setPreset("custom");
-              setFromDate(e.target.value);
-            }}
-            className={fieldClassName}
-          />
-        </div>
-        <div className="flex flex-col gap-1">
-          <label htmlFor="toDate" className="text-sm font-medium">
-            To
-          </label>
-          <input
-            id="toDate"
-            type="date"
-            value={toDate}
-            onChange={(e) => {
-              setPreset("custom");
-              setToDate(e.target.value);
-            }}
-            className={fieldClassName}
-          />
-        </div>
+      {/* Same padding and border as the select, so the row sits on one line rather than stepping. */}
+      <div className="flex flex-wrap gap-2">
+        {QUICK_PRESETS.map((key) => {
+          const option = RANGE_PRESETS.find((p) => p.key === key)!;
+          const isActive = preset === key;
+          return (
+            <button
+              key={key}
+              type="button"
+              onClick={() => applyPreset(key)}
+              /* aria-pressed, not colour alone — which of the three is on is otherwise carried by
+                 nothing a screen reader reads out. */
+              aria-pressed={isActive}
+              className={
+                isActive
+                  ? "rounded-md border border-primary bg-primary px-3 py-2 text-sm font-medium text-white"
+                  : "rounded-md border border-border bg-surface px-3 py-2 text-sm text-foreground/70 transition-colors hover:border-primary hover:text-foreground"
+              }
+            >
+              {option.label}
+            </button>
+          );
+        })}
       </div>
+
+      {preset === "custom" && (
+        <>
+          <div className="flex flex-col gap-1">
+            <label htmlFor="fromDate" className="text-sm font-medium">
+              From
+            </label>
+            <input
+              id="fromDate"
+              type="date"
+              value={fromDate}
+              max={toDate}
+              onChange={(e) => setCustomFrom(e.target.value)}
+              className={fieldClassName}
+            />
+          </div>
+          <div className="flex flex-col gap-1">
+            <label htmlFor="toDate" className="text-sm font-medium">
+              To
+            </label>
+            <input
+              id="toDate"
+              type="date"
+              value={toDate}
+              min={fromDate}
+              onChange={(e) => setCustomTo(e.target.value)}
+              className={fieldClassName}
+            />
+          </div>
+        </>
+      )}
     </div>
   );
 }

@@ -39,14 +39,7 @@ export default function OrderCollectionsReportPage() {
   return (
     <div className="flex flex-col gap-6">
       <div className="flex items-start justify-between gap-4">
-        <div>
-          <h1 className="text-2xl font-semibold">Orders &amp; Collections</h1>
-          <p className="mt-1 text-sm text-foreground/70">
-            Orders booked in this period, valued at quantity × price — so work that hasn&apos;t been
-            invoiced yet is counted too. These are sales figures, not profit: the shop&apos;s cloth
-            cost, labour and overheads aren&apos;t recorded against an order.
-          </p>
-        </div>
+        <h1 className="text-2xl font-semibold">Orders &amp; Collections</h1>
         {/* Carries the range on screen, so the file covers the same period. */}
         <ExportButton
           resource="reports"
@@ -64,14 +57,47 @@ export default function OrderCollectionsReportPage() {
           {error}
         </p>
       ) : data ? (
-        <div className="grid grid-cols-2 gap-3 sm:grid-cols-4">
-          <StatTile label="Orders" value={String(data.orderCount)} />
-          <StatTile label="Order value" value={data.orderValue.toFixed(2)} />
-          <StatTile label="Delivered value" value={data.deliveredValue.toFixed(2)} />
-          <StatTile label="Collected" value={data.collectedAmount.toFixed(2)} />
-          <StatTile label="Pending" value={data.pendingAmount.toFixed(2)} />
-          <StatTile label="Cancelled" value={data.cancelledValue.toFixed(2)} />
-          <StatTile label="Discounts given" value={data.discountsGiven.toFixed(2)} />
+        /*
+          One tile per row on a phone. These carry a sentence now, and two columns on a 320px screen
+          left roughly seventy pixels of text per line — the description wrapped to five lines and
+          the tile was taller than the two-up saved.
+        */
+        <div className="grid grid-cols-1 gap-3 sm:grid-cols-2 lg:grid-cols-4">
+          <StatTile
+            label="Orders"
+            value={String(data.orderCount)}
+            description="Orders booked in this period, cancelled ones included."
+          />
+          <StatTile
+            label="Order value"
+            value={data.orderValue.toFixed(2)}
+            description="Quantity × price, whether or not a bill has been raised. Excludes cancelled."
+          />
+          <StatTile
+            label="Delivered value"
+            value={data.deliveredValue.toFixed(2)}
+            description="The share of that value already handed over to the customer."
+          />
+          <StatTile
+            label="Collected"
+            value={data.collectedAmount.toFixed(2)}
+            description="Money actually received against these orders."
+          />
+          <StatTile
+            label="Pending"
+            value={data.pendingAmount.toFixed(2)}
+            description="Still to come in: unpaid bills, plus work not yet billed."
+          />
+          <StatTile
+            label="Cancelled"
+            value={data.cancelledValue.toFixed(2)}
+            description="Value of cancelled orders. Counted here and in no other tile."
+          />
+          <StatTile
+            label="Discounts given"
+            value={data.discountsGiven.toFixed(2)}
+            description="Reductions applied on the invoices for these orders."
+          />
         </div>
       ) : null}
     </div>

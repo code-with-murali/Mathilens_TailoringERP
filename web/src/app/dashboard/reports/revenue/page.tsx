@@ -37,13 +37,7 @@ export default function RevenueReportPage() {
   return (
     <div className="flex flex-col gap-6">
       <div className="flex items-start justify-between gap-4">
-        <div>
-          <h1 className="text-2xl font-semibold">Revenue</h1>
-          <p className="mt-1 text-sm text-foreground/70">
-            Invoices raised in this period — the billing position, which will differ from the order
-            value on Orders &amp; Collections.
-          </p>
-        </div>
+        <h1 className="text-2xl font-semibold">Revenue</h1>
         {/* Carries the range on screen, so the file covers the same period. */}
         <ExportButton
           resource="reports"
@@ -61,11 +55,28 @@ export default function RevenueReportPage() {
           {error}
         </p>
       ) : data ? (
-        <div className="grid grid-cols-2 gap-3 sm:grid-cols-4">
-          <StatTile label="Invoices" value={String(data.invoiceCount)} />
-          <StatTile label="Invoiced" value={data.totalInvoiced.toFixed(2)} />
-          <StatTile label="Collected" value={data.totalCollected.toFixed(2)} />
-          <StatTile label="Outstanding" value={data.totalOutstanding.toFixed(2)} />
+        /* One per row on a phone, for the reason given on Orders & Collections. */
+        <div className="grid grid-cols-1 gap-3 sm:grid-cols-2 lg:grid-cols-4">
+          <StatTile
+            label="Invoices"
+            value={String(data.invoiceCount)}
+            description="Bills raised in this period, by invoice date."
+          />
+          <StatTile
+            label="Invoiced"
+            value={data.totalInvoiced.toFixed(2)}
+            description="Their total value, after discount and including tax."
+          />
+          <StatTile
+            label="Collected"
+            value={data.totalCollected.toFixed(2)}
+            description="Money actually received against those invoices."
+          />
+          <StatTile
+            label="Outstanding"
+            value={data.totalOutstanding.toFixed(2)}
+            description="Still owed on them — invoiced less collected."
+          />
         </div>
       ) : null}
     </div>
