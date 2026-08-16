@@ -1,16 +1,80 @@
 "use client";
 
-import { Suspense, useState, type FormEvent } from "react";
+import { Suspense, useEffect, useRef, useState, type FormEvent } from "react";
 import { useRouter } from "next/navigation";
 import { Button } from "@/components/ui/Button";
 import { apiPost, ApiError } from "@/lib/api-client";
 import { storeTokens, type AuthTokens } from "@/lib/auth";
+import { CUSTOMER_NAME } from "@/lib/customer";
+import { fieldWithAdornmentClassName, labelClassName } from "./fieldStyles";
 import { BandWeave } from "./LoginBackdrop";
 import { ResetCodeForm } from "./ResetCodeForm";
 import { SessionEndedNotice } from "./SessionEndedNotice";
 
-const fieldClassName =
-  "w-full rounded-md border border-border bg-surface py-3 pl-4 pr-11 text-sm outline-none transition-colors placeholder:text-foreground/45 focus:border-primary focus:ring-2 focus:ring-primary/25";
+/*
+  The wordmark's two-tone treatment, applied to whatever the shop is called: everything up to the
+  last space in the text colour, the last word in the brand purple — "Radha Fabric", "ABC Textiles".
+
+  Split rather than hardcoded because the name is a per-deployment setting. A single-word name has
+  no tail to colour, and colouring the whole of it would make the mark a different thing on one
+  customer's screen than on another's, so it stays whole.
+*/
+const lastSpace = CUSTOMER_NAME.lastIndexOf(" ");
+const customerHead = lastSpace === -1 ? CUSTOMER_NAME : CUSTOMER_NAME.slice(0, lastSpace);
+const customerTail = lastSpace === -1 ? "" : CUSTOMER_NAME.slice(lastSpace + 1);
+
+/* Enough to catch a typo, not enough to argue with a valid address. The server validates properly
+   (FluentValidation's EmailAddress on LoginCommand); this only exists to save a round trip. */
+const EMAIL_PATTERN = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+
+function validate(email: string, password: string): Record<string, string> {
+  const errors: Record<string, string> = {};
+  const trimmedEmail = email.trim();
+
+  if (!trimmedEmail) {
+    errors.email = "Email address is required.";
+  } else if (!EMAIL_PATTERN.test(trimmedEmail)) {
+    errors.email = "Please enter a valid email address.";
+  }
+
+  if (!password) {
+    errors.password = "Password is required.";
+  }
+
+  return errors;
+}
+
+/**
+ * What the user is told when signing in fails.
+ *
+ * Three different failures, three different answers — the point being that "Incorrect email or
+ * password" is a lie when the phone is off the Wi-Fi, and sends the user off retyping a password
+ * that was right all along.
+ *
+ * Wrong credentials get one message whether the address exists or not, which is the server's
+ * behaviour too: it answers Auth.InvalidCredentials for an unknown email and a wrong password
+ * alike. A locked account is deliberately allowed through with the server's own wording — being
+ * told to wait is the only thing that helps, and repeating "incorrect password" to someone whose
+ * password is correct just earns more failed attempts.
+ */
+function failureMessage(error: unknown): string {
+  if (!(error instanceof ApiError)) {
+    // fetch itself rejected: no response, so there is nothing to have got wrong but the connection.
+    return "Unable to connect to the server. Please try again.";
+  }
+
+  if (error.code === "Auth.InvalidCredentials") {
+    return "Incorrect email or password.";
+  }
+
+  // Anything unexpected, including a body that could not be parsed, is the app's problem to word —
+  // never the server's raw one, which is where stack traces and internals leak out.
+  if (error.status >= 500 || error.code === "UNKNOWN_ERROR") {
+    return "Something went wrong. Please try again.";
+  }
+
+  return error.message;
+}
 
 export default function LoginPage() {
   const router = useRouter();
@@ -20,34 +84,67 @@ export default function LoginPage() {
   const [fieldErrors, setFieldErrors] = useState<Record<string, string>>({});
   const [formError, setFormError] = useState<string | null>(null);
   const [isSubmitting, setIsSubmitting] = useState(false);
-  // Reached by link, never shown automatically — see ResetCodeForm for why an email address alone
-  // must not open a password-setting flow.
+  const emailRef = useRef<HTMLInputElement>(null);
+  const passwordRef = useRef<HTMLInputElement>(null);
+  /* State lags a fast double-tap: two taps inside one React render both see isSubmitting as false
+     and both post. The ref is set synchronously, so the second tap sees the first. */
+  const submittingRef = useRef(false);
+  // Reached only by URL, never shown automatically — see ResetCodeForm for why an email address
+  // alone must not open a password-setting flow.
   const [isRedeeming, setIsRedeeming] = useState(false);
   const [redeemed, setRedeemed] = useState(false);
 
+  /*
+    The one-time reset code an Owner issues is redeemed here, at /login?reset=1.
+
+    There is no link to it on the screen by design: the shop hands the code over in person, and the
+    login screen stays a login screen. Read from window.location rather than useSearchParams so the
+    page keeps rendering statically — the same reason SessionEndedNotice is its own component.
+  */
+  useEffect(() => {
+    if (new URLSearchParams(window.location.search).get("reset") === "1") {
+      // eslint-disable-next-line react-hooks/set-state-in-effect
+      setIsRedeeming(true);
+    }
+  }, []);
+
   async function handleSubmit(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
+
+    if (submittingRef.current) {
+      return;
+    }
+
+    const errors = validate(email, password);
+    setFieldErrors(errors);
     setFormError(null);
-    setFieldErrors({});
+
+    if (Object.keys(errors).length > 0) {
+      // Straight to the field that needs fixing — on a phone the message can easily be under the
+      // keyboard, and focusing it both scrolls it into view and says it to a screen reader.
+      (errors.email ? emailRef : passwordRef).current?.focus();
+      return;
+    }
+
+    submittingRef.current = true;
     setIsSubmitting(true);
 
     try {
-      const tokens = await apiPost<AuthTokens>("/api/v1/auth/login", { email, password });
+      const tokens = await apiPost<AuthTokens>("/api/v1/auth/login", { email: email.trim(), password });
       storeTokens(tokens);
       router.push("/dashboard");
+      // Left in its loading state deliberately: the navigation is still in flight, and dropping
+      // back to "Login" for those few hundred milliseconds reads as though nothing happened.
     } catch (error) {
-      if (error instanceof ApiError) {
-        if (error.details) {
-          setFieldErrors(
-            Object.fromEntries(error.details.map((d) => [d.field.toLowerCase(), d.message])),
-          );
-        }
-        setFormError(error.message);
-      } else {
-        setFormError("Unable to reach the server. Please try again.");
-      }
-    } finally {
+      submittingRef.current = false;
       setIsSubmitting(false);
+
+      if (error instanceof ApiError && error.details) {
+        setFieldErrors(
+          Object.fromEntries(error.details.map((d) => [d.field.toLowerCase(), d.message])),
+        );
+      }
+      setFormError(failureMessage(error));
     }
   }
 
@@ -57,8 +154,10 @@ export default function LoginPage() {
       on the seam between the panel and the band and there is room for all of it.
 
       On a phone it is min-height instead: the card is the whole page there, and clipping the Login
-      button off the bottom of a short handset is a worse outcome than a short scroll. dvh rather
-      than vh because a phone's retracting address bar makes 100vh taller than what is on show.
+      button off the bottom of a short handset is a worse outcome than a short scroll. That is also
+      what lets the on-screen keyboard work — the page simply gets shorter than its content and
+      scrolls, where a fixed height would trap the button underneath. dvh rather than vh because a
+      phone's retracting address bar makes 100vh taller than what is on show.
     */
     <main className="relative flex min-h-dvh flex-col bg-background lg:h-dvh lg:min-h-0 lg:overflow-hidden">
       {/*
@@ -117,35 +216,61 @@ export default function LoginPage() {
 
         {/* ---- Sign-in card ---- */}
         <div className="w-full max-w-[30rem] shrink-0 rounded-xl border border-border bg-surface px-5 py-7 shadow-[0_18px_50px_-12px_rgba(0,0,0,0.35)] sm:px-10 sm:py-9">
-          <div className="flex flex-col items-center">
+          <div className="flex flex-col items-center text-center">
             {/*
               The machine, on a phone.
 
               Below lg the artwork beside the card is hidden — there is no room for a column next to
               the form — which left the one thing on the page that says what the shop does absent
               from the view most staff actually sign in on. Here it sits above the wordmark instead,
-              small enough to cost the form nothing.
+              small enough to cost the form nothing. Smaller again on the shortest handsets, where
+              every row above the Login button is one the thumb has to scroll past.
 
               Held on a light plate in both themes for the same reason the wide layout's panel is:
               the source is a black machine on a transparent background, and on the dark surface it
               would be a silhouette in a hole.
             */}
+            {/* Its own asset, not the one the wide layout uses: this is the icon.png supplied for
+                the phone, converted the same way login.webp was — near-white background cleared to
+                alpha, then cut to 360px tall, which is the largest phone rendering (80px) at 3x.
+                862 KB of PNG became 18 KB of WebP; the original is unusable over a shop's mobile
+                data, and its opaque background would have shown as a white slab on the plate. */}
             {/* eslint-disable-next-line @next/next/no-img-element -- output: "export" has no image optimiser configured */}
             <img
-              src="/login.webp"
+              src="/icon.webp"
               alt=""
-              className="mb-3 h-20 w-auto rounded-lg bg-[#f6f4f0] object-contain px-3 py-2 lg:hidden"
+              className="mb-4 h-16 w-auto max-w-full rounded-lg bg-[#f6f4f0] object-contain px-3 py-2 sm:h-20 lg:hidden"
             />
-            <span className="flex h-12 w-12 items-center justify-center rounded-xl bg-primary text-xl font-bold text-primary-foreground">
-              M
-            </span>
-            <p className="mt-2.5 text-lg font-bold tracking-tight">
-              Mathilens <span className="text-primary">Tailoring</span>
+            {/* The shop's own name is the wordmark — staff signing in work for the shop, not for the
+                company that wrote the software, which keeps its credit in the footer. No monogram
+                tile above it either: on the wide layout the machine beside the card is already the
+                page's mark, and a second logo said the same thing twice. */}
+            <p className="text-lg font-bold tracking-tight">
+              {customerHead}
+              {customerTail && (
+                <>
+                  {" "}
+                  <span className="text-primary">{customerTail}</span>
+                </>
+              )}
             </p>
           </div>
 
-          <h1 className="mt-6 text-center text-xl font-semibold">Sign In with your Email</h1>
-          <span className="mx-auto mt-2 block h-0.5 w-24 rounded-full bg-primary/70" />
+          {/* The card has two jobs and one heading, so the heading says which one is on screen —
+              "Set your password" over a form asking for credentials is an instruction for a form
+              that isn't there. */}
+          <h1 className="mt-6 text-center text-xl font-semibold tracking-tight">
+            {isRedeeming ? "Set your password" : "Sign in to your account"}
+          </h1>
+          {/* Only the reset flow gets a line under the heading, and only because it is a real
+              instruction: without it the code form never says where the code comes from. Sign-in had
+              one too — "Enter your credentials to continue" — but it told the reader nothing the two
+              labelled fields below it do not, so it is gone rather than merely hidden. */}
+          {isRedeeming && (
+            <p className="mt-1.5 text-center text-sm text-foreground/70">
+              Enter the code the shop owner gave you, then choose your own password.
+            </p>
+          )}
 
           {isRedeeming ? (
             <ResetCodeForm
@@ -167,99 +292,134 @@ export default function LoginPage() {
                   Password set. Sign in with it below.
                 </p>
               )}
-          <form onSubmit={handleSubmit} noValidate className="mt-7 flex flex-col gap-4">
-            <div>
-              {/* Labels are read out but not drawn: the reference puts the name in the field
-                  itself, and a placeholder alone would leave the input unnamed to a screen reader. */}
-              <label htmlFor="email" className="sr-only">
-                Email address
-              </label>
-              <div className="relative">
-                <input
-                  id="email"
-                  name="email"
-                  type="email"
-                  autoComplete="email"
-                  required
-                  placeholder="Email Address *"
-                  value={email}
-                  onChange={(e) => setEmail(e.target.value)}
-                  className={fieldClassName}
-                  aria-invalid={Boolean(fieldErrors.email)}
-                />
-                <svg
-                  viewBox="0 0 24 24"
-                  className="pointer-events-none absolute right-3.5 top-1/2 h-5 w-5 -translate-y-1/2 text-foreground/40"
-                  aria-hidden="true"
-                >
-                  <rect x="3" y="5" width="18" height="14" rx="2.5" fill="none" stroke="currentColor" strokeWidth="1.7" />
-                  <path d="M3.5 7 L12 13 L20.5 7" fill="none" stroke="currentColor" strokeWidth="1.7" strokeLinecap="round" />
-                </svg>
-              </div>
-              {fieldErrors.email && <p className="mt-1.5 text-sm text-danger">{fieldErrors.email}</p>}
-            </div>
-
-            <div>
-              <label htmlFor="password" className="sr-only">
-                Password
-              </label>
-              <div className="relative">
-                <input
-                  id="password"
-                  name="password"
-                  type={showPassword ? "text" : "password"}
-                  autoComplete="current-password"
-                  required
-                  placeholder="Password *"
-                  value={password}
-                  onChange={(e) => setPassword(e.target.value)}
-                  className={fieldClassName}
-                  aria-invalid={Boolean(fieldErrors.password)}
-                />
-                {/* Typing a password on a tablet's on-screen keyboard is easy to get wrong and
-                    impossible to check — so it can be revealed, on the device holding it. */}
-                <button
-                  type="button"
-                  onClick={() => setShowPassword((shown) => !shown)}
-                  className="absolute right-2 top-1/2 -translate-y-1/2 rounded-md p-1.5 text-foreground/45 transition-colors hover:text-foreground"
-                  aria-label={showPassword ? "Hide password" : "Show password"}
-                >
-                  <svg viewBox="0 0 24 24" className="h-5 w-5" aria-hidden="true">
-                    <path
-                      d="M2.5 12S6 5.5 12 5.5 21.5 12 21.5 12 18 18.5 12 18.5 2.5 12 2.5 12Z"
-                      fill="none"
-                      stroke="currentColor"
-                      strokeWidth="1.7"
-                      strokeLinejoin="round"
+              <form onSubmit={handleSubmit} noValidate className="mt-6 flex flex-col gap-4">
+                <div>
+                  <label htmlFor="email" className={labelClassName}>
+                    Email address
+                  </label>
+                  <div className="relative">
+                    <input
+                      ref={emailRef}
+                      id="email"
+                      name="email"
+                      type="email"
+                      /* The @-key keyboard on a phone, and none of the helpfulness that turns
+                         "anita@" into "Anita@" on the way in. */
+                      inputMode="email"
+                      autoComplete="email"
+                      autoCapitalize="none"
+                      autoCorrect="off"
+                      spellCheck={false}
+                      enterKeyHint="next"
+                      required
+                      placeholder="Enter your email"
+                      value={email}
+                      onChange={(e) => setEmail(e.target.value)}
+                      disabled={isSubmitting}
+                      className={fieldWithAdornmentClassName}
+                      aria-invalid={Boolean(fieldErrors.email)}
+                      aria-describedby={fieldErrors.email ? "email-error" : undefined}
                     />
-                    <circle cx="12" cy="12" r="3.2" fill="none" stroke="currentColor" strokeWidth="1.7" />
-                    {!showPassword && (
-                      <path d="M4 20 L20 4" fill="none" stroke="currentColor" strokeWidth="1.7" strokeLinecap="round" />
-                    )}
-                  </svg>
-                </button>
-              </div>
-              {fieldErrors.password && <p className="mt-1.5 text-sm text-danger">{fieldErrors.password}</p>}
-            </div>
+                    <svg
+                      viewBox="0 0 24 24"
+                      className="pointer-events-none absolute right-4 top-1/2 h-5 w-5 -translate-y-1/2 text-foreground/40"
+                      aria-hidden="true"
+                    >
+                      <rect x="3" y="5" width="18" height="14" rx="2.5" fill="none" stroke="currentColor" strokeWidth="1.7" />
+                      <path d="M3.5 7 L12 13 L20.5 7" fill="none" stroke="currentColor" strokeWidth="1.7" strokeLinecap="round" />
+                    </svg>
+                  </div>
+                  {fieldErrors.email && (
+                    <p id="email-error" className="mt-1.5 text-sm text-danger">
+                      {fieldErrors.email}
+                    </p>
+                  )}
+                </div>
 
-            {formError && (
-              <p role="alert" className="rounded-md border border-danger/30 bg-danger/10 px-3 py-2 text-sm text-danger">
-                {formError}
-              </p>
-            )}
+                <div>
+                  <label htmlFor="password" className={labelClassName}>
+                    Password
+                  </label>
+                  <div className="relative">
+                    <input
+                      ref={passwordRef}
+                      id="password"
+                      name="password"
+                      type={showPassword ? "text" : "password"}
+                      autoComplete="current-password"
+                      /* Only matter once the password is revealed — at which point it is an ordinary
+                         text field, and the keyboard would otherwise capitalise and correct it. */
+                      autoCapitalize="none"
+                      autoCorrect="off"
+                      spellCheck={false}
+                      enterKeyHint="go"
+                      required
+                      placeholder="Enter your password"
+                      value={password}
+                      onChange={(e) => setPassword(e.target.value)}
+                      disabled={isSubmitting}
+                      className={fieldWithAdornmentClassName}
+                      aria-invalid={Boolean(fieldErrors.password)}
+                      aria-describedby={fieldErrors.password ? "password-error" : undefined}
+                    />
+                    {/* Typing a password on an on-screen keyboard is easy to get wrong and
+                        impossible to check — so it can be revealed, on the device holding it.
 
-            <Button type="submit" disabled={isSubmitting} className="mx-auto mt-3 px-12">
-              {isSubmitting ? "Signing in…" : "Login"}
-            </Button>
-          </form>
+                        A 44px square, not the icon's 20: the tap target has to be a thumb's worth,
+                        and it sits inside the field's 48px height rather than growing it. */}
+                    <button
+                      type="button"
+                      onClick={() => setShowPassword((shown) => !shown)}
+                      disabled={isSubmitting}
+                      className="absolute right-1 top-1/2 flex h-11 w-11 -translate-y-1/2 items-center justify-center rounded-md text-foreground/50 transition-colors hover:text-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary/40 disabled:cursor-not-allowed"
+                      aria-label={showPassword ? "Hide password" : "Show password"}
+                      aria-pressed={showPassword}
+                    >
+                      <svg viewBox="0 0 24 24" className="h-5 w-5" aria-hidden="true">
+                        <path
+                          d="M2.5 12S6 5.5 12 5.5 21.5 12 21.5 12 18 18.5 12 18.5 2.5 12 2.5 12Z"
+                          fill="none"
+                          stroke="currentColor"
+                          strokeWidth="1.7"
+                          strokeLinejoin="round"
+                        />
+                        <circle cx="12" cy="12" r="3.2" fill="none" stroke="currentColor" strokeWidth="1.7" />
+                        {!showPassword && (
+                          <path d="M4 20 L20 4" fill="none" stroke="currentColor" strokeWidth="1.7" strokeLinecap="round" />
+                        )}
+                      </svg>
+                    </button>
+                  </div>
+                  {fieldErrors.password && (
+                    <p id="password-error" className="mt-1.5 text-sm text-danger">
+                      {fieldErrors.password}
+                    </p>
+                  )}
+                </div>
 
-              <button
-                type="button"
-                onClick={() => setIsRedeeming(true)}
-                className="mt-5 w-full text-center text-sm text-primary hover:underline"
-              >
-                Have a reset code?
-              </button>
+                {formError && (
+                  <p role="alert" className="rounded-md border border-danger/30 bg-danger/10 px-3 py-2 text-sm text-danger">
+                    {formError}
+                  </p>
+                )}
+
+                {/* Full width where the screen is a phone and the thumb is the pointer; the compact
+                    centred button the wider layout was drawn around from sm up. */}
+                <Button
+                  type="submit"
+                  disabled={isSubmitting}
+                  aria-busy={isSubmitting}
+                  className="mt-2 flex min-h-12 w-full items-center justify-center gap-2 text-base sm:mx-auto sm:w-auto sm:px-12"
+                >
+                  {isSubmitting && (
+                    <svg viewBox="0 0 24 24" className="h-4 w-4 animate-spin" aria-hidden="true">
+                      <circle cx="12" cy="12" r="9" fill="none" stroke="currentColor" strokeWidth="2.5" opacity="0.3" />
+                      <path d="M21 12a9 9 0 0 0-9-9" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" />
+                    </svg>
+                  )}
+                  {isSubmitting ? "Signing in…" : "Login"}
+                </Button>
+              </form>
             </>
           )}
 
@@ -275,10 +435,16 @@ export default function LoginPage() {
         </div>
       </div>
 
-      {/* Over the page background on a narrow screen, over the light left panel on a wide one — so
+      {/* In the flow, not pinned: on a short handset with the keyboard up it should scroll away
+          under the card rather than sit on top of it.
+
+          Over the page background on a narrow screen, over the light left panel on a wide one — so
           on lg it needs an explicit dark, not the theme's foreground, which is near-white in dark
-          mode and would vanish against the panel. */}
-      <footer className="relative shrink-0 px-5 pb-5 text-center text-xs text-foreground/60 lg:text-black/55">
+          mode and would vanish against the panel.
+
+          The safe-area inset is what keeps it clear of the home indicator on a tall iPhone. It
+          resolves to 0 on everything else, including this app today, and costs nothing there. */}
+      <footer className="relative shrink-0 px-5 pb-[calc(1.25rem+env(safe-area-inset-bottom))] text-center text-xs text-foreground/60 lg:text-black/55">
         © {new Date().getFullYear()} Mathilens Tailoring ERP. All rights reserved.
       </footer>
     </main>

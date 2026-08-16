@@ -4,9 +4,7 @@ import { useState, type FormEvent } from "react";
 import { Button } from "@/components/ui/Button";
 import { ApiError } from "@/lib/api-client";
 import { redeemResetCode } from "@/lib/api/auth";
-
-const fieldClassName =
-  "w-full rounded-md border border-border bg-surface py-3 px-4 text-sm outline-none transition-colors placeholder:text-foreground/45 focus:border-primary focus:ring-2 focus:ring-primary/25";
+import { fieldClassName, labelClassName } from "./fieldStyles";
 
 /**
  * Redeeming the one-time code an Owner handed over, and choosing a password with it.
@@ -54,13 +52,11 @@ export function ResetCodeForm({ onDone, onCancel }: { onDone: () => void; onCanc
   }
 
   return (
-    <form onSubmit={handleSubmit} noValidate className="mt-7 flex flex-col gap-4">
-      <p className="text-sm text-foreground/70">
-        Enter the code the shop owner gave you, then choose your own password.
-      </p>
-
+    /* The instruction that used to sit here is now the page heading's supporting line, so it reads
+       once, above the form, in the same place the sign-in form's does. */
+    <form onSubmit={handleSubmit} noValidate className="mt-6 flex flex-col gap-4">
       <div>
-        <label htmlFor="resetEmail" className="sr-only">
+        <label htmlFor="resetEmail" className={labelClassName}>
           Email address
         </label>
         <input
@@ -68,7 +64,7 @@ export function ResetCodeForm({ onDone, onCancel }: { onDone: () => void; onCanc
           type="email"
           autoComplete="email"
           required
-          placeholder="Email Address *"
+          placeholder="Enter your email"
           value={email}
           onChange={(e) => setEmail(e.target.value)}
           className={fieldClassName}
@@ -76,7 +72,7 @@ export function ResetCodeForm({ onDone, onCancel }: { onDone: () => void; onCanc
       </div>
 
       <div>
-        <label htmlFor="resetCode" className="sr-only">
+        <label htmlFor="resetCode" className={labelClassName}>
           Reset code
         </label>
         {/* Uppercased on the way in because the codes are generated that way; the server ignores
@@ -84,7 +80,7 @@ export function ResetCodeForm({ onDone, onCancel }: { onDone: () => void; onCanc
         <input
           id="resetCode"
           required
-          placeholder="Reset Code *"
+          placeholder="7K4M-92QP"
           value={code}
           onChange={(e) => setCode(e.target.value.toUpperCase())}
           className={`${fieldClassName} font-mono tracking-widest`}
@@ -97,7 +93,7 @@ export function ResetCodeForm({ onDone, onCancel }: { onDone: () => void; onCanc
       </div>
 
       <div>
-        <label htmlFor="resetNewPassword" className="sr-only">
+        <label htmlFor="resetNewPassword" className={labelClassName}>
           New password
         </label>
         <input
@@ -105,7 +101,7 @@ export function ResetCodeForm({ onDone, onCancel }: { onDone: () => void; onCanc
           type="password"
           autoComplete="new-password"
           required
-          placeholder="New Password *"
+          placeholder="Choose a new password"
           value={newPassword}
           onChange={(e) => setNewPassword(e.target.value)}
           className={fieldClassName}
@@ -114,7 +110,7 @@ export function ResetCodeForm({ onDone, onCancel }: { onDone: () => void; onCanc
       </div>
 
       <div>
-        <label htmlFor="resetConfirmPassword" className="sr-only">
+        <label htmlFor="resetConfirmPassword" className={labelClassName}>
           Confirm new password
         </label>
         <input
@@ -122,7 +118,7 @@ export function ResetCodeForm({ onDone, onCancel }: { onDone: () => void; onCanc
           type="password"
           autoComplete="new-password"
           required
-          placeholder="Confirm Password *"
+          placeholder="Re-enter the new password"
           value={confirmPassword}
           onChange={(e) => setConfirmPassword(e.target.value)}
           className={fieldClassName}

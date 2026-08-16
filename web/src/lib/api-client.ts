@@ -139,8 +139,11 @@ async function fetchWithAuthRetry(path: string, init: RequestInit, token?: strin
     if (typeof window !== "undefined") {
       // A full reload, not router.push: this module runs outside React (no useRouter access),
       // and a hard reset of all component state is exactly what an expired session calls for.
+      //
+      // Carrying the reason, for the same purpose "superseded" carries its own: landing back on the
+      // login screen mid-task with no explanation reads as the app having lost the work.
       // eslint-disable-next-line @next/next/no-location-assign-relative-destination
-      window.location.href = "/login";
+      window.location.href = "/login?ended=expired";
     }
     return response;
   }
