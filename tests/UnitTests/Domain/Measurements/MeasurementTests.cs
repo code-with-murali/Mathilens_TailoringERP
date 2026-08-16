@@ -10,11 +10,11 @@ public class MeasurementTests
         var customerId = Guid.NewGuid();
         var values = new Dictionary<string, decimal> { ["Chest"] = 40, ["Waist"] = 34 };
 
-        var measurement = Measurement.Create(customerId, GarmentType.Shirt, values);
+        var measurement = Measurement.Create(customerId, GarmentTypes.Shirt, values);
 
         Assert.NotEqual(Guid.Empty, measurement.Id);
         Assert.Equal(customerId, measurement.CustomerId);
-        Assert.Equal(GarmentType.Shirt, measurement.GarmentType);
+        Assert.Equal(GarmentTypes.Shirt, measurement.GarmentType);
         Assert.Equal(40, measurement.Values["Chest"]);
         Assert.Equal(34, measurement.Values["Waist"]);
     }
@@ -24,13 +24,13 @@ public class MeasurementTests
     {
         var values = new Dictionary<string, decimal> { ["Chest"] = 40 };
 
-        Assert.Throws<ArgumentException>(() => Measurement.Create(Guid.Empty, GarmentType.Shirt, values));
+        Assert.Throws<ArgumentException>(() => Measurement.Create(Guid.Empty, GarmentTypes.Shirt, values));
     }
 
     [Fact]
     public void Create_WithNoValues_Throws()
     {
-        Assert.Throws<ArgumentException>(() => Measurement.Create(Guid.NewGuid(), GarmentType.Shirt, new Dictionary<string, decimal>()));
+        Assert.Throws<ArgumentException>(() => Measurement.Create(Guid.NewGuid(), GarmentTypes.Shirt, new Dictionary<string, decimal>()));
     }
 
     [Fact]
@@ -38,7 +38,7 @@ public class MeasurementTests
     {
         var values = new Dictionary<string, decimal> { ["Chest"] = 0 };
 
-        Assert.Throws<ArgumentOutOfRangeException>(() => Measurement.Create(Guid.NewGuid(), GarmentType.Shirt, values));
+        Assert.Throws<ArgumentOutOfRangeException>(() => Measurement.Create(Guid.NewGuid(), GarmentTypes.Shirt, values));
     }
 
     [Fact]
@@ -46,13 +46,13 @@ public class MeasurementTests
     {
         var values = new Dictionary<string, decimal> { ["Chest"] = -5 };
 
-        Assert.Throws<ArgumentOutOfRangeException>(() => Measurement.Create(Guid.NewGuid(), GarmentType.Shirt, values));
+        Assert.Throws<ArgumentOutOfRangeException>(() => Measurement.Create(Guid.NewGuid(), GarmentTypes.Shirt, values));
     }
 
     [Fact]
     public void UpdateValues_ReplacesValues()
     {
-        var measurement = Measurement.Create(Guid.NewGuid(), GarmentType.Shirt, new Dictionary<string, decimal> { ["Chest"] = 40 });
+        var measurement = Measurement.Create(Guid.NewGuid(), GarmentTypes.Shirt, new Dictionary<string, decimal> { ["Chest"] = 40 });
 
         measurement.UpdateValues(new Dictionary<string, decimal> { ["Chest"] = 42, ["Sleeve"] = 25 });
 

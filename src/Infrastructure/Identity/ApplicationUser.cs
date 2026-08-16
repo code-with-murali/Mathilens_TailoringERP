@@ -16,6 +16,18 @@ namespace MathilensERP.Infrastructure.Identity;
 /// </summary>
 public class ApplicationUser : IdentityUser<Guid>, IAuditable, ISoftDeletable
 {
+    /// <summary>
+    /// What to call this person — "Kavitha R" rather than the address they sign in with.
+    ///
+    /// Nullable, because every account that existed before this column did has no name recorded and
+    /// nobody can invent one for them. Screens fall back to the email, which is what they showed
+    /// before, so an unnamed account reads exactly as it always did.
+    ///
+    /// Not <see cref="IdentityUser{TKey}.UserName"/>: that is set to the email and is what Identity
+    /// looks an account up by, so putting a display name in it would change how signing in works.
+    /// </summary>
+    public string? FullName { get; set; }
+
     public DateTime CreatedAtUtc { get; private set; }
 
     public Guid CreatedBy { get; private set; }

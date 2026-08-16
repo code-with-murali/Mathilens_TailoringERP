@@ -1,6 +1,6 @@
 "use client";
 
-import { useCallback, useEffect, useState, type FormEvent } from "react";
+import { useCallback, useEffect, useRef, useState, type FormEvent } from "react";
 import Link from "next/link";
 import { Button } from "@/components/ui/Button";
 import { Input } from "@/components/ui/Input";
@@ -40,6 +40,7 @@ export default function UserRolesPage() {
 
   const [pendingDelete, setPendingDelete] = useState<AppRole | null>(null);
   const [isDeleting, setIsDeleting] = useState(false);
+  const nameRef = useRef<HTMLInputElement>(null);
 
   const canManageRoles = can(PERMISSIONS.usersRoles);
 
@@ -131,12 +132,7 @@ export default function UserRolesPage() {
   return (
     <div className="flex flex-col gap-6">
       <div className="flex flex-wrap items-start justify-between gap-3">
-        <div className="min-w-0">
-          <h1 className="text-2xl font-semibold">User Role</h1>
-          <p className="mt-1 text-sm text-foreground/70">
-            The roles this shop hands out. A new one can do nothing until it is given rights on User Rights.
-          </p>
-        </div>
+        <h1 className="text-2xl font-semibold">User Role</h1>
         {canManageRoles && (
           <Button type="button" onClick={openAdd}>
             Add Role
@@ -180,22 +176,33 @@ export default function UserRolesPage() {
                       <Link href="/dashboard/user-rights" className="whitespace-nowrap text-foreground/70 hover:text-foreground">
                         Rights
                       </Link>
-                      {canManageRoles && !role.isBuiltIn && (
+                      {/* Shown on every row, greyed where the action is refused, rather than
+                          missing from built-in rows — an absent control reads as a screen that
+                          forgot them, and says nothing about why they cannot be touched. */}
+                      {canManageRoles && (
                         <>
                           <button
                             type="button"
                             onClick={() => openEdit(role)}
-                            className="text-foreground/70 hover:text-foreground"
+                            disabled={role.isBuiltIn}
+                            title={role.isBuiltIn ? "Built-in roles cannot be renamed" : undefined}
+                            className="text-foreground/70 hover:text-foreground disabled:cursor-not-allowed disabled:text-foreground/30 disabled:hover:text-foreground/30"
                           >
                             Edit
                           </button>
-                          {/* Offered only when nobody holds it. The server refuses either way —
-                              this is so the reason is visible before the click rather than after. */}
+                          {/* Refused while anybody holds it. The server refuses either way — this
+                              is so the reason is visible before the click rather than after. */}
                           <button
                             type="button"
                             onClick={() => setPendingDelete(role)}
-                            disabled={role.userCount > 0}
-                            title={role.userCount > 0 ? "In use by a user" : undefined}
+                            disabled={role.isBuiltIn || role.userCount > 0}
+                            title={
+                              role.isBuiltIn
+                                ? "Built-in roles cannot be deleted"
+                                : role.userCount > 0
+                                  ? `Held by ${role.userCount} ${role.userCount === 1 ? "user" : "users"}`
+                                  : undefined
+                            }
                             className="text-danger hover:text-danger-hover disabled:cursor-not-allowed disabled:text-foreground/30 disabled:hover:text-foreground/30"
                           >
                             Delete
@@ -223,6 +230,7 @@ export default function UserRolesPage() {
             placeholder="e.g. Assistant Manager"
             value={name}
             onChange={(e) => setName(e.target.value)}
+            ref={nameRef}
             autoFocus
           />
           <p className="mt-1 text-xs text-foreground/60">
@@ -237,8 +245,18 @@ export default function UserRolesPage() {
 
           <ModalActions>
             {/* CLEAR empties the field rather than closing the dialog — the X and Escape are what
-                close it. A mistyped name is the thing this is reached for. */}
-            <Button type="button" variant="secondary" onClick={() => setName("")} disabled={isSaving}>
+                close it. The cursor goes back into the box afterwards: emptying a field the eye is
+                not on, while focus sits on the button that did it, looks like nothing happened. */}
+            <Button
+              type="button"
+              variant="secondary"
+              onClick={() => {
+                setName("");
+                setFormError(null);
+                nameRef.current?.focus();
+              }}
+              disabled={isSaving}
+            >
               CLEAR
             </Button>
             <Button type="submit" disabled={isSaving}>

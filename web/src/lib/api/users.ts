@@ -1,15 +1,27 @@
-import { apiDelete, apiGet, apiGetPaged, apiPost, apiPostNoContent, apiPut } from "@/lib/api-client";
+import { apiDelete, apiGet, apiGetPaged, apiPost, apiPostNoContent, apiPut, apiPutNoContent } from "@/lib/api-client";
 import type { AuthTokens } from "@/lib/auth";
 
 export type CurrentUser = {
   id: string;
   email: string | null;
+  /** Null on an account created before names were recorded — show displayNameOf, not this. */
+  fullName: string | null;
   roles: string[];
   /** Resolved server-side from the roles, so the client never has to know the mapping. */
   permissions: string[];
 };
 
-export type AppUser = { id: string; email: string; role: string | null };
+export type AppUser = { id: string; email: string; fullName: string | null; role: string | null };
+
+/**
+ * What to call someone on screen: their name, or the email they sign in with where there is none.
+ *
+ * Accounts that existed before names were recorded have none, and nobody can invent one for them.
+ * Falling back to the email means those read exactly as they did before rather than as a blank.
+ */
+export function displayNameOf(user: { fullName: string | null; email: string | null }): string {
+  return user.fullName?.trim() || user.email || "";
+}
 
 /**
  * Mirrors Permissions.cs. Kept as strings so a permission added server-side needs no client change
@@ -94,12 +106,18 @@ export function resetUserPassword(id: string, newPassword: string, token: string
   return apiPostNoContent(`/api/v1/users/${id}/password`, { newPassword }, token);
 }
 
-export function createUser(email: string, password: string, role: string, token: string | null) {
-  return apiPost<AppUser>("/api/v1/users", { email, password, role }, token);
+export function createUser(email: string, password: string, fullName: string, role: string, token: string | null) {
+  return apiPost<AppUser>("/api/v1/users", { email, password, fullName, role }, token);
 }
 
+/** The API answers 204 here, so this must not go through apiPut — see apiPutNoContent. */
 export function setUserRole(id: string, role: string, token: string | null) {
-  return apiPut<void>(`/api/v1/users/${id}/role`, { role }, token);
+  return apiPutNoContent(`/api/v1/users/${id}/role`, { role }, token);
+}
+
+/** Renames a person. Their email is how they sign in and is not touched. Answers 204, like setUserRole. */
+export function setUserName(id: string, fullName: string, token: string | null) {
+  return apiPutNoContent(`/api/v1/users/${id}`, { fullName }, token);
 }
 
 /** One screen and the actions it defines — some screens are view-only and offer no Manage. */

@@ -11,8 +11,8 @@ public class GetMeasurementsByCustomerQueryHandlerTests
     public async Task Handle_ReturnsAllMeasurementsForCustomer()
     {
         var customerId = Guid.NewGuid();
-        var shirt = Measurement.Create(customerId, GarmentType.Shirt, new Dictionary<string, decimal> { ["Chest"] = 40 });
-        var trousers = Measurement.Create(customerId, GarmentType.Trousers, new Dictionary<string, decimal> { ["Waist"] = 34 });
+        var shirt = Measurement.Create(customerId, GarmentTypes.Shirt, new Dictionary<string, decimal> { ["Chest"] = 40 });
+        var trousers = Measurement.Create(customerId, GarmentTypes.Trousers, new Dictionary<string, decimal> { ["Waist"] = 34 });
         var repository = Substitute.For<IMeasurementRepository>();
         repository.GetByCustomerAsync(customerId, Arg.Any<CancellationToken>()).Returns([shirt, trousers]);
         var handler = new GetMeasurementsByCustomerQueryHandler(repository);

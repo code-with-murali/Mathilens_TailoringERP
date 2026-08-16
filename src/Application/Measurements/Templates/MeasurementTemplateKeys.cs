@@ -17,5 +17,9 @@ public static class MeasurementTemplateKeys
 {
     public const string Prefix = "Measurements.Template.";
 
-    public static string For(GarmentType garmentType) => $"{Prefix}{garmentType}";
+    /// <summary>
+    /// Normalised, so a garment typed with a stray space cannot claim a second template key and
+    /// leave the shop's edits apparently unsaved.
+    /// </summary>
+    public static string For(string garmentType) => $"{Prefix}{GarmentTypes.Normalise(garmentType)}";
 }

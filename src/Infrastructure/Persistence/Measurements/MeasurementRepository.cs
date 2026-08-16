@@ -17,7 +17,7 @@ public class MeasurementRepository : IMeasurementRepository
     public Task<Measurement?> GetByIdAsync(Guid id, CancellationToken cancellationToken) =>
         _dbContext.Measurements.SingleOrDefaultAsync(m => m.Id == id, cancellationToken);
 
-    public Task<bool> ExistsForCustomerAndGarmentTypeAsync(Guid customerId, GarmentType garmentType, CancellationToken cancellationToken) =>
+    public Task<bool> ExistsForCustomerAndGarmentTypeAsync(Guid customerId, string garmentType, CancellationToken cancellationToken) =>
         _dbContext.Measurements.AnyAsync(m => m.CustomerId == customerId && m.GarmentType == garmentType, cancellationToken);
 
     public async Task<IReadOnlyList<Measurement>> GetByCustomerAsync(Guid customerId, CancellationToken cancellationToken) =>

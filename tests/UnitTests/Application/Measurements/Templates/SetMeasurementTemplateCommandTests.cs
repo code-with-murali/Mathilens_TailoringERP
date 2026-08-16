@@ -18,13 +18,13 @@ public class SetMeasurementTemplateCommandHandlerTests
         var handler = new SetMeasurementTemplateCommandHandler(repository);
 
         var result = await handler.Handle(
-            new SetMeasurementTemplateCommand(GarmentType.Trousers, ["Length", "Waist"]), CancellationToken.None);
+            new SetMeasurementTemplateCommand(GarmentTypes.Trousers, ["Length", "Waist"]), CancellationToken.None);
 
         Assert.True(result.IsSuccess);
         Assert.Equal(["Length", "Waist"], result.Value.Points);
         repository.Received(1).Add(Arg.Is<Setting>(s =>
             s != null &&
-            s.Key == MeasurementTemplateKeys.For(GarmentType.Trousers) &&
+            s.Key == MeasurementTemplateKeys.For(GarmentTypes.Trousers) &&
             s.Value == JsonSerializer.Serialize(new[] { "Length", "Waist" })));
         await repository.Received(1).SaveChangesAsync(Arg.Any<CancellationToken>());
     }
@@ -32,12 +32,12 @@ public class SetMeasurementTemplateCommandHandlerTests
     [Fact]
     public async Task Handle_WithAStoredTemplate_ReplacesItRatherThanAddingASecond()
     {
-        var existing = Setting.Create(MeasurementTemplateKeys.For(GarmentType.Shirt), "[\"Neck\"]");
+        var existing = Setting.Create(MeasurementTemplateKeys.For(GarmentTypes.Shirt), "[\"Neck\"]");
         var repository = Substitute.For<ISettingRepository>();
-        repository.GetByKeyAsync(MeasurementTemplateKeys.For(GarmentType.Shirt), Arg.Any<CancellationToken>()).Returns(existing);
+        repository.GetByKeyAsync(MeasurementTemplateKeys.For(GarmentTypes.Shirt), Arg.Any<CancellationToken>()).Returns(existing);
         var handler = new SetMeasurementTemplateCommandHandler(repository);
 
-        await handler.Handle(new SetMeasurementTemplateCommand(GarmentType.Shirt, ["Chest", "Neck"]), CancellationToken.None);
+        await handler.Handle(new SetMeasurementTemplateCommand(GarmentTypes.Shirt, ["Chest", "Neck"]), CancellationToken.None);
 
         Assert.Equal(JsonSerializer.Serialize(new[] { "Chest", "Neck" }), existing.Value);
         repository.DidNotReceive().Add(Arg.Any<Setting>());
@@ -50,7 +50,7 @@ public class SetMeasurementTemplateCommandHandlerTests
         var handler = new SetMeasurementTemplateCommandHandler(repository);
 
         var result = await handler.Handle(
-            new SetMeasurementTemplateCommand(GarmentType.Blouse, ["  Waist  "]), CancellationToken.None);
+            new SetMeasurementTemplateCommand(GarmentTypes.Blouse, ["  Waist  "]), CancellationToken.None);
 
         // Values are stored keyed by point name, so a stray space would key them differently.
         Assert.Equal(["Waist"], result.Value.Points);
@@ -62,15 +62,15 @@ public class ResetMeasurementTemplateCommandHandlerTests
     [Fact]
     public async Task Handle_RemovesTheStoredTemplateAndReturnsTheDefault()
     {
-        var existing = Setting.Create(MeasurementTemplateKeys.For(GarmentType.Dress), "[\"Length\"]");
+        var existing = Setting.Create(MeasurementTemplateKeys.For(GarmentTypes.Dress), "[\"Length\"]");
         var repository = Substitute.For<ISettingRepository>();
-        repository.GetByKeyAsync(MeasurementTemplateKeys.For(GarmentType.Dress), Arg.Any<CancellationToken>()).Returns(existing);
+        repository.GetByKeyAsync(MeasurementTemplateKeys.For(GarmentTypes.Dress), Arg.Any<CancellationToken>()).Returns(existing);
         var handler = new ResetMeasurementTemplateCommandHandler(repository);
 
-        var result = await handler.Handle(new ResetMeasurementTemplateCommand(GarmentType.Dress), CancellationToken.None);
+        var result = await handler.Handle(new ResetMeasurementTemplateCommand(GarmentTypes.Dress), CancellationToken.None);
 
         Assert.True(result.IsSuccess);
-        Assert.Equal(MeasurementTemplateDefaults.For(GarmentType.Dress), result.Value.Points);
+        Assert.Equal(MeasurementTemplateDefaults.For(GarmentTypes.Dress), result.Value.Points);
         Assert.False(result.Value.IsCustomised);
         repository.Received(1).Remove(existing);
     }
@@ -82,7 +82,7 @@ public class ResetMeasurementTemplateCommandHandlerTests
         repository.GetByKeyAsync(Arg.Any<string>(), Arg.Any<CancellationToken>()).Returns((Setting?)null);
         var handler = new ResetMeasurementTemplateCommandHandler(repository);
 
-        var result = await handler.Handle(new ResetMeasurementTemplateCommand(GarmentType.Suit), CancellationToken.None);
+        var result = await handler.Handle(new ResetMeasurementTemplateCommand(GarmentTypes.Suit), CancellationToken.None);
 
         Assert.True(result.IsSuccess);
         await repository.DidNotReceive().SaveChangesAsync(Arg.Any<CancellationToken>());
@@ -96,7 +96,7 @@ public class SetMeasurementTemplateCommandValidatorTests
     [Fact]
     public void Validate_WithPoints_Passes()
     {
-        var result = _validator.Validate(new SetMeasurementTemplateCommand(GarmentType.Shirt, ["Neck", "Chest"]));
+        var result = _validator.Validate(new SetMeasurementTemplateCommand(GarmentTypes.Shirt, ["Neck", "Chest"]));
 
         Assert.True(result.IsValid);
     }
@@ -104,7 +104,7 @@ public class SetMeasurementTemplateCommandValidatorTests
     [Fact]
     public void Validate_WithNoPoints_Fails()
     {
-        var result = _validator.Validate(new SetMeasurementTemplateCommand(GarmentType.Shirt, []));
+        var result = _validator.Validate(new SetMeasurementTemplateCommand(GarmentTypes.Shirt, []));
 
         Assert.False(result.IsValid);
     }
@@ -112,7 +112,7 @@ public class SetMeasurementTemplateCommandValidatorTests
     [Fact]
     public void Validate_WithABlankPointName_Fails()
     {
-        var result = _validator.Validate(new SetMeasurementTemplateCommand(GarmentType.Shirt, ["Neck", " "]));
+        var result = _validator.Validate(new SetMeasurementTemplateCommand(GarmentTypes.Shirt, ["Neck", " "]));
 
         Assert.False(result.IsValid);
     }
@@ -121,7 +121,7 @@ public class SetMeasurementTemplateCommandValidatorTests
     public void Validate_WithDuplicatePointNames_Fails()
     {
         // Values are stored keyed by point name, so two "Waist" rows would collapse into one.
-        var result = _validator.Validate(new SetMeasurementTemplateCommand(GarmentType.Shirt, ["Waist", "waist"]));
+        var result = _validator.Validate(new SetMeasurementTemplateCommand(GarmentTypes.Shirt, ["Waist", "waist"]));
 
         Assert.False(result.IsValid);
     }

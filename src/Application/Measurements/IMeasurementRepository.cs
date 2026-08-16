@@ -11,7 +11,7 @@ public interface IMeasurementRepository
 {
     Task<Measurement?> GetByIdAsync(Guid id, CancellationToken cancellationToken);
 
-    Task<bool> ExistsForCustomerAndGarmentTypeAsync(Guid customerId, GarmentType garmentType, CancellationToken cancellationToken);
+    Task<bool> ExistsForCustomerAndGarmentTypeAsync(Guid customerId, string garmentType, CancellationToken cancellationToken);
 
     Task<IReadOnlyList<Measurement>> GetByCustomerAsync(Guid customerId, CancellationToken cancellationToken);
 

@@ -13,7 +13,9 @@ public sealed class OrderItem : AuditableEntity
 {
     public Guid OrderId { get; private set; }
 
-    public GarmentType GarmentType { get; private set; }
+    // Seeded so the EF materialisation constructor leaves no null behind; every path that
+    // creates one sets it. Free text since a shop names its own garments — see GarmentTypes.
+    public string GarmentType { get; private set; } = string.Empty;
 
     public int Quantity { get; private set; }
 
@@ -31,7 +33,7 @@ public sealed class OrderItem : AuditableEntity
     {
     }
 
-    internal static OrderItem Create(Guid orderId, GarmentType garmentType, int quantity, decimal unitPrice)
+    internal static OrderItem Create(Guid orderId, string garmentType, int quantity, decimal unitPrice)
     {
         var item = new OrderItem(Guid.NewGuid())
         {
@@ -43,14 +45,16 @@ public sealed class OrderItem : AuditableEntity
     }
 
     /// <summary>Corrects this item's garment, quantity and price. Fabric details are unaffected.</summary>
-    internal void UpdateDetails(GarmentType garmentType, int quantity, decimal unitPrice)
+    internal void UpdateDetails(string garmentType, int quantity, decimal unitPrice)
     {
         if (quantity <= 0)
         {
             throw new ArgumentOutOfRangeException(nameof(quantity), quantity, "Quantity must be greater than zero.");
         }
 
-        GarmentType = garmentType;
+        // Normalised on the way in, so the same garment typed with a stray space cannot appear as
+        // two lines on a report that groups by it.
+        GarmentType = GarmentTypes.Normalise(garmentType);
         Quantity = quantity;
         UnitPrice = Guard.AgainstNegativeOrZero(unitPrice, nameof(unitPrice));
     }

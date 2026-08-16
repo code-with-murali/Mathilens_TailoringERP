@@ -16,7 +16,6 @@ public class MeasurementConfiguration : IEntityTypeConfiguration<Measurement>
 
         builder.Property(m => m.GarmentType)
             .IsRequired()
-            .HasConversion<string>()
             .HasMaxLength(50);
 
         builder.Property(m => m.ValuesJson)

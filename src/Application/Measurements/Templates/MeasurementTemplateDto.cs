@@ -9,4 +9,4 @@ namespace MathilensERP.Application.Measurements.Templates;
 /// False when the shop has never edited this garment type and is seeing the built-in starting
 /// point — worth surfacing so the Settings screen can say so rather than implying someone chose it.
 /// </param>
-public sealed record MeasurementTemplateDto(GarmentType GarmentType, IReadOnlyList<string> Points, bool IsCustomised);
+public sealed record MeasurementTemplateDto(string GarmentType, IReadOnlyList<string> Points, bool IsCustomised);

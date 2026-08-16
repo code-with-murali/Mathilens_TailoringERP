@@ -32,10 +32,10 @@ public class OrderTests
     {
         var order = Order.Create(Guid.NewGuid(), DateTime.UtcNow, null);
 
-        var item = order.AddItem(GarmentType.Shirt, 2, 500m);
+        var item = order.AddItem(GarmentTypes.Shirt, 2, 500m);
 
         Assert.Single(order.Items);
-        Assert.Equal(GarmentType.Shirt, item.GarmentType);
+        Assert.Equal(GarmentTypes.Shirt, item.GarmentType);
         Assert.Equal(2, item.Quantity);
         Assert.Equal(500m, item.UnitPrice);
         Assert.Null(item.Fabric);
@@ -48,7 +48,7 @@ public class OrderTests
     {
         var order = Order.Create(Guid.NewGuid(), DateTime.UtcNow, null);
 
-        Assert.Throws<ArgumentOutOfRangeException>(() => order.AddItem(GarmentType.Shirt, quantity, 500m));
+        Assert.Throws<ArgumentOutOfRangeException>(() => order.AddItem(GarmentTypes.Shirt, quantity, 500m));
     }
 
     [Fact]
@@ -56,14 +56,14 @@ public class OrderTests
     {
         var order = Order.Create(Guid.NewGuid(), DateTime.UtcNow, null);
 
-        Assert.Throws<ArgumentOutOfRangeException>(() => order.AddItem(GarmentType.Shirt, 1, 0m));
+        Assert.Throws<ArgumentOutOfRangeException>(() => order.AddItem(GarmentTypes.Shirt, 1, 0m));
     }
 
     [Fact]
     public void SetItemFabric_WithExistingItem_SetsFabric()
     {
         var order = Order.Create(Guid.NewGuid(), DateTime.UtcNow, null);
-        var item = order.AddItem(GarmentType.Shirt, 1, 500m);
+        var item = order.AddItem(GarmentTypes.Shirt, 1, 500m);
 
         order.SetItemFabric(item.Id, "Cotton", FabricSource.ShopSupplied, "Blue", 2.5m);
 
@@ -213,7 +213,7 @@ public class OrderTests
         var order = Order.Create(Guid.NewGuid(), DateTime.UtcNow, null);
         AdvanceTo(order, OrderStatus.Delivered);
 
-        Assert.Throws<InvalidOperationException>(() => order.AddItem(GarmentType.Shirt, 1, 100m));
+        Assert.Throws<InvalidOperationException>(() => order.AddItem(GarmentTypes.Shirt, 1, 100m));
     }
 
     [Fact]
@@ -244,7 +244,7 @@ public class OrderTests
     public void UpdateDetails_OnDeliveredOrder_Throws()
     {
         var order = Order.Create(Guid.NewGuid(), DateTime.UtcNow, null);
-        order.AddItem(GarmentType.Shirt, 1, 100m);
+        order.AddItem(GarmentTypes.Shirt, 1, 100m);
         AdvanceTo(order, OrderStatus.Delivered);
 
         Assert.Throws<InvalidOperationException>(() => order.UpdateDetails(Guid.NewGuid(), null, DateTime.UtcNow, null));
@@ -254,12 +254,12 @@ public class OrderTests
     public void UpdateItem_WithValidInputs_ReplacesItemFieldsAndKeepsFabric()
     {
         var order = Order.Create(Guid.NewGuid(), DateTime.UtcNow, null);
-        var item = order.AddItem(GarmentType.Shirt, 2, 500m);
+        var item = order.AddItem(GarmentTypes.Shirt, 2, 500m);
         order.SetItemFabric(item.Id, "Cotton", FabricSource.ShopSupplied, "Blue", 3m);
 
-        order.UpdateItem(item.Id, GarmentType.Blazer, 5, 900m);
+        order.UpdateItem(item.Id, GarmentTypes.Blazer, 5, 900m);
 
-        Assert.Equal(GarmentType.Blazer, item.GarmentType);
+        Assert.Equal(GarmentTypes.Blazer, item.GarmentType);
         Assert.Equal(5, item.Quantity);
         Assert.Equal(900m, item.UnitPrice);
         Assert.NotNull(item.Fabric);
@@ -270,26 +270,26 @@ public class OrderTests
     public void UpdateItem_WithNonPositiveQuantity_Throws()
     {
         var order = Order.Create(Guid.NewGuid(), DateTime.UtcNow, null);
-        var item = order.AddItem(GarmentType.Shirt, 2, 500m);
+        var item = order.AddItem(GarmentTypes.Shirt, 2, 500m);
 
-        Assert.Throws<ArgumentOutOfRangeException>(() => order.UpdateItem(item.Id, GarmentType.Shirt, 0, 500m));
+        Assert.Throws<ArgumentOutOfRangeException>(() => order.UpdateItem(item.Id, GarmentTypes.Shirt, 0, 500m));
     }
 
     [Fact]
     public void UpdateItem_WithUnknownItemId_Throws()
     {
         var order = Order.Create(Guid.NewGuid(), DateTime.UtcNow, null);
-        order.AddItem(GarmentType.Shirt, 1, 100m);
+        order.AddItem(GarmentTypes.Shirt, 1, 100m);
 
-        Assert.Throws<InvalidOperationException>(() => order.UpdateItem(Guid.NewGuid(), GarmentType.Shirt, 1, 100m));
+        Assert.Throws<InvalidOperationException>(() => order.UpdateItem(Guid.NewGuid(), GarmentTypes.Shirt, 1, 100m));
     }
 
     [Fact]
     public void RemoveItem_WithMoreThanOneItem_SoftDeletesItAndDropsItFromItems()
     {
         var order = Order.Create(Guid.NewGuid(), DateTime.UtcNow, null);
-        var first = order.AddItem(GarmentType.Shirt, 1, 100m);
-        order.AddItem(GarmentType.Trousers, 1, 200m);
+        var first = order.AddItem(GarmentTypes.Shirt, 1, 100m);
+        order.AddItem(GarmentTypes.Trousers, 1, 200m);
 
         order.RemoveItem(first.Id, Guid.NewGuid(), DateTime.UtcNow);
 
@@ -302,7 +302,7 @@ public class OrderTests
     public void RemoveItem_WithOnlyOneItem_Throws()
     {
         var order = Order.Create(Guid.NewGuid(), DateTime.UtcNow, null);
-        var only = order.AddItem(GarmentType.Shirt, 1, 100m);
+        var only = order.AddItem(GarmentTypes.Shirt, 1, 100m);
 
         Assert.Throws<InvalidOperationException>(() => order.RemoveItem(only.Id, Guid.NewGuid(), DateTime.UtcNow));
     }
@@ -311,8 +311,8 @@ public class OrderTests
     public void RemoveItem_TwiceForTheSameItem_Throws()
     {
         var order = Order.Create(Guid.NewGuid(), DateTime.UtcNow, null);
-        var first = order.AddItem(GarmentType.Shirt, 1, 100m);
-        order.AddItem(GarmentType.Trousers, 1, 200m);
+        var first = order.AddItem(GarmentTypes.Shirt, 1, 100m);
+        order.AddItem(GarmentTypes.Trousers, 1, 200m);
         order.RemoveItem(first.Id, Guid.NewGuid(), DateTime.UtcNow);
 
         // Already-removed items are invisible to the aggregate, so this is an unknown id.
@@ -323,8 +323,8 @@ public class OrderTests
     public void RemoveItem_OnDeliveredOrder_Throws()
     {
         var order = Order.Create(Guid.NewGuid(), DateTime.UtcNow, null);
-        var first = order.AddItem(GarmentType.Shirt, 1, 100m);
-        order.AddItem(GarmentType.Trousers, 1, 200m);
+        var first = order.AddItem(GarmentTypes.Shirt, 1, 100m);
+        order.AddItem(GarmentTypes.Trousers, 1, 200m);
         AdvanceTo(order, OrderStatus.Delivered);
 
         Assert.Throws<InvalidOperationException>(() => order.RemoveItem(first.Id, Guid.NewGuid(), DateTime.UtcNow));

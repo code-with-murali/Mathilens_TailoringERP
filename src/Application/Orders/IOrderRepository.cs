@@ -9,10 +9,16 @@ public interface IOrderRepository
     Task<Order?> GetByIdAsync(Guid id, CancellationToken cancellationToken);
 
     /// <param name="searchTerm">Matched against the order number, the customer's name and their phone number. Null or blank matches everything.</param>
+    /// <param name="garmentType">
+    /// Keeps only orders with at least one item for this garment. Null or blank matches everything.
+    /// Compared case-insensitively: names are normalised on the way in, but rows written before the
+    /// garment list became the shop's own carry whatever casing the old enum used.
+    /// </param>
     Task<PagedResult<Order>> SearchAsync(
         Guid? customerId,
         OrderStatus? status,
         string? searchTerm,
+        string? garmentType,
         int page,
         int pageSize,
         CancellationToken cancellationToken);

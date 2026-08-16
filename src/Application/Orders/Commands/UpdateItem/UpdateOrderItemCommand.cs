@@ -8,6 +8,6 @@ namespace MathilensERP.Application.Orders.Commands.UpdateItem;
 public sealed record UpdateOrderItemCommand(
     Guid OrderId,
     Guid OrderItemId,
-    GarmentType GarmentType,
+    string GarmentType,
     int Quantity,
     decimal UnitPrice) : ICommand<Result<OrderDto>>;

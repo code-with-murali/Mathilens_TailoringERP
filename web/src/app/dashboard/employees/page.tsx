@@ -17,6 +17,7 @@ import {
   searchEmployees,
   retireEmployee,
   updateEmployee,
+  isRetired,
   EMPLOYMENT_TYPE_LABELS,
   type Employee,
 } from "@/lib/api/employees";
@@ -171,13 +172,15 @@ export default function EmployeesPage() {
                   <td data-label="Joined" className="px-4 py-3 whitespace-nowrap">
                     {new Date(`${employee.joiningDate}T00:00:00Z`).toLocaleDateString()}
                   </td>
+                  {/* Reads the recorded last working day, not isActive — see isRetired for why
+                      pressing Retire used to leave the row saying Active for the rest of the day. */}
                   <td data-label="Status" className="px-4 py-3 whitespace-nowrap">
-                    {employee.isActive ? (
-                      <span className="text-success">Active</span>
-                    ) : (
+                    {isRetired(employee) ? (
                       <span className="text-foreground/60">
                         Retired {new Date(`${employee.lastWorkingDate}T00:00:00Z`).toLocaleDateString()}
                       </span>
+                    ) : (
+                      <span className="text-success">Active</span>
                     )}
                   </td>
                   <td data-label="" className="px-4 py-3">
@@ -194,7 +197,7 @@ export default function EmployeesPage() {
                       >
                         Edit
                       </button>
-                      {employee.isActive ? (
+                      {!isRetired(employee) ? (
                         <button
                           type="button"
                           onClick={() => {
@@ -241,12 +244,14 @@ export default function EmployeesPage() {
             aria-labelledby="retireTitle"
             className="max-h-[92dvh] w-full max-w-md overflow-y-auto rounded-lg border border-border bg-surface p-4 sm:p-6"
           >
+            {/* A fixed title with the name below it, rather than "Retire Kavitha" as the heading —
+                the dialog is the same one every time, and the name is who it applies to. */}
             <h2 id="retireTitle" className="text-lg font-semibold">
-              Retire {pendingRetire.fullName}
+              Retire Employee
             </h2>
             <p className="mt-1 text-sm text-foreground/70">
-              Records their last working day. Their record and order history stay — this only takes them off the list
-              for new work, and it can be undone.
+              {pendingRetire.fullName} — takes them off the list for new work. Nothing is deleted, and this can be
+              undone.
             </p>
             <div className="mt-4 flex flex-col gap-1">
               <label htmlFor="retireDate" className="text-sm font-medium">

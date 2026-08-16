@@ -25,7 +25,12 @@ public sealed class GetMeasurementTemplatesQueryHandler
         var stored = await _settingRepository.ListByKeyPrefixAsync(MeasurementTemplateKeys.Prefix, cancellationToken);
         var storedByKey = stored.ToDictionary(s => s.Key, s => s.Value, StringComparer.Ordinal);
 
-        var templates = Enum.GetValues<GarmentType>()
+        // One per garment the shop actually stitches, rather than one per value of a fixed enum:
+        // a shop that has added Chudidhar needs a template for it, and one that has removed Blazer
+        // should not be offered a template for a garment it never books.
+        var garmentTypes = await GarmentCatalogKeys.ListAsync(_settingRepository, cancellationToken);
+
+        var templates = garmentTypes
             .Select(garmentType =>
             {
                 var points = storedByKey.TryGetValue(MeasurementTemplateKeys.For(garmentType), out var json)

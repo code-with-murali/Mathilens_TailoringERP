@@ -21,6 +21,7 @@ public class OrderRepository : IOrderRepository
         Guid? customerId,
         OrderStatus? status,
         string? searchTerm,
+        string? garmentType,
         int page,
         int pageSize,
         CancellationToken cancellationToken)
@@ -55,6 +56,15 @@ public class OrderRepository : IOrderRepository
                     c.Id == o.CustomerId &&
                     (EF.Functions.ILike(c.FullName, term) ||
                      EF.Functions.ILike(c.PhoneNumber.Replace(" ", string.Empty).Replace("-", string.Empty), digits))));
+        }
+
+        if (!string.IsNullOrWhiteSpace(garmentType))
+        {
+            // Compared lowered rather than with ILike: a garment is named by the shop, and a name
+            // holding % or _ would otherwise be read as a wildcard and match garments it is not.
+            var garment = garmentType.Trim().ToLower();
+
+            query = query.Where(o => o.Items.Any(i => i.GarmentType.ToLower() == garment));
         }
 
         var totalCount = await query.CountAsync(cancellationToken);

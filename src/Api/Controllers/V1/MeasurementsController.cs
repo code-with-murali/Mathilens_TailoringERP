@@ -110,7 +110,7 @@ public sealed class MeasurementsController : ApiControllerBase
     [ProducesResponseType(typeof(ApiResponse<MeasurementTemplateDto>), StatusCodes.Status200OK)]
     [ProducesResponseType(typeof(ApiErrorResponse), StatusCodes.Status400BadRequest)]
     public async Task<IActionResult> SetTemplate(
-        GarmentType garmentType,
+        string garmentType,
         [FromBody] SetMeasurementTemplateRequest request,
         CancellationToken cancellationToken)
     {
@@ -122,7 +122,7 @@ public sealed class MeasurementsController : ApiControllerBase
     [HttpDelete("measurements/templates/{garmentType}")]
     [Authorize(Policy = Permissions.SettingsEdit)]
     [ProducesResponseType(typeof(ApiResponse<MeasurementTemplateDto>), StatusCodes.Status200OK)]
-    public async Task<IActionResult> ResetTemplate(GarmentType garmentType, CancellationToken cancellationToken)
+    public async Task<IActionResult> ResetTemplate(string garmentType, CancellationToken cancellationToken)
     {
         var result = await _sender.Send(new ResetMeasurementTemplateCommand(garmentType), cancellationToken);
         return ToActionResult(result);

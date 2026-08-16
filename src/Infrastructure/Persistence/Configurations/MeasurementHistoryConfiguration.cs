@@ -16,7 +16,6 @@ public class MeasurementHistoryConfiguration : IEntityTypeConfiguration<Measurem
 
         builder.Property(h => h.GarmentType)
             .IsRequired()
-            .HasConversion<string>()
             .HasMaxLength(50);
 
         builder.Property(h => h.ValuesJson)

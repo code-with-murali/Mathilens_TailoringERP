@@ -16,6 +16,9 @@ import {
   MEASUREMENT_TEMPLATE_KEY_PREFIX,
   type Setting,
 } from "@/lib/api/settings";
+import { TAILORING_RATE_KEY_PREFIX } from "@/lib/api/tailoring-rates";
+import { GARMENT_KEY_PREFIX } from "@/lib/api/garments";
+import { USER_PHOTO_KEY_PREFIX } from "@/lib/api/user-profile";
 
 /**
  * The raw settings store — the escape hatch for a value that needs changing before it has a
@@ -51,7 +54,14 @@ export default function AdvancedSettingsPage() {
       // line of JSON is a way to break it, not a feature.
       setSettings(
         items.filter(
-          (s) => s.key !== DEFAULT_ORDER_DUE_DATE_DAYS_KEY && !s.key.startsWith(MEASUREMENT_TEMPLATE_KEY_PREFIX),
+          (s) =>
+            s.key !== DEFAULT_ORDER_DUE_DATE_DAYS_KEY &&
+            !s.key.startsWith(MEASUREMENT_TEMPLATE_KEY_PREFIX) &&
+            !s.key.startsWith(TAILORING_RATE_KEY_PREFIX) &&
+            !s.key.startsWith(GARMENT_KEY_PREFIX) &&
+            // A profile picture is four thousand characters of base64 — a row nobody can read and
+            // nobody should hand-edit.
+            !s.key.startsWith(USER_PHOTO_KEY_PREFIX),
         ),
       );
       setMeta(meta);

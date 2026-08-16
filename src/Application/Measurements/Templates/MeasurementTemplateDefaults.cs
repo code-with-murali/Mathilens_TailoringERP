@@ -14,44 +14,46 @@ namespace MathilensERP.Application.Measurements.Templates;
 /// </summary>
 public static class MeasurementTemplateDefaults
 {
-    private static readonly IReadOnlyDictionary<GarmentType, IReadOnlyList<string>> ByGarmentType =
-        new Dictionary<GarmentType, IReadOnlyList<string>>
+    // Case-insensitive: garment names are the shop's own text now, so "shirt" typed into the
+    // garment master has to find the standard shirt points rather than starting blank.
+    private static readonly IReadOnlyDictionary<string, IReadOnlyList<string>> ByGarmentType =
+        new Dictionary<string, IReadOnlyList<string>>(StringComparer.OrdinalIgnoreCase)
         {
-            [GarmentType.Shirt] =
+            [GarmentTypes.Shirt] =
             [
                 "Neck", "Shoulder width", "Chest", "Waist", "Hip",
                 "Sleeve length", "Bicep", "Wrist", "Shirt length",
             ],
-            [GarmentType.Trousers] =
+            [GarmentTypes.Trousers] =
             [
                 "Waist", "Hip/Seat", "Thigh", "Knee", "Calf",
                 "Inseam (inside leg)", "Outseam (waist to ankle)", "Rise (front & back)",
                 "Bottom opening (ankle width)",
             ],
-            [GarmentType.Suit] =
+            [GarmentTypes.Suit] =
             [
                 "Neck", "Shoulder width", "Chest", "Waist", "Hip/Seat",
                 "Sleeve length", "Bicep", "Cuff", "Back width", "Jacket length",
                 "Trouser waist", "Thigh", "Inseam (inside leg)", "Outseam (waist to ankle)",
                 "Bottom opening (ankle width)",
             ],
-            [GarmentType.Blazer] =
+            [GarmentTypes.Blazer] =
             [
                 "Neck", "Shoulder width", "Chest", "Waist", "Hip/Seat",
                 "Sleeve length", "Bicep", "Cuff", "Back width", "Armhole",
                 "Blazer length", "Lapel width",
             ],
-            [GarmentType.Kurta] =
+            [GarmentTypes.Kurta] =
             [
                 "Neck", "Shoulder width", "Chest", "Waist", "Hip",
                 "Sleeve length", "Bicep", "Armhole", "Kurta length", "Bottom opening",
             ],
-            [GarmentType.Blouse] =
+            [GarmentTypes.Blouse] =
             [
                 "Neck depth (front)", "Neck depth (back)", "Shoulder width", "Bust/Chest",
                 "Under-bust", "Waist", "Sleeve length", "Arm round", "Armhole", "Blouse length",
             ],
-            [GarmentType.Dress] =
+            [GarmentTypes.Dress] =
             [
                 "Neck", "Shoulder width", "Bust/Chest", "Under-bust", "Waist", "Hip",
                 "Sleeve length", "Arm round", "Armhole", "Shoulder to waist",
@@ -59,9 +61,17 @@ public static class MeasurementTemplateDefaults
             ],
             // "Other" is whatever the shop is asked to make this once, so it starts generic on
             // purpose rather than guessing at a garment nobody named.
-            [GarmentType.Other] = ["Length", "Width", "Chest", "Waist", "Hip"],
+            [GarmentTypes.Other] = ["Length", "Width", "Chest", "Waist", "Hip"],
         };
 
-    public static IReadOnlyList<string> For(GarmentType garmentType) =>
-        ByGarmentType.TryGetValue(garmentType, out var points) ? points : [];
+    /// <summary>
+    /// The standard points for a garment, or none for one the shop invented.
+    ///
+    /// A garment this system never shipped — a Chudidhar, a Lehenga — has no standard anybody could
+    /// have written down, so it starts empty and the shop fills the list in from the Measurement
+    /// screen. Guessing at points for it would be worse than an empty list: nobody would know which
+    /// of them were real.
+    /// </summary>
+    public static IReadOnlyList<string> For(string garmentType) =>
+        ByGarmentType.TryGetValue(GarmentTypes.Normalise(garmentType), out var points) ? points : [];
 }

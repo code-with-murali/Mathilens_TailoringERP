@@ -5,7 +5,7 @@ import { ExportButton } from "@/components/ui/ExportButton";
 import { getAccessToken } from "@/lib/auth";
 import { ApiError } from "@/lib/api-client";
 import { getRevenueReport, type RevenueReport } from "@/lib/api/reports";
-import { ReportRangeFilter, StatTile, toUtcRange, useReportRange } from "../ReportRange";
+import { ReportRangeFilter, StatFigures, toUtcRange, useReportRange } from "../ReportRange";
 
 /** Invoices raised in a period — the billing position, which differs from order value. */
 export default function RevenueReportPage() {
@@ -55,29 +55,30 @@ export default function RevenueReportPage() {
           {error}
         </p>
       ) : data ? (
-        /* One per row on a phone, for the reason given on Orders & Collections. */
-        <div className="grid grid-cols-1 gap-3 sm:grid-cols-2 lg:grid-cols-4">
-          <StatTile
-            label="Invoices"
-            value={String(data.invoiceCount)}
-            description="Bills raised in this period, by invoice date."
-          />
-          <StatTile
-            label="Invoiced"
-            value={data.totalInvoiced.toFixed(2)}
-            description="Their total value, after discount and including tax."
-          />
-          <StatTile
-            label="Collected"
-            value={data.totalCollected.toFixed(2)}
-            description="Money actually received against those invoices."
-          />
-          <StatTile
-            label="Outstanding"
-            value={data.totalOutstanding.toFixed(2)}
-            description="Still owed on them — invoiced less collected."
-          />
-        </div>
+        <StatFigures
+          figures={[
+            {
+              label: "Invoices",
+              value: String(data.invoiceCount),
+              description: "Bills raised in this period, by invoice date.",
+            },
+            {
+              label: "Invoiced",
+              value: data.totalInvoiced.toFixed(2),
+              description: "Their total value, after discount and including tax.",
+            },
+            {
+              label: "Collected",
+              value: data.totalCollected.toFixed(2),
+              description: "Money actually received against those invoices.",
+            },
+            {
+              label: "Outstanding",
+              value: data.totalOutstanding.toFixed(2),
+              description: "Still owed on them — invoiced less collected.",
+            },
+          ]}
+        />
       ) : null}
     </div>
   );

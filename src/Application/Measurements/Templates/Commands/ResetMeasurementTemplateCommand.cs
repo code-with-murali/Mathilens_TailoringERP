@@ -9,4 +9,4 @@ namespace MathilensERP.Application.Measurements.Templates.Commands;
 /// Without this, a template edited into an unusable state could only be repaired by retyping the
 /// original by hand.
 /// </summary>
-public sealed record ResetMeasurementTemplateCommand(GarmentType GarmentType) : ICommand<Result<MeasurementTemplateDto>>;
+public sealed record ResetMeasurementTemplateCommand(string GarmentType) : ICommand<Result<MeasurementTemplateDto>>;

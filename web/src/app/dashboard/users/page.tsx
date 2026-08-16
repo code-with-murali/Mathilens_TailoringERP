@@ -9,10 +9,26 @@ import { useToast } from "@/components/ui/ToastProvider";
 import { getAccessToken } from "@/lib/auth";
 import { ApiError, type PaginationMeta } from "@/lib/api-client";
 import { usePermissions } from "@/lib/use-permissions";
-import { listUsers, listRoles, createUser, setUserRole, resetUserPassword, issueResetCode, PERMISSIONS, type AppUser } from "@/lib/api/users";
+import {
+  listUsers,
+  listRoles,
+  createUser,
+  setUserRole,
+  setUserName,
+  resetUserPassword,
+  PERMISSIONS,
+  type AppUser,
+} from "@/lib/api/users";
 
 const fieldClassName =
   "rounded-md border border-border bg-surface px-3 py-2 text-sm outline-none transition-colors focus:border-primary focus:ring-2 focus:ring-primary/25";
+
+/**
+ * The role that runs the shop. It is the only one that can hand out access, so its holders are not
+ * demotable from this screen — the server refuses to remove the last one anyway, and finding that
+ * out after pressing Submit is a worse way to learn it.
+ */
+const OWNER_ROLE = "Owner";
 
 /**
  * Plain-language descriptions, because "Manager" alone doesn't tell an owner what they're handing
@@ -39,33 +55,27 @@ export default function UsersPage() {
 
   const [showCreate, setShowCreate] = useState(false);
   const [email, setEmail] = useState("");
+  const [fullName, setFullName] = useState("");
   const [password, setPassword] = useState("");
   const [role, setRole] = useState("");
   const [createError, setCreateError] = useState<string | null>(null);
   const [isCreating, setIsCreating] = useState(false);
 
-  // The user whose role is being changed, and the role picked for them. Held here rather than per
-  // row, because the picker now lives in a dialog instead of in the grid.
+  // The user being edited, and the name and role picked for them. Held here rather than per row,
+  // because the fields now live in a dialog instead of in the grid.
   const [editTarget, setEditTarget] = useState<AppUser | null>(null);
+  const [editName, setEditName] = useState("");
   const [editRole, setEditRole] = useState("");
   const [editError, setEditError] = useState<string | null>(null);
   const [isSavingRole, setIsSavingRole] = useState(false);
 
-  // Reset targets one user at a time; holding the user here doubles as "the dialog is open".
+  // Resetting targets one user at a time; holding the user here doubles as "the dialog is open".
   const [resetTarget, setResetTarget] = useState<AppUser | null>(null);
+  const [confirmEmail, setConfirmEmail] = useState("");
   const [resetPassword, setResetPassword] = useState("");
+  const [confirmPassword, setConfirmPassword] = useState("");
   const [resetError, setResetError] = useState<string | null>(null);
   const [isResetting, setIsResetting] = useState(false);
-
-  // Sending a code asks first and shows second, in one dialog. `codeTarget` is who it is for;
-  // `issuedCode` is null while the question is still on screen and holds the code afterwards.
-  // Nothing reads it back — the server keeps a hash, so if this is dismissed before it is written
-  // down, the only way on is a new code.
-  const [codeTarget, setCodeTarget] = useState<AppUser | null>(null);
-  const [issuedCode, setIssuedCode] = useState<string | null>(null);
-  const [issuedExpiry, setIssuedExpiry] = useState<string | null>(null);
-  const [codeError, setCodeError] = useState<string | null>(null);
-  const [isIssuing, setIsIssuing] = useState(false);
 
   const canCreate = can(PERMISSIONS.usersCreate);
   const canEdit = can(PERMISSIONS.usersEdit);
@@ -100,17 +110,18 @@ export default function UsersPage() {
     event.preventDefault();
     setCreateError(null);
 
-    if (!email.trim() || !password.trim() || !role) {
-      setCreateError("Email, password and role are all required.");
+    if (!fullName.trim() || !email.trim() || !password.trim() || !role) {
+      setCreateError("Name, email, password and role are all required.");
       return;
     }
 
     setIsCreating(true);
     try {
-      await createUser(email.trim(), password, role, getAccessToken());
+      await createUser(email.trim(), password, fullName.trim(), role, getAccessToken());
       showToast("User created.");
       setShowCreate(false);
       setEmail("");
+      setFullName("");
       setPassword("");
       await load();
     } catch (error) {
@@ -121,13 +132,17 @@ export default function UsersPage() {
   }
 
   /**
-   * Changing a role happens in a dialog, not from a dropdown in the grid.
+   * Editing a user happens in a dialog, not from a dropdown in the grid.
    *
    * A picker sitting in the row applied to whichever line the eye happened to be on, and this is
    * the control that grants and revokes access to the whole system. Opening a dialog names the
    * person at the top of it, which is the confirmation the grid could not give.
+   *
+   * The name and the role are two endpoints, so this writes only what actually moved. The name goes
+   * first: it is the one that cannot be refused, and doing it first means a role change blocked by
+   * the last-Owner rule still leaves the rename saved rather than throwing both away.
    */
-  async function handleSaveRole(event: FormEvent<HTMLFormElement>) {
+  async function handleSaveUser(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
     setEditError(null);
 
@@ -135,45 +150,47 @@ export default function UsersPage() {
       return;
     }
 
+    const name = editName.trim();
+    if (!name) {
+      setEditError("Enter a name for this user.");
+      return;
+    }
+
+    const nameChanged = name !== (editTarget.fullName ?? "");
+    const roleChanged = editRole !== editTarget.role;
+
+    if (!nameChanged && !roleChanged) {
+      setEditTarget(null);
+      return;
+    }
+
     setIsSavingRole(true);
     try {
-      await setUserRole(editTarget.id, editRole, getAccessToken());
-      showToast(`${editTarget.email} is now ${editRole}.`);
+      if (nameChanged) {
+        await setUserName(editTarget.id, name, getAccessToken());
+      }
+      if (roleChanged) {
+        await setUserRole(editTarget.id, editRole, getAccessToken());
+      }
+      showToast(roleChanged ? `${name} is now ${editRole}.` : `${name} updated.`);
       setEditTarget(null);
       await load();
     } catch (error) {
       // The server refuses to demote the last Owner — its message explains why, so show it as-is.
-      setEditError(error instanceof ApiError ? error.message : "Unable to change this user's role.");
+      setEditError(error instanceof ApiError ? error.message : "Unable to save this user.");
     } finally {
       setIsSavingRole(false);
     }
   }
 
   /**
-   * Issues a one-time code instead of setting a password on someone's behalf.
+   * Resetting a password asks for the account's own email address first.
    *
-   * The Owner reads it out and never learns what the user chooses. Their sessions end now rather
-   * than when the code is used, so an account in the wrong hands stops working immediately — which
-   * is why this is asked before it is done rather than fired off by a single click in a row.
+   * Every row on this screen looks alike, and this is the one action that locks somebody out of
+   * their account. Typing the address is the step that proves the right row was clicked; the
+   * password fields stay disabled until it matches, so a mistyped row cannot be pushed through by
+   * pressing Enter twice.
    */
-  async function handleIssueCode() {
-    if (!codeTarget) {
-      return;
-    }
-
-    setCodeError(null);
-    setIsIssuing(true);
-    try {
-      const issued = await issueResetCode(codeTarget.id, getAccessToken());
-      setIssuedCode(issued.code);
-      setIssuedExpiry(issued.expiresAtUtc);
-    } catch (error) {
-      setCodeError(error instanceof ApiError ? error.message : "Unable to issue a reset code.");
-    } finally {
-      setIsIssuing(false);
-    }
-  }
-
   async function handleResetPassword(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
     setResetError(null);
@@ -182,8 +199,18 @@ export default function UsersPage() {
       return;
     }
 
+    if (confirmEmail.trim().toLowerCase() !== resetTarget.email.toLowerCase()) {
+      setResetError("That is not this user's email address.");
+      return;
+    }
+
     if (!resetPassword.trim()) {
       setResetError("Enter the new password.");
+      return;
+    }
+
+    if (resetPassword !== confirmPassword) {
+      setResetError("The two passwords do not match.");
       return;
     }
 
@@ -191,8 +218,7 @@ export default function UsersPage() {
     try {
       await resetUserPassword(resetTarget.id, resetPassword, getAccessToken());
       showToast(`Password reset for ${resetTarget.email}. They have been signed out everywhere.`);
-      setResetTarget(null);
-      setResetPassword("");
+      closeResetDialog();
     } catch (error) {
       // The server enforces the password policy and reports which rule failed — show it as-is.
       setResetError(error instanceof ApiError ? error.message : "Unable to reset this password.");
@@ -201,12 +227,30 @@ export default function UsersPage() {
     }
   }
 
-  function closeCodeDialog() {
-    setCodeTarget(null);
-    setIssuedCode(null);
-    setIssuedExpiry(null);
-    setCodeError(null);
+  function openResetDialog(user: AppUser) {
+    setResetTarget(user);
+    setConfirmEmail("");
+    setResetPassword("");
+    setConfirmPassword("");
+    setResetError(null);
   }
+
+  function closeResetDialog() {
+    setResetTarget(null);
+    setConfirmEmail("");
+    setResetPassword("");
+    setConfirmPassword("");
+    setResetError(null);
+  }
+
+  const isEmailConfirmed =
+    resetTarget !== null && confirmEmail.trim().toLowerCase() === resetTarget.email.toLowerCase();
+
+  // The Owner's role is fixed on this screen, so a role change is only an edit for anyone else.
+  const hasEdits =
+    editTarget !== null &&
+    (editName.trim() !== (editTarget.fullName ?? "") ||
+      (editTarget.role !== OWNER_ROLE && editRole !== editTarget.role));
 
   if (!isLoaded || isLoading) {
     return <p className="text-sm text-foreground/70">Loading…</p>;
@@ -215,12 +259,7 @@ export default function UsersPage() {
   return (
     <div className="flex flex-col gap-6">
       <div className="flex flex-wrap items-start justify-between gap-3">
-        <div className="min-w-0">
-          <h1 className="text-2xl font-semibold">Users</h1>
-          <p className="mt-1 text-sm text-foreground/70">
-            Who can sign in, and what each of them is allowed to do. A role decides which screens they see and which actions they can take.
-          </p>
-        </div>
+        <h1 className="text-2xl font-semibold">Users</h1>
         {canCreate && (
           <Button
             type="button"
@@ -276,6 +315,7 @@ export default function UsersPage() {
                           type="button"
                           onClick={() => {
                             setEditTarget(user);
+                            setEditName(user.fullName ?? "");
                             setEditRole(user.role ?? roles[roles.length - 1] ?? "");
                             setEditError(null);
                           }}
@@ -285,33 +325,13 @@ export default function UsersPage() {
                         </button>
                       )}
                       {canSetPassword && (
-                        <>
-                          {/* Named plainly, because it is the one to reach for: the Owner hands
-                              over a code and never learns the password that gets chosen. */}
-                          <button
-                            type="button"
-                            onClick={() => {
-                              setCodeTarget(user);
-                              setIssuedCode(null);
-                              setIssuedExpiry(null);
-                              setCodeError(null);
-                            }}
-                            className="whitespace-nowrap text-primary hover:underline"
-                          >
-                            Send Code
-                          </button>
-                          <button
-                            type="button"
-                            onClick={() => {
-                              setResetTarget(user);
-                              setResetPassword("");
-                              setResetError(null);
-                            }}
-                            className="whitespace-nowrap text-foreground/70 hover:text-foreground"
-                          >
-                            Set Password
-                          </button>
-                        </>
+                        <button
+                          type="button"
+                          onClick={() => openResetDialog(user)}
+                          className="whitespace-nowrap text-foreground/70 hover:text-foreground"
+                        >
+                          Reset Password
+                        </button>
                       )}
                     </div>
                   </td>
@@ -336,6 +356,18 @@ export default function UsersPage() {
       <Modal open={showCreate} title="Add User" onClose={() => setShowCreate(false)}>
         <form onSubmit={handleCreate} className="flex flex-col">
           <div className="grid gap-3 sm:grid-cols-2">
+            {/* First, and across both columns: it is what this person is called, and the email
+                below it is only how they sign in. Wrapped, because Input puts className on the
+                field itself — the grid item is this div. */}
+            <div className="sm:col-span-2">
+              <Input
+                id="newFullName"
+                label="Name"
+                maxLength={100}
+                value={fullName}
+                onChange={(e) => setFullName(e.target.value)}
+              />
+            </div>
             <Input id="newEmail" label="Email" type="email" value={email} onChange={(e) => setEmail(e.target.value)} />
             <Input
               id="newPassword"
@@ -383,12 +415,31 @@ export default function UsersPage() {
         description={editTarget?.email}
         onClose={() => setEditTarget(null)}
       >
-        <form onSubmit={handleSaveRole} className="flex flex-col">
+        <form onSubmit={handleSaveUser} className="flex flex-col">
+          {/* The name is editable here; the email is not. Changing the address someone signs in
+              with is a different thing from correcting their name, and is not offered. */}
+          <div className="mb-3">
+            <Input
+              id="editFullName"
+              label="Name"
+              maxLength={100}
+              value={editName}
+              onChange={(e) => setEditName(e.target.value)}
+              autoFocus
+            />
+          </div>
+
           <div className="flex flex-col gap-1">
             <label htmlFor="editRole" className="text-sm font-medium">
               Role
             </label>
-            <select id="editRole" value={editRole} onChange={(e) => setEditRole(e.target.value)} className={fieldClassName}>
+            <select
+              id="editRole"
+              value={editRole}
+              onChange={(e) => setEditRole(e.target.value)}
+              disabled={editTarget?.role === OWNER_ROLE}
+              className={`${fieldClassName} disabled:cursor-not-allowed disabled:opacity-60`}
+            >
               {editTarget?.role === null && <option value="">No role</option>}
               {roles.map((option) => (
                 <option key={option} value={option}>
@@ -396,7 +447,13 @@ export default function UsersPage() {
                 </option>
               ))}
             </select>
-            {ROLE_SUMMARY[editRole] && <p className="text-xs text-foreground/60">{ROLE_SUMMARY[editRole]}</p>}
+            {editTarget?.role === OWNER_ROLE ? (
+              <p className="text-xs text-foreground/60">
+                The Owner runs the shop and is the only role that can hand out access, so it is not changed from here.
+              </p>
+            ) : (
+              ROLE_SUMMARY[editRole] && <p className="text-xs text-foreground/60">{ROLE_SUMMARY[editRole]}</p>
+            )}
           </div>
 
           {editError && (
@@ -409,7 +466,9 @@ export default function UsersPage() {
             <Button type="button" variant="secondary" onClick={() => setEditTarget(null)} disabled={isSavingRole}>
               CANCEL
             </Button>
-            <Button type="submit" disabled={isSavingRole || !editRole}>
+            {/* Live once either field has actually moved. An Owner's role is fixed here, but their
+                name is not — so this can no longer key off the role alone. */}
+            <Button type="submit" disabled={isSavingRole || !editRole || !editName.trim() || !hasEdits}>
               {isSavingRole ? "Saving…" : "SUBMIT"}
             </Button>
           </ModalActions>
@@ -418,22 +477,48 @@ export default function UsersPage() {
 
       <Modal
         open={resetTarget !== null}
-        title="Set Password"
+        title="Reset Password"
         description={resetTarget?.email}
-        onClose={() => setResetTarget(null)}
+        onClose={closeResetDialog}
       >
         <form onSubmit={handleResetPassword} className="flex flex-col">
           <p className="text-sm text-foreground/70">
-            You do not need their old password. They will be signed out on every device, so tell them the new one.
+            Type this user&rsquo;s email address to confirm, then set their new password. They will be signed out on
+            every device, so tell them what it is.
           </p>
-          <div className="mt-3">
+
+          <div className="mt-3 flex flex-col gap-3">
+            <Input
+              id="confirmEmail"
+              label="Email address"
+              type="email"
+              autoComplete="off"
+              placeholder={resetTarget?.email}
+              value={confirmEmail}
+              onChange={(e) => setConfirmEmail(e.target.value)}
+            />
+            {/* Disabled until the address matches, so the fields open only once the right person is
+                confirmed rather than sitting ready for whichever row was clicked. */}
             <Input
               id="resetPassword"
               label="New password"
               type="password"
               autoComplete="new-password"
+              disabled={!isEmailConfirmed}
               value={resetPassword}
               onChange={(e) => setResetPassword(e.target.value)}
+            />
+            <Input
+              id="confirmPassword"
+              label="Confirm password"
+              type="password"
+              autoComplete="new-password"
+              disabled={!isEmailConfirmed}
+              value={confirmPassword}
+              onChange={(e) => setConfirmPassword(e.target.value)}
+              error={
+                confirmPassword && resetPassword !== confirmPassword ? "The two passwords do not match." : undefined
+              }
             />
           </div>
           <p className="mt-1 text-xs text-foreground/60">At least 8 characters, with upper, lower, and a number.</p>
@@ -445,75 +530,14 @@ export default function UsersPage() {
           )}
 
           <ModalActions>
-            <Button type="button" variant="secondary" onClick={() => setResetTarget(null)} disabled={isResetting}>
+            <Button type="button" variant="secondary" onClick={closeResetDialog} disabled={isResetting}>
               CANCEL
             </Button>
-            <Button type="submit" disabled={isResetting}>
+            <Button type="submit" disabled={isResetting || !isEmailConfirmed || !resetPassword || !confirmPassword}>
               {isResetting ? "Saving…" : "CONFIRM"}
             </Button>
           </ModalActions>
         </form>
-      </Modal>
-
-      {/*
-        Two states in one dialog: the question, then the code.
-
-        The code is shown once and never again. Only a hash reaches the database, so this is the
-        single moment the plaintext exists anywhere — dismissing it before writing the code down
-        means issuing a new one, which is the correct trade for not storing a working credential.
-      */}
-      <Modal
-        open={codeTarget !== null}
-        title="Send Code"
-        description={codeTarget?.email}
-        onClose={closeCodeDialog}
-      >
-        {issuedCode ? (
-          <div className="flex flex-col">
-            <p className="text-sm text-foreground/70">
-              Give this to them in person. They enter it on the login screen under &ldquo;Have a reset code?&rdquo; and
-              choose their own password — you never need to know it.
-            </p>
-
-            <p className="mt-3 select-all rounded-md border border-border bg-background/40 px-4 py-3 text-center font-mono text-xl tracking-widest sm:text-2xl">
-              {issuedCode}
-            </p>
-
-            <p className="mt-3 text-sm text-foreground/70">
-              Works once, and stops working{" "}
-              {issuedExpiry ? `at ${new Date(issuedExpiry).toLocaleString()}` : "after a day"}. They have been signed
-              out everywhere already.
-            </p>
-
-            <ModalActions>
-              <Button type="button" onClick={closeCodeDialog}>
-                I have written it down
-              </Button>
-            </ModalActions>
-          </div>
-        ) : (
-          <div className="flex flex-col">
-            <p className="text-sm text-foreground/70">
-              Issue a one-time code for this user to set their own password? They will be signed out everywhere
-              straight away, and any code issued to them before this stops working.
-            </p>
-
-            {codeError && (
-              <p role="alert" className="mt-3 text-sm text-danger">
-                {codeError}
-              </p>
-            )}
-
-            <ModalActions>
-              <Button type="button" variant="secondary" onClick={closeCodeDialog} disabled={isIssuing}>
-                CANCEL
-              </Button>
-              <Button type="button" onClick={handleIssueCode} disabled={isIssuing}>
-                {isIssuing ? "Issuing…" : "CONFIRM"}
-              </Button>
-            </ModalActions>
-          </div>
-        )}
       </Modal>
     </div>
   );

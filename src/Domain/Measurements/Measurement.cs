@@ -18,7 +18,9 @@ public sealed class Measurement : AuditableEntity
 {
     public Guid CustomerId { get; private set; }
 
-    public GarmentType GarmentType { get; private set; }
+    // Seeded so the EF materialisation constructor leaves no null behind; every path that
+    // creates one sets it. Free text since a shop names its own garments — see GarmentTypes.
+    public string GarmentType { get; private set; } = string.Empty;
 
     /// <summary>Persisted form of <see cref="Values"/> — an ordinary JSON-text column, not a
     /// provider-specific JSON column type, to keep the mapping simple and dependable.</summary>
@@ -37,12 +39,14 @@ public sealed class Measurement : AuditableEntity
     {
     }
 
-    public static Measurement Create(Guid customerId, GarmentType garmentType, IReadOnlyDictionary<string, decimal> values)
+    public static Measurement Create(Guid customerId, string garmentType, IReadOnlyDictionary<string, decimal> values)
     {
         var measurement = new Measurement(Guid.NewGuid())
         {
             CustomerId = Guard.AgainstEmpty(customerId, nameof(customerId)),
-            GarmentType = garmentType,
+            // Normalised on the way in, so one customer cannot end up with two measurement sets for
+            // what is really the same garment.
+            GarmentType = GarmentTypes.Normalise(garmentType),
         };
 
         measurement.SetValues(values);

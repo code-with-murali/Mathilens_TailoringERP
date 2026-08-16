@@ -5,6 +5,7 @@ import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { CustomerForm } from "../CustomerForm";
 import { MeasurementsSection } from "./MeasurementsSection";
+import { PreviousOrdersSection } from "./PreviousOrdersSection";
 import { useToast } from "@/components/ui/ToastProvider";
 import { getAccessToken } from "@/lib/auth";
 import { useRouteId } from "@/lib/use-route-id";
@@ -83,6 +84,10 @@ export default function EditCustomerPage() {
               onCancel={() => router.push("/dashboard/customers")}
             />
           </div>
+
+          {/* Orders before measurements: this page is reached from the phone number on the list,
+              and "what have we made for them" is the question that click is usually asking. */}
+          <PreviousOrdersSection customerId={customerId} />
 
           <MeasurementsSection customerId={customerId} />
         </div>

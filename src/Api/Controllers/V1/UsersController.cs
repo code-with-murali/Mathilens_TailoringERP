@@ -56,7 +56,11 @@ public sealed class UsersController : ApiControllerBase
         // and the calls it is actually allowed to make can never disagree.
         var permissions = await _rolePermissions.PermissionsForAsync(roles, cancellationToken);
 
-        return Ok(ApiResponse<CurrentUserResponse>.Ok(new CurrentUserResponse(id, email, roles, permissions)));
+        // Read rather than taken from a claim, so somebody renamed on the Users screen sees it on
+        // their next request instead of whenever their token next happens to be refreshed.
+        var fullName = await _userAdminService.GetFullNameAsync(id, cancellationToken);
+
+        return Ok(ApiResponse<CurrentUserResponse>.Ok(new CurrentUserResponse(id, email, fullName, roles, permissions)));
     }
 
     /// <summary>Every login in the system with the role each one holds, paginated (00_MASTER_SPEC.md § 8.3).</summary>
@@ -127,7 +131,19 @@ public sealed class UsersController : ApiControllerBase
     [ProducesResponseType(typeof(ApiErrorResponse), StatusCodes.Status409Conflict)]
     public async Task<IActionResult> Create([FromBody] CreateUserRequest request, CancellationToken cancellationToken)
     {
-        var result = await _userAdminService.CreateUserAsync(request.Email, request.Password, request.Role, cancellationToken);
+        var result = await _userAdminService.CreateUserAsync(request.Email, request.Password, request.FullName, request.Role, cancellationToken);
+        return ToActionResult(result);
+    }
+
+    /// <summary>Changes what a user is called. Their email, and so how they sign in, is untouched.</summary>
+    [HttpPut("{id:guid}")]
+    [Authorize(Policy = Permissions.UsersEdit)]
+    [ProducesResponseType(StatusCodes.Status204NoContent)]
+    [ProducesResponseType(typeof(ApiErrorResponse), StatusCodes.Status400BadRequest)]
+    [ProducesResponseType(typeof(ApiErrorResponse), StatusCodes.Status404NotFound)]
+    public async Task<IActionResult> SetName(Guid id, [FromBody] SetUserNameRequest request, CancellationToken cancellationToken)
+    {
+        var result = await _userAdminService.SetFullNameAsync(id, request.FullName, cancellationToken);
         return ToActionResult(result);
     }
 

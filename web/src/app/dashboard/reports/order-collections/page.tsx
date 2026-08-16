@@ -5,7 +5,7 @@ import { ExportButton } from "@/components/ui/ExportButton";
 import { getAccessToken } from "@/lib/auth";
 import { ApiError } from "@/lib/api-client";
 import { getOrderCollectionsReport, type OrderCollectionsReport } from "@/lib/api/reports";
-import { ReportRangeFilter, StatTile, toUtcRange, useReportRange } from "../ReportRange";
+import { ReportRangeFilter, StatFigures, toUtcRange, useReportRange } from "../ReportRange";
 
 /** Orders booked in a period, and how much of that money has actually come in. */
 export default function OrderCollectionsReportPage() {
@@ -39,7 +39,7 @@ export default function OrderCollectionsReportPage() {
   return (
     <div className="flex flex-col gap-6">
       <div className="flex items-start justify-between gap-4">
-        <h1 className="text-2xl font-semibold">Orders &amp; Collections</h1>
+        <h1 className="text-2xl font-semibold">Orders</h1>
         {/* Carries the range on screen, so the file covers the same period. */}
         <ExportButton
           resource="reports"
@@ -57,48 +57,45 @@ export default function OrderCollectionsReportPage() {
           {error}
         </p>
       ) : data ? (
-        /*
-          One tile per row on a phone. These carry a sentence now, and two columns on a 320px screen
-          left roughly seventy pixels of text per line — the description wrapped to five lines and
-          the tile was taller than the two-up saved.
-        */
-        <div className="grid grid-cols-1 gap-3 sm:grid-cols-2 lg:grid-cols-4">
-          <StatTile
-            label="Orders"
-            value={String(data.orderCount)}
-            description="Orders booked in this period, cancelled ones included."
-          />
-          <StatTile
-            label="Order value"
-            value={data.orderValue.toFixed(2)}
-            description="Quantity × price, whether or not a bill has been raised. Excludes cancelled."
-          />
-          <StatTile
-            label="Delivered value"
-            value={data.deliveredValue.toFixed(2)}
-            description="The share of that value already handed over to the customer."
-          />
-          <StatTile
-            label="Collected"
-            value={data.collectedAmount.toFixed(2)}
-            description="Money actually received against these orders."
-          />
-          <StatTile
-            label="Pending"
-            value={data.pendingAmount.toFixed(2)}
-            description="Still to come in: unpaid bills, plus work not yet billed."
-          />
-          <StatTile
-            label="Cancelled"
-            value={data.cancelledValue.toFixed(2)}
-            description="Value of cancelled orders. Counted here and in no other tile."
-          />
-          <StatTile
-            label="Discounts given"
-            value={data.discountsGiven.toFixed(2)}
-            description="Reductions applied on the invoices for these orders."
-          />
-        </div>
+        <StatFigures
+          figures={[
+            {
+              label: "Orders",
+              value: String(data.orderCount),
+              description: "Orders booked in this period, cancelled ones included.",
+            },
+            {
+              label: "Order value",
+              value: data.orderValue.toFixed(2),
+              description: "Quantity × price, whether or not a bill has been raised. Excludes cancelled.",
+            },
+            {
+              label: "Delivered value",
+              value: data.deliveredValue.toFixed(2),
+              description: "The share of that value already handed over to the customer.",
+            },
+            {
+              label: "Collected",
+              value: data.collectedAmount.toFixed(2),
+              description: "Money actually received against these orders.",
+            },
+            {
+              label: "Pending",
+              value: data.pendingAmount.toFixed(2),
+              description: "Still to come in: unpaid bills, plus work not yet billed.",
+            },
+            {
+              label: "Cancelled",
+              value: data.cancelledValue.toFixed(2),
+              description: "Value of cancelled orders. Counted here and in no other figure.",
+            },
+            {
+              label: "Discounts given",
+              value: data.discountsGiven.toFixed(2),
+              description: "Reductions applied on the invoices for these orders.",
+            },
+          ]}
+        />
       ) : null}
     </div>
   );

@@ -138,7 +138,7 @@ public sealed class Order : AuditableEntity
     }
 
     /// <summary>Adds a garment line item. Callers should check <see cref="IsOpen"/> first — see 01_ARCHITECTURE.md § 11 Validation Strategy.</summary>
-    public OrderItem AddItem(GarmentType garmentType, int quantity, decimal unitPrice)
+    public OrderItem AddItem(string garmentType, int quantity, decimal unitPrice)
     {
         EnsureModifiable("add items to");
 
@@ -148,7 +148,7 @@ public sealed class Order : AuditableEntity
     }
 
     /// <summary>Corrects one of this order's garment line items. Its fabric details are left untouched.</summary>
-    public void UpdateItem(Guid orderItemId, GarmentType garmentType, int quantity, decimal unitPrice)
+    public void UpdateItem(Guid orderItemId, string garmentType, int quantity, decimal unitPrice)
     {
         EnsureModifiable("update items on");
 

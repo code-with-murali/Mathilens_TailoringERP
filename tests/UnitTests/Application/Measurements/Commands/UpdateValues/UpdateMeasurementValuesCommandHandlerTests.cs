@@ -10,7 +10,7 @@ public class UpdateMeasurementValuesCommandHandlerTests
     [Fact]
     public async Task Handle_WithExistingMeasurement_SnapshotsHistoryThenUpdates()
     {
-        var measurement = Measurement.Create(Guid.NewGuid(), GarmentType.Shirt, new Dictionary<string, decimal> { ["Chest"] = 40 });
+        var measurement = Measurement.Create(Guid.NewGuid(), GarmentTypes.Shirt, new Dictionary<string, decimal> { ["Chest"] = 40 });
         var repository = Substitute.For<IMeasurementRepository>();
         repository.GetByIdAsync(measurement.Id, Arg.Any<CancellationToken>()).Returns(measurement);
         MeasurementHistory? capturedSnapshot = null;

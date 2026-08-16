@@ -3,6 +3,7 @@
 import { useCallback, useEffect, useState } from "react";
 import Link from "next/link";
 import { Button } from "@/components/ui/Button";
+import { Modal, ModalActions } from "@/components/ui/Modal";
 import { DEFAULT_PAGE_SIZE, Pagination } from "@/components/ui/Pagination";
 import { useToast } from "@/components/ui/ToastProvider";
 import { getAccessToken } from "@/lib/auth";
@@ -10,10 +11,13 @@ import { useRouteId } from "@/lib/use-route-id";
 import { usePermissions } from "@/lib/use-permissions";
 import { ApiError, type PaginationMeta } from "@/lib/api-client";
 import { PERMISSIONS } from "@/lib/api/users";
+import { EmployeeForm } from "../../employees/EmployeeForm";
 import {
   getEmployee,
   getEmployeeOrders,
   retireEmployee,
+  updateEmployee,
+  isRetired,
   EMPLOYMENT_TYPE_LABELS,
   type Employee,
   type EmployeeOrder,
@@ -67,6 +71,7 @@ export default function EmployeeViewPage() {
   const [loadError, setLoadError] = useState<string | null>(null);
 
   const [showRetire, setShowRetire] = useState(false);
+  const [showEdit, setShowEdit] = useState(false);
   const [lastWorkingDate, setLastWorkingDate] = useState(todayIsoDate);
   const [retireError, setRetireError] = useState<string | null>(null);
   const [isRetiring, setIsRetiring] = useState(false);
@@ -74,6 +79,7 @@ export default function EmployeeViewPage() {
   // Retiring and bringing someone back are the only things this page changes, so it asks for
   // exactly that right rather than for staff editing as a whole.
   const canManage = can(PERMISSIONS.employeesRetire);
+  const canEdit = can(PERMISSIONS.employeesEdit);
 
   const loadEmployee = useCallback(async () => {
     try {
@@ -145,20 +151,33 @@ export default function EmployeeViewPage() {
             {employee.jobTitle ? ` · ${employee.jobTitle}` : ""}
           </p>
         </div>
-        <div className="flex items-center gap-3">
-          {canManage && !employee.isActive && (
+        {/* Wraps rather than overflowing: four controls do not fit a phone on one line. */}
+        <div className="flex flex-wrap items-center gap-3">
+          {canManage && isRetired(employee) && (
             <Button type="button" variant="secondary" onClick={() => handleRetire(true)} disabled={isRetiring}>
               Return to work
             </Button>
           )}
-          {canManage && employee.isActive && !showRetire && (
-            <Button type="button" variant="secondary" onClick={() => setShowRetire(true)}>
+          {canManage && !isRetired(employee) && (
+            <Button
+              type="button"
+              variant="secondary"
+              onClick={() => {
+                setLastWorkingDate(todayIsoDate());
+                setRetireError(null);
+                setShowRetire(true);
+              }}
+            >
               Retire
             </Button>
           )}
-          <Link href={`/dashboard/employees/${employee.id}`}>
-            <Button type="button">Edit</Button>
-          </Link>
+          {/* Edits here instead of navigating to the edit page, so the order history and scroll
+              position survive a change of phone number. */}
+          {canEdit && (
+            <Button type="button" onClick={() => setShowEdit(true)}>
+              Edit
+            </Button>
+          )}
           <Link href="/dashboard/employees" className="text-sm text-foreground/70 hover:text-foreground">
             Back to employees
           </Link>
@@ -174,53 +193,18 @@ export default function EmployeeViewPage() {
           <Detail label="Joining date" value={formatDate(employee.joiningDate)} />
           <Detail label="Employment type" value={EMPLOYMENT_TYPE_LABELS[employee.employmentType]} />
           <Detail label="Last working date" value={formatDate(employee.lastWorkingDate)} />
+          {/* Recorded standing, not "still employed today" — see isRetired. */}
           <Detail
             label="Status"
             value={
-              employee.isActive ? (
-                <span className="text-success">Active</span>
-              ) : (
+              isRetired(employee) ? (
                 <span className="text-foreground/60">Retired</span>
+              ) : (
+                <span className="text-success">Active</span>
               )
             }
           />
         </div>
-
-        {showRetire && (
-          <div className="flex flex-wrap items-end gap-4 rounded-md border border-border bg-background/40 p-4">
-            <div className="flex flex-col gap-1">
-              <label htmlFor="lastWorkingDate" className="text-sm font-medium">
-                Last working date
-              </label>
-              <input
-                id="lastWorkingDate"
-                type="date"
-                value={lastWorkingDate}
-                min={employee.joiningDate}
-                onChange={(e) => setLastWorkingDate(e.target.value)}
-                className={fieldClassName}
-              />
-            </div>
-            <Button type="button" onClick={() => handleRetire(false)} disabled={isRetiring}>
-              {isRetiring ? "Saving…" : "Confirm retire"}
-            </Button>
-            <button
-              type="button"
-              onClick={() => setShowRetire(false)}
-              className="py-2 text-sm text-foreground/70 hover:text-foreground"
-            >
-              Cancel
-            </button>
-            <p className="w-full text-sm text-foreground/60">
-              Retiring keeps their record and order history — it only takes them off the list for new work.
-            </p>
-            {retireError && (
-              <p role="alert" className="w-full text-sm text-danger">
-                {retireError}
-              </p>
-            )}
-          </div>
-        )}
       </div>
 
       <div className="flex flex-col gap-3">
@@ -239,7 +223,7 @@ export default function EmployeeViewPage() {
                   <th className="px-4 py-3 font-medium">Customer</th>
                   <th className="px-4 py-3 font-medium">Items</th>
                   <th className="px-4 py-3 font-medium">Status</th>
-                  <th className="px-4 py-3 font-medium">Due</th>
+                  <th className="px-4 py-3 font-medium">Collection</th>
                   <th className="px-4 py-3 font-medium">Work started</th>
                   <th className="px-4 py-3 font-medium">Work finished</th>
                   <th className="px-4 py-3 font-medium">Delivered</th>
@@ -256,7 +240,7 @@ export default function EmployeeViewPage() {
                     <td data-label="Customer" className="px-4 py-3">{order.customerName}</td>
                     <td data-label="Items" className="px-4 py-3">{order.itemCount}</td>
                     <td data-label="Status" className="px-4 py-3 whitespace-nowrap">{order.status}</td>
-                    <td data-label="Due" className="px-4 py-3 whitespace-nowrap">{formatInstant(order.dueAtUtc)}</td>
+                    <td data-label="Collection" className="px-4 py-3 whitespace-nowrap">{formatInstant(order.dueAtUtc)}</td>
                     <td data-label="Work started" className="px-4 py-3 whitespace-nowrap">{formatInstant(order.workStartedAtUtc)}</td>
                     <td data-label="Work finished" className="px-4 py-3 whitespace-nowrap">{formatInstant(order.workCompletedAtUtc)}</td>
                     <td data-label="Delivered" className="px-4 py-3 whitespace-nowrap">{formatInstant(order.deliveredAtUtc)}</td>
@@ -278,6 +262,66 @@ export default function EmployeeViewPage() {
           />
         )}
       </div>
+
+      {/* The same dialog the list uses, so retiring reads identically wherever it is done. */}
+      <Modal open={showRetire} title="Retire Employee" onClose={() => setShowRetire(false)}>
+        <div className="flex flex-col">
+          <p className="text-sm text-foreground/70">
+            {employee.fullName} — takes them off the list for new work. Nothing is deleted, and this can be undone.
+          </p>
+          <div className="mt-4 flex flex-col gap-1">
+            <label htmlFor="lastWorkingDate" className="text-sm font-medium">
+              Last working date
+            </label>
+            <input
+              id="lastWorkingDate"
+              type="date"
+              value={lastWorkingDate}
+              min={employee.joiningDate}
+              onChange={(e) => setLastWorkingDate(e.target.value)}
+              className={fieldClassName}
+            />
+          </div>
+
+          {retireError && (
+            <p role="alert" className="mt-3 text-sm text-danger">
+              {retireError}
+            </p>
+          )}
+
+          <ModalActions>
+            <Button type="button" variant="secondary" onClick={() => setShowRetire(false)} disabled={isRetiring}>
+              CANCEL
+            </Button>
+            <Button type="button" onClick={() => handleRetire(false)} disabled={isRetiring}>
+              {isRetiring ? "Saving…" : "CONFIRM"}
+            </Button>
+          </ModalActions>
+        </div>
+      </Modal>
+
+      {/* Keyed on the record so reopening after a save seeds the fields from what was stored, not
+          from the values the form mounted with. */}
+      <Modal open={showEdit} title="Edit Employee" onClose={() => setShowEdit(false)}>
+        <EmployeeForm
+          key={`${employee.id}-${employee.phoneNumber}-${employee.fullName}`}
+          initialValues={{
+            employeeCode: employee.employeeCode,
+            joiningDate: employee.joiningDate,
+            employmentType: employee.employmentType,
+            fullName: employee.fullName,
+            jobTitle: employee.jobTitle,
+            phoneNumber: employee.phoneNumber,
+            email: employee.email,
+          }}
+          onCancel={() => setShowEdit(false)}
+          onSubmit={async (input) => {
+            setEmployee(await updateEmployee(employee.id, input, getAccessToken()));
+            showToast("Employee updated.");
+            setShowEdit(false);
+          }}
+        />
+      </Modal>
     </div>
   );
 }

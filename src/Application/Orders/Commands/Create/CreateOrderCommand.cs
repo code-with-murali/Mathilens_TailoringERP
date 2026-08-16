@@ -14,7 +14,7 @@ public sealed record CreateOrderCommand(
     IReadOnlyList<CreateOrderItemInput> Items,
     string? Notes = null) : ICommand<Result<OrderDto>>;
 
-public sealed record CreateOrderItemInput(GarmentType GarmentType, int Quantity, decimal UnitPrice, CreateOrderItemFabricInput? Fabric);
+public sealed record CreateOrderItemInput(string GarmentType, int Quantity, decimal UnitPrice, CreateOrderItemFabricInput? Fabric);
 
 /// <param name="ClothCode">
 /// The cloth code staff typed. Resolved against the price list when the order is saved: a match

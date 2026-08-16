@@ -1,16 +1,20 @@
 "use client";
 
-import { useCallback, useEffect, useRef, useState, type FormEvent } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState, type FormEvent } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { Button } from "@/components/ui/Button";
 import { Input } from "@/components/ui/Input";
 import { PhoneNumberInput, cleanPhoneNumberInput } from "@/components/ui/PhoneNumberInput";
-import { SearchPicker } from "@/components/ui/SearchPicker";
 import { ConfirmDialog } from "@/components/ui/ConfirmDialog";
-import { OrderItemsEditor, type ItemRow } from "@/components/orders/OrderItemsEditor";
+import {
+  OrderItemsEditor,
+  clothAmount,
+  rowTotal,
+  type BusinessMode,
+  type ItemRow,
+} from "@/components/orders/OrderItemsEditor";
 import { InvoicePrintModal } from "@/components/orders/InvoicePrintModal";
-import { OrderStatusCounts } from "@/components/dashboard/OrderStatusCounts";
 import { useMeasurementFields } from "@/lib/use-measurement-templates";
 import { useToast } from "@/components/ui/ToastProvider";
 import { useDebouncedValue } from "@/lib/use-debounced-value";
@@ -21,6 +25,9 @@ import { searchEmployees, type Employee } from "@/lib/api/employees";
 import { createOrder, type CreateOrderItemInput, type Order } from "@/lib/api/orders";
 import { listMeasurementsForCustomer, createMeasurement, updateMeasurementValues, type Measurement } from "@/lib/api/measurements";
 import { getSetting, DEFAULT_ORDER_DUE_DATE_DAYS_KEY } from "@/lib/api/settings";
+import { getShopCalendar, nextOpenDay, toIsoDate, WEEKDAYS } from "@/lib/api/shop-calendar";
+import { getTailoringRates, type TailoringRates } from "@/lib/api/tailoring-rates";
+import { getGarments, type Garment } from "@/lib/api/garments";
 import { createInvoice, recordPayment, PAYMENT_METHODS, type PaymentMethod, type Invoice } from "@/lib/api/billing";
 import { getInvoiceSettings, taxAmountFor, DEFAULT_INVOICE_SETTINGS } from "@/lib/api/invoice-settings";
 import "./theme.css";
@@ -29,6 +36,45 @@ const fieldClassName = "rounded-md border border-border bg-surface px-3 py-1 tex
 
 function digitsOnly(value: string): string {
   return value.replace(/\D/g, "");
+}
+
+/** The server rejects anything above 100 (Shared/Constants/PaginationDefaults.cs). */
+const EMPLOYEE_PAGE_SIZE = 100;
+/** 500 staff is far past any tailoring shop; the cap only exists so a bad meta can't loop forever. */
+const EMPLOYEE_PAGE_LIMIT = 5;
+
+/** "26-08-2026" from "2026-08-26". */
+function toDisplayDate(isoDate: string): string {
+  const [year, month, day] = isoDate.split("-");
+  return year && month && day ? `${day}-${month}-${year}` : "";
+}
+
+/** "2026-08-26" from a displayed "26-08-2026", or "" if it is not a real date. */
+function fromDisplayDate(text: string): string {
+  const digits = text.replace(/\D/g, "");
+  if (digits.length !== 8) {
+    return "";
+  }
+  const day = Number(digits.slice(0, 2));
+  const month = Number(digits.slice(2, 4));
+  const year = Number(digits.slice(4, 8));
+
+  // Round-tripped through Date because the constructor rolls 31-02 forward into March rather than
+  // refusing it — comparing the parts back is what catches a day that does not exist.
+  const candidate = new Date(year, month - 1, day);
+  if (candidate.getFullYear() !== year || candidate.getMonth() !== month - 1 || candidate.getDate() !== day) {
+    return "";
+  }
+  return `${year}-${String(month).padStart(2, "0")}-${String(day).padStart(2, "0")}`;
+}
+
+/** The weekday of the yyyy-MM-dd a date input holds, or null while the field is empty or half-typed. */
+function weekdayOf(isoDate: string): (typeof WEEKDAYS)[number] | null {
+  const [year, month, day] = isoDate.split("-").map(Number);
+  if (!year || !month || !day) {
+    return null;
+  }
+  return WEEKDAYS[new Date(year, month - 1, day).getDay()];
 }
 
 export default function NewOrderPage() {
@@ -47,13 +93,30 @@ export default function NewOrderPage() {
   const [newCustomerFieldErrors, setNewCustomerFieldErrors] = useState<Record<string, string>>({});
   const [isCreatingCustomer, setIsCreatingCustomer] = useState(false);
   const [employee, setEmployee] = useState<Employee | null>(null);
+  const [employees, setEmployees] = useState<Employee[]>([]);
+  const [isLoadingEmployees, setIsLoadingEmployees] = useState(true);
   const [dueAtUtc, setDueAtUtc] = useState("");
+  /** What the DD-MM-YYYY field shows — its own state so a half-typed date survives keystrokes. */
+  const [dueDateText, setDueDateText] = useState("");
   const [orderNotes, setOrderNotes] = useState("");
   const [itemRows, setItemRows] = useState<ItemRow[]>([]);
-  const [formError, setFormError] = useState<string | null>(null);
+  // Chosen per order: the same owner may stitch a customer's own cloth one minute and sell a
+  // shirt length the next. Tailoring-only is the default because it is the simpler form, and a
+  // shop that never sells cloth should never see a fabric field.
+  const [businessMode, setBusinessMode] = useState<BusinessMode>("tailoring");
+  const [tailoringRates, setTailoringRates] = useState<TailoringRates>({});
+  const [garments, setGarments] = useState<Garment[]>([]);
+  // What an item row may be for: on the shop's garment list and carrying a stitching price. A
+  // garment nobody has priced would put a zero on the bill, so it is not offered at all.
+  //
+  // Memoised because the item editor watches this list in an effect — a fresh array on every render
+  // would re-run that effect on every keystroke in the form.
+  const offerableGarments = useMemo(
+    () => garments.filter((garment) => tailoringRates[garment.name] !== undefined),
+    [garments, tailoringRates],
+  );
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [createdOrder, setCreatedOrder] = useState<Order | null>(null);
-  const [invoiceError, setInvoiceError] = useState<string | null>(null);
   const [isGeneratingInvoice, setIsGeneratingInvoice] = useState(false);
   const [activeMeasurementItemId, setActiveMeasurementItemId] = useState<number | null>(null);
   const [customerMeasurements, setCustomerMeasurements] = useState<Measurement[]>([]);
@@ -63,7 +126,9 @@ export default function NewOrderPage() {
   const [measurementValues, setMeasurementValues] = useState<Record<string, string>>({});
   const [measurementFormError, setMeasurementFormError] = useState<string | null>(null);
   const [isSavingMeasurement, setIsSavingMeasurement] = useState(false);
-  const [isViewingSummary, setIsViewingSummary] = useState(false);
+  // Which cell opened the Order Summary Preview — both the Order summary cell and the Schedule
+  // cell open the same panel, and the one that was clicked is the one that gets highlighted.
+  const [summarySource, setSummarySource] = useState<"summary" | "schedule" | null>(null);
   const [formKey, setFormKey] = useState(0);
   const [showInvoiceConfirm, setShowInvoiceConfirm] = useState(false);
   const [createdInvoice, setCreatedInvoice] = useState<Invoice | null>(null);
@@ -71,6 +136,8 @@ export default function NewOrderPage() {
   const [autoPrintInvoice, setAutoPrintInvoice] = useState(false);
 
   const isOrderCreated = createdOrder !== null;
+  const isViewingSummary = summarySource !== null;
+  const collectionWeekday = weekdayOf(dueAtUtc);
 
   const activeMeasurementItemIndex = itemRows.findIndex((row) => row.id === activeMeasurementItemId);
   const activeMeasurementItem = activeMeasurementItemIndex === -1 ? null : itemRows[activeMeasurementItemIndex];
@@ -88,6 +155,16 @@ export default function NewOrderPage() {
   const measurementBlockRef = useRef<HTMLDivElement>(null);
   const mobileFieldRef = useRef<HTMLDivElement>(null);
   const orderSummaryRef = useRef<HTMLDivElement>(null);
+  const scheduleRef = useRef<HTMLDivElement>(null);
+  const datePickerRef = useRef<HTMLInputElement>(null);
+
+  useEffect(() => {
+    // Keeps the DD-MM-YYYY field in step with dates that arrive from somewhere other than typing
+    // — the pre-fill, the picker, New order's reset. Left alone when it already spells the same
+    // date, so a cursor mid-entry is never yanked.
+    // eslint-disable-next-line react-hooks/set-state-in-effect
+    setDueDateText((current) => (fromDisplayDate(current) === dueAtUtc ? current : toDisplayDate(dueAtUtc)));
+  }, [dueAtUtc]);
 
   useEffect(() => {
     if (!activeMeasurementItem && !isViewingSummary) {
@@ -95,16 +172,21 @@ export default function NewOrderPage() {
     }
 
     // Clicking an item card opens the measurement panel, clicking Order summary opens the invoice
-    // preview — clicking anywhere else (Customer field, Due date, blank space, etc.) should close
-    // whichever one is open, same as their own Close button — but a click inside the panel/Order
-    // summary cell itself must not count as "elsewhere".
+    // preview, and so does the Schedule cell next to it — clicking anywhere else (Customer field,
+    // blank space, etc.) should close whichever one is open, same as their own Close button — but
+    // a click inside the panel, or inside either cell that opens it, must not count as "elsewhere".
     function handleOutsideClick(event: MouseEvent) {
       const target = event.target as Node;
-      if (itemsAreaRef.current?.contains(target) || measurementBlockRef.current?.contains(target) || orderSummaryRef.current?.contains(target)) {
+      if (
+        itemsAreaRef.current?.contains(target) ||
+        measurementBlockRef.current?.contains(target) ||
+        orderSummaryRef.current?.contains(target) ||
+        scheduleRef.current?.contains(target)
+      ) {
         return;
       }
       setActiveMeasurementItemId(null);
-      setIsViewingSummary(false);
+      setSummarySource(null);
     }
 
     document.addEventListener("mousedown", handleOutsideClick);
@@ -150,13 +232,9 @@ export default function NewOrderPage() {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [activeMeasurementItem?.id, activeMeasurement?.id]);
 
-  // Live preview only — tolerant of blank/partial rows so the total updates as the shop owner
-  // types, unlike handleSubmit's strict per-item validation which runs at actual submit time.
-  function itemRowTotal(row: ItemRow): number {
-    const quantity = Number(row.quantity);
-    const unitPrice = Number(row.unitPrice);
-    return (Number.isFinite(quantity) ? quantity : 0) * (Number.isFinite(unitPrice) ? unitPrice : 0);
-  }
+  // Cloth plus stitching, row by row. Tolerant of blank input so the total moves as the owner
+  // types, unlike handleCreateOrder's strict per-item validation at submit time.
+  const itemRowTotal = (row: ItemRow) => rowTotal(row, businessMode);
   const orderTotal = itemRows.reduce((sum, row) => sum + itemRowTotal(row), 0);
   const advanceValue = advanceAmount.trim() === "" ? 0 : Number(advanceAmount);
   const orderBalance = orderTotal - (Number.isFinite(advanceValue) ? advanceValue : 0);
@@ -188,17 +266,17 @@ export default function NewOrderPage() {
     setIsAddingNewCustomer(true);
     setIsMobileDropdownOpen(false);
     setActiveMeasurementItemId(null);
-    setIsViewingSummary(false);
+    setSummarySource(null);
   }
 
   function handleItemClick(row: ItemRow) {
     setActiveMeasurementItemId(row.id);
     setIsAddingNewCustomer(false);
-    setIsViewingSummary(false);
+    setSummarySource(null);
   }
 
-  function handleOpenSummary() {
-    setIsViewingSummary(true);
+  function handleOpenSummary(source: "summary" | "schedule") {
+    setSummarySource(source);
     setActiveMeasurementItemId(null);
     setIsAddingNewCustomer(false);
   }
@@ -308,29 +386,97 @@ export default function NewOrderPage() {
   }, [loadCustomerMeasurements]);
 
   const applyDefaultDueDate = useCallback(() => {
-    // Pre-fills Due date from the shop's configured turnaround (Settings page) — different
-    // shops commit to different lead times, so this isn't hardcoded. Silently does nothing if
-    // the setting was never configured; the functional update leaves a value the user already
-    // typed untouched, in case this resolves after they've started filling the form.
-    getSetting(DEFAULT_ORDER_DUE_DATE_DAYS_KEY, getAccessToken())
-      .then((setting) => {
+    // Pre-fills Collection date from the shop's configured turnaround (Settings › Order Duration)
+    // — different shops commit to different lead times, so this isn't hardcoded — then rolls it
+    // forward off any day the shop is shut (Settings › Working Days). Add five days on a Tuesday
+    // and the answer used to be Sunday; now it is the Monday after.
+    //
+    // Silently does nothing if the turnaround was never configured; the functional update leaves a
+    // value the user already typed untouched, in case this resolves after they started the form.
+    Promise.all([
+      getSetting(DEFAULT_ORDER_DUE_DATE_DAYS_KEY, getAccessToken()),
+      // Never rejects — an unconfigured shop calendar falls back to "closed Sundays".
+      getShopCalendar(getAccessToken()),
+    ])
+      .then(([setting, calendar]) => {
         const days = Number(setting.value);
         if (!Number.isFinite(days) || days <= 0) {
           return;
         }
         const due = new Date();
         due.setDate(due.getDate() + days);
-        const isoDate = due.toISOString().slice(0, 10);
+        // toIsoDate off the local calendar, not toISOString: a due date computed late in the
+        // evening east of UTC would otherwise be written down as the day before.
+        const isoDate = nextOpenDay(toIsoDate(due), calendar);
         setDueAtUtc((current) => current || isoDate);
       })
       .catch(() => {
-        // No default configured — Due date stays blank, same as before this feature existed.
+        // No turnaround configured — Collection date stays blank, same as before this existed.
       });
   }, []);
 
   useEffect(() => {
     applyDefaultDueDate();
   }, [applyDefaultDueDate]);
+
+  useEffect(() => {
+    // The two lists that decide what an item row can be: the garments the shop stitches
+    // (Settings › Garments) and what it charges for them (Settings › Tailoring Cost). Read once
+    // here so no row has to ask for either. Neither rejects — a shop that has set no prices gets
+    // no garments to pick, which is the message below rather than an error.
+    let cancelled = false;
+    Promise.all([getTailoringRates(getAccessToken()), getGarments(getAccessToken())]).then(([rates, list]) => {
+      if (!cancelled) {
+        setTailoringRates(rates);
+        setGarments(list);
+      }
+    });
+
+    return () => {
+      cancelled = true;
+    };
+  }, []);
+
+  useEffect(() => {
+    // The whole roster, once, for the Assigned employee list. 200 is far above any real shop's
+    // headcount and still one request; a shop that outgrows it would need paging here anyway.
+    let cancelled = false;
+
+    // Paged rather than asked for in one go: the server caps pageSize at 100
+    // (Shared/Constants/PaginationDefaults.cs) and rejects anything larger, so a single request
+    // for the whole roster came back a validation error and left this list empty.
+    async function loadEveryEmployee() {
+      const all: Employee[] = [];
+      for (let page = 1; page <= EMPLOYEE_PAGE_LIMIT; page++) {
+        const { items, meta } = await searchEmployees("", page, EMPLOYEE_PAGE_SIZE, getAccessToken());
+        all.push(...items);
+        if (page >= meta.totalPages) {
+          break;
+        }
+      }
+      return all;
+    }
+
+    loadEveryEmployee()
+      .then((items) => {
+        if (!cancelled) {
+          // Retired staff are dropped — assigning new work to someone who has left is never right.
+          setEmployees(items.filter((candidate) => candidate.isActive));
+        }
+      })
+      .catch(() => {
+        // Leaves the list with only "Not assigned", which is a working order rather than a dead form.
+      })
+      .finally(() => {
+        if (!cancelled) {
+          setIsLoadingEmployees(false);
+        }
+      });
+
+    return () => {
+      cancelled = true;
+    };
+  }, []);
 
   function handleStartNewOrder() {
     // Resets every field back to a blank form — the Add item/quantity/etc. rows live inside
@@ -348,10 +494,8 @@ export default function NewOrderPage() {
     setEmployee(null);
     setDueAtUtc("");
     setItemRows([]);
-    setFormError(null);
     setIsSubmitting(false);
     setCreatedOrder(null);
-    setInvoiceError(null);
     setIsGeneratingInvoice(false);
     setCreatedInvoice(null);
     setShowInvoiceModal(false);
@@ -362,7 +506,7 @@ export default function NewOrderPage() {
     setAdvanceMethod(PAYMENT_METHODS[0]);
     setMeasurementValues({});
     setMeasurementFormError(null);
-    setIsViewingSummary(false);
+    setSummarySource(null);
     setFormKey((key) => key + 1);
     applyDefaultDueDate();
   }
@@ -412,66 +556,76 @@ export default function NewOrderPage() {
 
   async function handleCreateOrder(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
-    setFormError(null);
 
     if (!customer) {
-      setFormError("Select a customer.");
+      showToast("Select a customer.", "error");
       return;
     }
     if (!dueAtUtc) {
-      setFormError("Set a due date.");
+      showToast("Set a collection date.", "error");
       return;
     }
 
+    const sellsFabric = businessMode === "tailoringFabric";
     const items: CreateOrderItemInput[] = [];
     for (const row of itemRows) {
-      // The form starts with a few blank placeholder rows so staff don't have to click "+ Add
-      // item" for a typical order — untouched ones (no cloth code, no unit price typed in) are
-      // silently skipped rather than blocking submission with a validation error.
-      if (row.clothCode.trim() === "" && row.unitPrice.trim() === "") {
+      // The form starts with blank placeholder rows so staff don't have to click "+ Add item" for
+      // a typical order — untouched ones are silently skipped rather than blocking submission.
+      const isUntouched =
+        row.tailoringRate.trim() === "" && row.clothCode.trim() === "" && row.metres.trim() === "";
+      if (isUntouched) {
         continue;
       }
 
       const quantity = Number(row.quantity);
-      const unitPrice = Number(row.unitPrice);
-      if (!Number.isFinite(quantity) || quantity <= 0 || !Number.isFinite(unitPrice) || unitPrice <= 0) {
-        setFormError("Every item needs a positive quantity and unit price.");
+      const tailoring = Number(row.tailoringRate);
+      if (!Number.isFinite(quantity) || quantity <= 0 || !Number.isFinite(tailoring) || tailoring <= 0) {
+        showToast("Every item needs a quantity and a tailoring amount.", "error");
         return;
       }
 
-      let fabric = null;
-      if (row.includeFabric) {
-        const fabricQuantity = Number(row.fabricQuantity);
-        if (!row.fabricType.trim() || !Number.isFinite(fabricQuantity) || fabricQuantity <= 0) {
-          setFormError("Fabric details need a type and a positive quantity.");
-          return;
-        }
-        fabric = {
-          fabricType: row.fabricType,
-          source: row.fabricSource,
-          color: row.fabricColor.trim() === "" ? null : row.fabricColor,
-          quantity: fabricQuantity,
-          // Sent so shop-supplied cloth comes off stock. The server resolves it against the price
-          // list; an unmatched code is kept as typed and simply never reaches inventory.
-          clothCode: row.clothCode.trim() === "" ? null : row.clothCode.trim(),
-          unit: "Metres" as const,
-        };
+      const usesShopFabric = sellsFabric && row.fabricSource === "internal";
+      const metres = Number(row.metres);
+      const ratePerMetre = Number(row.ratePerMetre);
+      if (usesShopFabric && (!row.clothCode.trim() || !Number.isFinite(metres) || metres <= 0 || ratePerMetre <= 0)) {
+        showToast("Shop fabric needs a cloth code, metres and a rate.", "error");
+        return;
       }
+
+      const fabric = usesShopFabric
+        ? {
+            fabricType: row.clothName.trim() === "" ? row.clothCode.trim() : row.clothName,
+            source: "ShopSupplied" as const,
+            color: null,
+            quantity: metres,
+            // Sent so the cloth comes off stock. The server resolves it against the price list; an
+            // unmatched code is kept as typed and simply never reaches inventory.
+            clothCode: row.clothCode.trim(),
+            unit: "Metres" as const,
+          }
+        : null;
+
+      // The order API prices an item as quantity x unitPrice and has nowhere to put a separate
+      // cloth charge, so the cloth is folded into the unit price rather than being dropped. That
+      // keeps the saved total equal to the total on screen and on the invoice — but it does mean
+      // the split between cloth and stitching is not stored yet. Recording the two amounts
+      // separately is the backend half of this feature.
+      const unitPrice = tailoring + clothAmount(row, businessMode) / quantity;
 
       items.push({ garmentType: row.garmentType, quantity, unitPrice, fabric });
     }
 
     if (items.length === 0) {
-      setFormError("Add at least one garment item.");
+      showToast("Add at least one garment item.", "error");
       return;
     }
 
     if (!Number.isFinite(advanceValue) || advanceValue < 0) {
-      setFormError("Advance amount must be zero or greater.");
+      showToast("Advance amount must be zero or greater.", "error");
       return;
     }
     if (advanceValue > orderTotal) {
-      setFormError("Advance can't be more than the order total.");
+      showToast("Advance can't be more than the order total.", "error");
       return;
     }
 
@@ -492,7 +646,7 @@ export default function NewOrderPage() {
       setCreatedOrder(order);
       showToast("Order created.");
     } catch (error) {
-      setFormError(error instanceof ApiError ? error.message : "Unable to reach the server. Please try again.");
+      showToast(error instanceof ApiError ? error.message : "Unable to reach the server. Please try again.", "error");
     } finally {
       setIsSubmitting(false);
     }
@@ -502,7 +656,6 @@ export default function NewOrderPage() {
     if (!createdOrder) {
       return;
     }
-    setInvoiceError(null);
     setIsGeneratingInvoice(true);
     try {
       // Tax comes from the shop's rate in Invoice Settings, read at click time so this form and the
@@ -520,7 +673,7 @@ export default function NewOrderPage() {
     } catch (error) {
       // The order itself already exists — don't strand it. Staff can retry Generate Invoice here,
       // or fall back to the order page's own manual "Create Invoice" action.
-      setInvoiceError(error instanceof ApiError ? error.message : "Unable to reach the server. Please try again.");
+      showToast(error instanceof ApiError ? error.message : "Unable to reach the server. Please try again.", "error");
     } finally {
       setIsGeneratingInvoice(false);
     }
@@ -530,21 +683,52 @@ export default function NewOrderPage() {
     <>
     <div className="orderNewSkin flex flex-col gap-3 print:hidden">
       <div className="flex items-center justify-between">
-        {/* Shows the number the order was just given, which is what gets written on the job card. */}
-        <h1 className="text-2xl font-semibold">
+        {/* Shows the number the order was just given, which is what gets written on the job card.
+            One step down from the 2xl the other pages use: this screen is a working form, not a
+            page to be read, and the title only has to be found — every pixel it gives up is one
+            the item list and measurement panel get back. */}
+        <h1 className="text-xl font-semibold">
           {createdOrder
             ? `Order - ${createdOrder.orderNumber?.trim() || `#${createdOrder.id.slice(0, 8).toUpperCase()}`}`
             : "New Order"}
         </h1>
-        <Link href="/dashboard/orders" className="text-sm text-foreground/70 hover:text-foreground">
-          Back to orders
-        </Link>
+        <div className="flex items-center gap-4">
+          {/* What this order is: stitching alone, or stitching plus the shop's own cloth. It sits
+              in the title row because it changes what every item below asks for, and it is frozen
+              once the order exists — the items are already priced by then. */}
+          <div className="flex items-center gap-1">
+            {(
+              [
+                { value: "tailoring", label: "Tailoring" },
+                { value: "tailoringFabric", label: "Tailoring + fabric" },
+              ] as const
+            ).map((choice) => (
+              <button
+                key={choice.value}
+                type="button"
+                disabled={isOrderCreated}
+                aria-pressed={businessMode === choice.value}
+                onClick={() => setBusinessMode(choice.value)}
+                className={`rounded-full border px-3 py-1 text-xs font-medium transition-colors disabled:cursor-not-allowed disabled:opacity-50 ${
+                  businessMode === choice.value
+                    ? "border-primary bg-primary text-primary-foreground"
+                    : "border-border text-foreground/70 hover:bg-surface-hover"
+                }`}
+              >
+                {choice.label}
+              </button>
+            ))}
+          </div>
+          <Link href="/dashboard/orders" className="text-sm text-foreground/70 hover:text-foreground">
+            Back to orders
+          </Link>
+        </div>
       </div>
 
       <form onSubmit={handleCreateOrder} className="flex flex-col gap-3">
-        <div className="flex flex-col items-start gap-3 lg:flex-row lg:items-stretch">
+        <div className="flex flex-col items-start gap-4 lg:h-[min(calc(100dvh-6rem),44rem)] lg:flex-row lg:items-stretch">
           {/* Column 1: who the order is for, and what's being made. */}
-          <div className="flex w-full flex-1 flex-col gap-2 rounded-lg border border-border bg-surface p-3 lg:flex-[2]">
+          <div className="flex w-full flex-1 flex-col gap-3 rounded-lg border border-border bg-surface p-4 lg:flex-[2]">
           <div className="orderSection-customer flex flex-col gap-2">
             {/* The Customer field (a second, name/phone search picker) was removed as redundant
                 with Mobile Number below — this block now doubles as both the search UI and, once
@@ -590,8 +774,11 @@ export default function NewOrderPage() {
               </div>
             ) : (
               <div className="flex flex-col gap-1">
-                <label className="text-sm font-medium">Customer</label>
-                <div className="flex items-center justify-between rounded-md border border-border bg-surface px-3 py-2 text-sm">
+                <label className="text-sm font-medium">Customer Detail</label>
+                {/* Same padding as the search input it replaces, so picking a customer swaps one
+                    control for another of exactly the same height — otherwise the whole item list
+                    below shifted down 8px the moment a customer was chosen. */}
+                <div className="flex items-center justify-between rounded-md border border-border bg-surface px-3 py-1 text-sm">
                   <span>
                     {customer.fullName} ({customer.phoneNumber})
                   </span>
@@ -605,9 +792,12 @@ export default function NewOrderPage() {
             )}
           </div>
 
-            <div ref={itemsAreaRef} className="orderSection-items">
+            <div ref={itemsAreaRef} className="orderSection-items min-h-0 lg:flex-1 lg:overflow-y-auto">
               <OrderItemsEditor
                 key={formKey}
+                mode={businessMode}
+                tailoringRates={tailoringRates}
+                garments={offerableGarments}
                 onChange={setItemRows}
                 activeItemId={activeMeasurementItemId}
                 onItemClick={handleItemClick}
@@ -619,13 +809,28 @@ export default function NewOrderPage() {
           {/* Right side: the measurement panel merges columns 2 and 3's top into one block when
               an item is active; Due date/Assigned employee and Order summary sit below it, back
               as two separate columns. */}
-          <div className="flex w-full flex-1 flex-col gap-3 lg:flex-[2]">
+          <div className="flex w-full flex-1 flex-col gap-4 lg:flex-[2]">
             {/* Always present (blank when no item is active) so Due date/Assigned employee and
                 Order summary below stay pinned to the bottom, matching column 1's height, instead
                 of jumping up to fill the gap. */}
-            <div ref={measurementBlockRef} className="flex flex-1 flex-col gap-3 rounded-lg border-2 border-foreground bg-surface p-3">
+            {/* Frozen height from the large breakpoint up: this box's three modes (measurement,
+                new customer, summary preview) are all different heights, and letting it size to
+                its content moved Order summary and Schedule below it every time one opened or
+                closed. A fixed height keeps them still; anything taller scrolls inside the box.
+                Left to size naturally on phones, where the whole column is stacked and a fixed
+                empty box would just be dead space to scroll past.
+
+                18rem starts from the measured fit — with the three garment items the form opens
+                with, column 1 is 618px, which leaves 240px here once Order summary/Schedule, the
+                action row and the two 12px gaps are taken out — and adds a row's worth on top, so
+                two more measurement points are readable before scrolling. The item list stretches
+                to meet it. */}
+            <div
+              ref={measurementBlockRef}
+              className="flex flex-1 flex-col gap-3 overflow-y-auto rounded-lg border-2 border-foreground bg-surface p-4 lg:min-h-0"
+            >
               {activeMeasurementItem && (
-                <div className="orderSection-measure flex flex-col gap-3">
+                <div className="orderSection-measure flex shrink-0 flex-col gap-3">
                   <div className="flex items-center justify-between gap-2 border-b-2 border-foreground/15 pb-3">
                     <span className="order-heading min-w-0 flex-1 truncate text-sm font-medium">
                       Measurement Detail - Item {activeMeasurementItemIndex + 1} - {activeMeasurementItem.garmentType}
@@ -698,7 +903,7 @@ export default function NewOrderPage() {
                   )}
 
                   {customer && !isLoadingMeasurements && measurementFields.length > 0 && (
-                    <div className="flex justify-center gap-3 border-y-2 border-foreground/15 py-3">
+                    <div className="flex justify-center gap-3 border-y-2 border-foreground/15 py-0.5">
                       <Button type="button" variant="secondary" onClick={handleClearMeasurement} disabled={isSavingMeasurement || isOrderCreated}>
                         Clear
                       </Button>
@@ -714,7 +919,7 @@ export default function NewOrderPage() {
                   mutually exclusive with the measurement panel above since starting either one
                   clears the other's active state. */}
               {!activeMeasurementItem && isAddingNewCustomer && (
-                <div className="orderSection-customer flex flex-col gap-2">
+                <div className="orderSection-customer flex shrink-0 flex-col gap-2">
                   <span className="order-heading text-sm font-medium">New customer</span>
                   <Input id="newCustomerName" label="Full name" value={newCustomerName} onChange={(e) => setNewCustomerName(e.target.value)} error={newCustomerFieldErrors.fullname} />
                   <PhoneNumberInput id="newCustomerPhone" value={newCustomerPhone} onChange={setNewCustomerPhone} error={newCustomerFieldErrors.phonenumber} />
@@ -738,10 +943,10 @@ export default function NewOrderPage() {
                   just closing whatever was open — a read-only recap of items/total/advance/balance
                   before committing to Create order. */}
               {!activeMeasurementItem && !isAddingNewCustomer && isViewingSummary && (
-                <div className="orderSection-summary flex flex-1 flex-col gap-3">
+                <div className="orderSection-summary flex shrink-0 flex-col gap-3">
                   <div className="flex items-center justify-between border-b-2 border-foreground/15 pb-3">
                     <span className="order-heading text-sm font-medium">Order Summary Preview</span>
-                    <button type="button" onClick={() => setIsViewingSummary(false)} className="text-sm text-foreground/70 hover:text-foreground">
+                    <button type="button" onClick={() => setSummarySource(null)} className="text-sm text-foreground/70 hover:text-foreground">
                       Close
                     </button>
                   </div>
@@ -751,7 +956,8 @@ export default function NewOrderPage() {
                         <th className="py-1 font-medium">#</th>
                         <th className="py-1 font-medium">Garment</th>
                         <th className="py-1 text-right font-medium">Qty</th>
-                        <th className="py-1 text-right font-medium">Unit price</th>
+                        {businessMode === "tailoringFabric" && <th className="py-1 text-right font-medium">Cloth</th>}
+                        <th className="py-1 text-right font-medium">Tailoring</th>
                         <th className="py-1 text-right font-medium">Total</th>
                       </tr>
                     </thead>
@@ -761,7 +967,10 @@ export default function NewOrderPage() {
                           <td className="py-1">{index + 1}</td>
                           <td className="py-1">{row.garmentType}</td>
                           <td className="py-1 text-right">{row.quantity || "0"}</td>
-                          <td className="py-1 text-right">{(Number(row.unitPrice) || 0).toFixed(2)}</td>
+                          {businessMode === "tailoringFabric" && (
+                            <td className="py-1 text-right">{clothAmount(row, businessMode).toFixed(2)}</td>
+                          )}
+                          <td className="py-1 text-right">{(Number(row.tailoringRate) || 0).toFixed(2)}</td>
                           <td className="py-1 text-right">{itemRowTotal(row).toFixed(2)}</td>
                         </tr>
                       ))}
@@ -783,20 +992,19 @@ export default function NewOrderPage() {
                   </div>
                 </div>
               )}
-              {/* Widget helps staff before they've picked a customer to work on; once a customer is
-                  selected this box is reserved for that customer's item measurements, so the
-                  widget is disabled (hidden) rather than shown alongside them. */}
-              {!activeMeasurementItem && !isAddingNewCustomer && !isViewingSummary && !customer && <OrderStatusCounts />}
+              {/* Nothing fills this box when no item, new customer or summary is open. It is kept
+                  in the layout rather than collapsed so Order summary and Schedule below stay
+                  pinned to the bottom, level with column 1. */}
             </div>
 
-            <div className="flex flex-col items-start gap-3 lg:flex-row lg:items-stretch">
+            <div className="flex flex-col items-start gap-4 lg:flex-row lg:items-stretch">
               {/* Column 2: money. Clicking the cell (outside the interactive advance fields) opens
                   the invoice preview above. */}
               <div
                 ref={orderSummaryRef}
-                onClick={handleOpenSummary}
-                className={`orderSection-summary flex w-full flex-1 cursor-pointer flex-col gap-2 rounded-lg border p-3 ${
-                  isViewingSummary ? "border-foreground bg-surface ring-1 ring-foreground" : "border-border bg-surface"
+                onClick={() => handleOpenSummary("summary")}
+                className={`orderSection-summary flex w-full flex-1 cursor-pointer flex-col gap-2 rounded-lg border p-4 ${
+                  summarySource === "summary" ? "border-foreground bg-surface ring-1 ring-foreground" : "border-border bg-surface"
                 }`}
               >
                 <span className="order-heading text-sm font-medium">Order summary</span>
@@ -840,34 +1048,100 @@ export default function NewOrderPage() {
                 </div>
               </div>
 
-              {/* Column 3: scheduling. */}
-              <div className="orderSection-schedule flex w-full flex-1 flex-col gap-3 rounded-lg border border-border bg-surface p-3">
+              {/* Column 3: scheduling. Clicking it opens the same Order Summary Preview as the cell
+                  beside it — the two cells are one review step, and reaching the preview shouldn't
+                  depend on which half of the row you happen to click. */}
+              <div
+                ref={scheduleRef}
+                onClick={() => handleOpenSummary("schedule")}
+                className={`orderSection-schedule flex w-full flex-1 cursor-pointer flex-col gap-3 rounded-lg border p-4 ${
+                  summarySource === "schedule" ? "border-foreground bg-surface ring-1 ring-foreground" : "border-border bg-surface"
+                }`}
+              >
                 <div className="flex flex-col gap-1">
                   <label htmlFor="dueAtUtc" className="text-sm font-medium">
-                    Due date
+                    Collection date
                   </label>
-                  <input
-                    id="dueAtUtc"
-                    type="date"
-                    value={dueAtUtc}
-                    disabled={isOrderCreated}
-                    onChange={(e) => setDueAtUtc(e.target.value)}
-                    className={`${fieldClassName} disabled:cursor-not-allowed disabled:opacity-50`}
-                  />
+                  {/* Weekday beside the field, on its line — it answers "is that a Sunday?" right
+                      where the date is read, and sharing the row costs no height. The field is
+                      given a fixed width and the day one of its own, wide enough for "Wednesday",
+                      so neither moves as the date changes. The day sits just after the field
+                      rather than out at the card's edge — it reads as part of the date, not as a
+                      separate column.
+
+                      A text field rather than a native date input, because a native one renders
+                      in the browser's own locale — mm/dd/yyyy on these machines — and no attribute
+                      changes that ("lang" is ignored). The real date input is still there, kept
+                      rendered but invisible behind this one, purely so its picker can be opened. */}
+                  <div className="flex items-center gap-3">
+                    <div className="relative shrink-0">
+                      <input
+                        id="dueAtUtc"
+                        type="text"
+                        inputMode="numeric"
+                        autoComplete="off"
+                        placeholder="DD-MM-YYYY"
+                        value={dueDateText}
+                        disabled={isOrderCreated}
+                        // Read-only because the click that opens the picker also takes focus away
+                        // from this field — a caret that can be placed but never typed into is
+                        // worse than a field that plainly belongs to the picker. Enter and Space
+                        // open it too, so this is still reachable without a mouse.
+                        readOnly
+                        onClick={() => datePickerRef.current?.showPicker?.()}
+                        onKeyDown={(e) => {
+                          if (e.key === "Enter" || e.key === " ") {
+                            e.preventDefault();
+                            datePickerRef.current?.showPicker?.();
+                          }
+                        }}
+                        className={`${fieldClassName} w-28 cursor-pointer disabled:cursor-not-allowed disabled:opacity-50`}
+                      />
+                      {/* Invisible, not hidden: showPicker throws on an element that is not being
+                          rendered. Sized over the text field so the picker opens against it. */}
+                      <input
+                        ref={datePickerRef}
+                        type="date"
+                        tabIndex={-1}
+                        aria-hidden="true"
+                        value={dueAtUtc}
+                        disabled={isOrderCreated}
+                        onChange={(e) => setDueAtUtc(e.target.value)}
+                        className="pointer-events-none absolute inset-0 h-full w-full opacity-0"
+                      />
+                    </div>
+                    {/* Rendered even when blank, so nothing shifts as the date is typed. */}
+                    <span className="w-[5.5rem] shrink-0 truncate text-sm font-medium text-foreground/70">
+                      {collectionWeekday?.label ?? ""}
+                    </span>
+                  </div>
                 </div>
 
-                <SearchPicker
-                  id="employee"
-                  label="Assigned employee (optional)"
-                  selectedLabel={employee ? employee.fullName : null}
-                  onSelect={setEmployee}
-                  onClear={() => setEmployee(null)}
-                  search={searchEmployees}
-                  getId={(e) => e.id}
-                  getLabel={(e) => e.fullName}
-                  placeholder="Search employees…"
-                  disabled={isOrderCreated}
-                />
+                <div className="flex flex-col gap-1">
+                  <label htmlFor="employee" className="text-sm font-medium">
+                    Assigned employee (optional)
+                  </label>
+                  {/* The whole roster in one list rather than a search box: a shop has tens of
+                      staff, not thousands, and picking from a list beats typing a name you have
+                      to spell right. "Not assigned" is the first option and the default — most
+                      orders are handed to a tailor later, not at the counter. */}
+                  <select
+                    id="employee"
+                    value={employee?.id ?? ""}
+                    disabled={isOrderCreated || isLoadingEmployees}
+                    onChange={(e) => setEmployee(employees.find((candidate) => candidate.id === e.target.value) ?? null)}
+                    className={`${fieldClassName} disabled:cursor-not-allowed disabled:opacity-50`}
+                  >
+                    <option value="">{isLoadingEmployees ? "Loading employees…" : "Not assigned"}</option>
+                    {employees.map((option) => (
+                      <option key={option.id} value={option.id}>
+                        {/* Code alongside the name — a shop can hold two Kumars. */}
+                        {option.fullName}
+                        {option.employeeCode ? ` (${option.employeeCode})` : ""}
+                      </option>
+                    ))}
+                  </select>
+                </div>
 
                 <div className="flex flex-col gap-1">
                   <label htmlFor="orderNotes" className="text-sm font-medium">
@@ -875,7 +1149,7 @@ export default function NewOrderPage() {
                   </label>
                   <textarea
                     id="orderNotes"
-                    rows={3}
+                    rows={1}
                     value={orderNotes}
                     disabled={isOrderCreated}
                     onChange={(e) => setOrderNotes(e.target.value)}
@@ -886,14 +1160,18 @@ export default function NewOrderPage() {
               </div>
             </div>
 
-            {/* Row 3: order creation and (once created) invoice generation, as two explicit steps. */}
-            <div className="flex w-full flex-col gap-3 rounded-lg border border-border bg-surface p-3">
-              {(formError || invoiceError) && (
-                <p role="alert" className="text-sm text-danger">
-                  {formError ?? invoiceError}
-                </p>
-              )}
-              <div className="flex items-center justify-center gap-3">
+            {/* Row 3: order creation and (once created) invoice generation, as two explicit steps.
+                Takes whatever height is left over so this column ends level with the item list
+                beside it — the frozen panel above rounds to a fixed size, and without this the
+                slack showed up as a gap under the buttons. */}
+            {/* No error text lives in this card. A message appearing here changed its height, and
+                with it the height of everything aligned to it — order failures are announced by a
+                toast at the page's bottom-right instead, where nothing has to move to make room. */}
+            <div className="flex w-full shrink-0 flex-col justify-center gap-3 rounded-lg border border-border bg-surface p-4">
+              {/* Wraps — four buttons in a nowrap row have a min-content width of 334px, which no
+                  amount of shrinking elsewhere could fit on a 320px phone. That was the page's
+                  sideways scroll, not anything in the item list. */}
+              <div className="flex flex-wrap items-center justify-center gap-3">
                 <Button type="submit" disabled={isSubmitting || isOrderCreated}>
                   {isSubmitting ? "Creating…" : isOrderCreated ? "Order created" : "Create order"}
                 </Button>

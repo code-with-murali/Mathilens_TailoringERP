@@ -63,7 +63,7 @@ export default function OrderDurationSettingsPage() {
 
       <form onSubmit={handleSave} className="flex max-w-xl flex-col gap-4 rounded-lg border border-border bg-surface p-6">
         <p className="text-sm text-foreground/70">
-          When staff create a new order, the due date is pre-filled this many days from today. They
+          When staff create a new order, the collection date is pre-filled this many days from today. They
           can still change it on the order itself — this only sets the starting point.
         </p>
         <Input

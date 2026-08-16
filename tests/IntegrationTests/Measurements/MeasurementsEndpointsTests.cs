@@ -52,10 +52,10 @@ public class MeasurementsEndpointsTests : IClassFixture<CustomWebApplicationFact
     [Fact]
     public async Task Create_WithValidStringGarmentTypeAndValues_PassesValidationAndReachesTheHandler()
     {
-        // Proves GarmentType actually deserializes from its JSON string name ("Shirt"), not
+        // Proves string actually deserializes from its JSON string name ("Shirt"), not
         // just that malformed requests get rejected — a request that's fully valid gets past
         // both model binding and FluentValidation into CreateMeasurementCommandHandler. Without
-        // a JsonStringEnumConverter registered, "Shirt" wouldn't bind to GarmentType at all and
+        // a JsonStringEnumConverter registered, "Shirt" wouldn't bind to string at all and
         // this would come back 400, for the wrong reason.
         //
         // What happens *after* validation depends on the machine: 500 where no PostgreSQL is

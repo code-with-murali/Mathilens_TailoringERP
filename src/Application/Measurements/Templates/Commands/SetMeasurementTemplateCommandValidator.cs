@@ -1,4 +1,5 @@
 using FluentValidation;
+using MathilensERP.Application.Common.Validation;
 
 namespace MathilensERP.Application.Measurements.Templates.Commands;
 
@@ -10,7 +11,7 @@ public sealed class SetMeasurementTemplateCommandValidator : AbstractValidator<S
     public SetMeasurementTemplateCommandValidator()
     {
         RuleFor(x => x.GarmentType)
-            .IsInEnum();
+            .MustBeAGarmentName();
 
         RuleFor(x => x.Points)
             .NotEmpty()

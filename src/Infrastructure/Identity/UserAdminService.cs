@@ -49,13 +49,13 @@ public sealed class UserAdminService : IUserAdminService
         foreach (var user in users)
         {
             var roles = await _userManager.GetRolesAsync(user);
-            items.Add(new AppUserDto(user.Id, user.Email ?? string.Empty, roles.FirstOrDefault()));
+            items.Add(new AppUserDto(user.Id, user.Email ?? string.Empty, user.FullName, roles.FirstOrDefault()));
         }
 
         return new PagedResult<AppUserDto>(items, page, pageSize, totalCount);
     }
 
-    public async Task<Result<AppUserDto>> CreateUserAsync(string email, string password, string role, CancellationToken cancellationToken)
+    public async Task<Result<AppUserDto>> CreateUserAsync(string email, string password, string fullName, string role, CancellationToken cancellationToken)
     {
         // Against the role store rather than a fixed list: a shop can add its own roles on the
         // User Roles screen, and one created five minutes ago is as assignable as Front Desk.
@@ -69,7 +69,9 @@ public sealed class UserAdminService : IUserAdminService
             return Result.Failure<AppUserDto>(Error.Conflict("Users.EmailAlreadyRegistered", "An account with this email already exists."));
         }
 
-        var user = new ApplicationUser { UserName = email, Email = email };
+        var name = fullName.Trim();
+
+        var user = new ApplicationUser { UserName = email, Email = email, FullName = name };
         var created = await _userManager.CreateAsync(user, password);
         if (!created.Succeeded)
         {
@@ -79,8 +81,34 @@ public sealed class UserAdminService : IUserAdminService
 
         await _userManager.AddToRoleAsync(user, role);
 
-        return Result.Success(new AppUserDto(user.Id, email, role));
+        return Result.Success(new AppUserDto(user.Id, email, name, role));
     }
+
+    public async Task<Result> SetFullNameAsync(Guid userId, string fullName, CancellationToken cancellationToken)
+    {
+        var user = await _userManager.FindByIdAsync(userId.ToString());
+        if (user is null)
+        {
+            return Result.Failure(Error.NotFound("Users.NotFound", $"No user was found with id '{userId}'."));
+        }
+
+        user.FullName = fullName.Trim();
+
+        var updated = await _userManager.UpdateAsync(user);
+        if (!updated.Succeeded)
+        {
+            var details = updated.Errors.Select(e => new FieldError("fullName", e.Description)).ToList();
+            return Result.Failure(Error.Validation("Users.UpdateFailed", "This name could not be saved.", details));
+        }
+
+        return Result.Success();
+    }
+
+    public async Task<string?> GetFullNameAsync(Guid userId, CancellationToken cancellationToken) =>
+        await _userManager.Users
+            .Where(u => u.Id == userId)
+            .Select(u => u.FullName)
+            .SingleOrDefaultAsync(cancellationToken);
 
     public async Task<Result> SetRoleAsync(Guid userId, string role, CancellationToken cancellationToken)
     {

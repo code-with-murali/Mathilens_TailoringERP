@@ -1,8 +1,11 @@
 namespace MathilensERP.Api.Contracts.Users;
 
-public sealed record CreateUserRequest(string Email, string Password, string Role);
+public sealed record CreateUserRequest(string Email, string Password, string FullName, string Role);
 
 public sealed record SetUserRoleRequest(string Role);
+
+/// <summary>Renaming a person. Their email is how they sign in and is not changed here.</summary>
+public sealed record SetUserNameRequest(string FullName);
 
 /// <summary>No current password: an Owner resetting someone else's has no reason to know it.</summary>
 public sealed record ResetUserPasswordRequest(string NewPassword);

@@ -185,8 +185,10 @@ export default function CustomersPage() {
           <table className="stacked w-full text-left text-sm">
             <thead className="border-b border-border bg-surface">
               <tr>
-                <th className="px-4 py-3 font-medium">Name</th>
+                {/* Phone leads: it is what a customer is looked up by at the counter, and it is
+                    the way in to their record. */}
                 <th className="px-4 py-3 font-medium">Phone</th>
+                <th className="px-4 py-3 font-medium">Name</th>
                 <th className="px-4 py-3 font-medium">Email</th>
                 <th className="px-4 py-3 font-medium">
                   <span className="sr-only">Actions</span>
@@ -196,11 +198,20 @@ export default function CustomersPage() {
             <tbody>
               {customers.map((customer) => (
                 <tr key={customer.id} className="border-b border-border last:border-0">
-                  <td data-label="Name" className="px-4 py-3 font-medium">
-                    {customer.fullName}
-                  </td>
+                  {/* The phone is the way into the record — their details, their previous orders
+                      and their measurements are all on the other side of it. It replaces the
+                      Measurements link that used to sit in the actions, which only ever went to
+                      the same page. */}
                   <td data-label="Phone" className="px-4 py-3">
-                    {customer.phoneNumber}
+                    <Link
+                      href={`/dashboard/customers/${customer.id}`}
+                      className="font-medium text-primary underline underline-offset-2 hover:text-primary-hover"
+                    >
+                      {customer.phoneNumber}
+                    </Link>
+                  </td>
+                  <td data-label="Name" className="px-4 py-3">
+                    {customer.fullName}
                   </td>
                   <td data-label="Email" className="px-4 py-3">
                     {customer.email ?? "—"}
@@ -208,8 +219,7 @@ export default function CustomersPage() {
                   <td data-label="" className="px-4 py-3">
                     <div className="flex justify-end gap-4">
                       {/* In place, like New. Editing from the list no longer means losing the page
-                          and the search term — the record's own page is still there for
-                          measurements, and its link is the name of the customer. */}
+                          and the search term. */}
                       <button
                         type="button"
                         onClick={() => setEditing(customer)}
@@ -217,9 +227,6 @@ export default function CustomersPage() {
                       >
                         Edit
                       </button>
-                      <Link href={`/dashboard/customers/${customer.id}`} className="text-foreground/70 hover:text-foreground">
-                        Measurements
-                      </Link>
                       <button
                         type="button"
                         onClick={() => setPendingDelete(customer)}
@@ -248,7 +255,7 @@ export default function CustomersPage() {
       <ConfirmDialog
         open={pendingDelete !== null}
         title="Delete customer"
-        description={pendingDelete ? `Are you sure you want to delete ${pendingDelete.fullName}? This cannot be undone.` : ""}
+        description={pendingDelete ? `Are you sure you want to delete ${pendingDelete.fullName}?` : ""}
         isConfirming={isDeleting}
         onConfirm={handleConfirmDelete}
         onCancel={() => setPendingDelete(null)}

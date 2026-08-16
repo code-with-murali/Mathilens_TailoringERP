@@ -1,9 +1,11 @@
 "use client";
 
-import { useState, type FormEvent } from "react";
+import { useEffect, useState, type FormEvent } from "react";
 import { Button } from "@/components/ui/Button";
 import { ApiError } from "@/lib/api-client";
-import { GARMENT_TYPES, type GarmentType } from "@/lib/api/measurements";
+import { type GarmentType } from "@/lib/api/measurements";
+import { getGarments } from "@/lib/api/garments";
+import { getAccessToken } from "@/lib/auth";
 import { MeasurementValuesEditor, type ValueRowInput } from "./MeasurementValuesEditor";
 
 type MeasurementFormProps = {
@@ -15,7 +17,10 @@ type MeasurementFormProps = {
 };
 
 export function MeasurementForm({ garmentType: fixedGarmentType, initialValues, submitLabel, onSubmit }: MeasurementFormProps) {
-  const [garmentType, setGarmentType] = useState<GarmentType>(fixedGarmentType ?? GARMENT_TYPES[0]);
+  const [garmentType, setGarmentType] = useState<GarmentType>(fixedGarmentType ?? "");
+  // The shop's own garment list, so a measurement can be taken for a Chudidhar it added. Empty
+  // until it arrives; the picker is only shown when this form is creating a measurement anyway.
+  const [garments, setGarments] = useState<string[]>([]);
   const [rows, setRows] = useState<ValueRowInput[]>([]);
   const [formError, setFormError] = useState<string | null>(null);
   const [isSubmitting, setIsSubmitting] = useState(false);
@@ -23,6 +28,26 @@ export function MeasurementForm({ garmentType: fixedGarmentType, initialValues, 
   // first clear, initialValues is dropped too, so clearing again still yields blank fields
   // instead of reverting back to whatever was originally loaded.
   const [clearCount, setClearCount] = useState(0);
+
+  useEffect(() => {
+    // Skipped while editing: the garment of an existing measurement never changes, so there is no
+    // picker to fill and no reason to ask.
+    if (fixedGarmentType) {
+      return;
+    }
+    let cancelled = false;
+    getGarments(getAccessToken()).then((list) => {
+      if (cancelled) {
+        return;
+      }
+      setGarments(list.map((g) => g.name));
+      setGarmentType((current) => current || list[0]?.name || "");
+    });
+
+    return () => {
+      cancelled = true;
+    };
+  }, [fixedGarmentType]);
 
   function handleClear() {
     setFormError(null);
@@ -76,7 +101,7 @@ export function MeasurementForm({ garmentType: fixedGarmentType, initialValues, 
             onChange={(e) => setGarmentType(e.target.value as GarmentType)}
             className="rounded-md border border-border bg-surface px-3 py-2 text-sm outline-none transition-colors focus:border-primary focus:ring-2 focus:ring-primary/25"
           >
-            {GARMENT_TYPES.map((type) => (
+            {garments.map((type) => (
               <option key={type} value={type}>
                 {type}
               </option>

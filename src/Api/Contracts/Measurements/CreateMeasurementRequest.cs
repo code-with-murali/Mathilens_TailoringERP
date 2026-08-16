@@ -2,4 +2,4 @@ using MathilensERP.Domain.Measurements;
 
 namespace MathilensERP.Api.Contracts.Measurements;
 
-public sealed record CreateMeasurementRequest(GarmentType GarmentType, IReadOnlyDictionary<string, decimal> Values);
+public sealed record CreateMeasurementRequest(string GarmentType, IReadOnlyDictionary<string, decimal> Values);

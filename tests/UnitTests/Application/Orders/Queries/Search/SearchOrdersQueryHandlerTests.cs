@@ -18,14 +18,14 @@ public class SearchOrdersQueryHandlerTests
     {
         var customerId = Guid.NewGuid();
         var order = Order.Create(customerId, DateTime.UtcNow, null);
-        order.AddItem(GarmentType.Shirt, 2, 500m);
-        _orderRepository.SearchAsync(customerId, OrderStatus.Received, null, 1, 20, Arg.Any<CancellationToken>())
+        order.AddItem(GarmentTypes.Shirt, 2, 500m);
+        _orderRepository.SearchAsync(customerId, OrderStatus.Received, null, null, 1, 20, Arg.Any<CancellationToken>())
             .Returns(new PagedResult<Order>([order], 1, 20, 1));
         _invoiceRepository.GetPaidAmountsForOrdersAsync(Arg.Any<IReadOnlyCollection<Guid>>(), Arg.Any<CancellationToken>())
             .Returns(new Dictionary<Guid, decimal> { [order.Id] = 400m });
         var handler = new SearchOrdersQueryHandler(_orderRepository, _invoiceRepository);
 
-        var result = await handler.Handle(new SearchOrdersQuery(customerId, OrderStatus.Received, null, 1, 20), CancellationToken.None);
+        var result = await handler.Handle(new SearchOrdersQuery(customerId, OrderStatus.Received, null, null, 1, 20), CancellationToken.None);
 
         Assert.True(result.IsSuccess);
         var dto = Assert.Single(result.Value.Items);
@@ -39,14 +39,14 @@ public class SearchOrdersQueryHandlerTests
     public async Task Handle_WithAnUninvoicedOrder_ReportsNothingCollectedRatherThanUnknown()
     {
         var order = Order.Create(Guid.NewGuid(), DateTime.UtcNow, null);
-        order.AddItem(GarmentType.Shirt, 1, 750m);
-        _orderRepository.SearchAsync(null, null, null, 1, 20, Arg.Any<CancellationToken>())
+        order.AddItem(GarmentTypes.Shirt, 1, 750m);
+        _orderRepository.SearchAsync(null, null, null, null, 1, 20, Arg.Any<CancellationToken>())
             .Returns(new PagedResult<Order>([order], 1, 20, 1));
         _invoiceRepository.GetPaidAmountsForOrdersAsync(Arg.Any<IReadOnlyCollection<Guid>>(), Arg.Any<CancellationToken>())
             .Returns(new Dictionary<Guid, decimal>());
         var handler = new SearchOrdersQueryHandler(_orderRepository, _invoiceRepository);
 
-        var result = await handler.Handle(new SearchOrdersQuery(null, null, null, 1, 20), CancellationToken.None);
+        var result = await handler.Handle(new SearchOrdersQuery(null, null, null, null, 1, 20), CancellationToken.None);
 
         var dto = Assert.Single(result.Value.Items);
         Assert.Equal(0m, dto.AmountPaid);
@@ -58,13 +58,13 @@ public class SearchOrdersQueryHandlerTests
     {
         var first = Order.Create(Guid.NewGuid(), DateTime.UtcNow, null);
         var second = Order.Create(Guid.NewGuid(), DateTime.UtcNow, null);
-        _orderRepository.SearchAsync(null, null, null, 1, 20, Arg.Any<CancellationToken>())
+        _orderRepository.SearchAsync(null, null, null, null, 1, 20, Arg.Any<CancellationToken>())
             .Returns(new PagedResult<Order>([first, second], 1, 20, 2));
         _invoiceRepository.GetPaidAmountsForOrdersAsync(Arg.Any<IReadOnlyCollection<Guid>>(), Arg.Any<CancellationToken>())
             .Returns(new Dictionary<Guid, decimal>());
         var handler = new SearchOrdersQueryHandler(_orderRepository, _invoiceRepository);
 
-        await handler.Handle(new SearchOrdersQuery(null, null, null, 1, 20), CancellationToken.None);
+        await handler.Handle(new SearchOrdersQuery(null, null, null, null, 1, 20), CancellationToken.None);
 
         await _invoiceRepository.Received(1).GetPaidAmountsForOrdersAsync(
             Arg.Is<IReadOnlyCollection<Guid>>(ids => ids.Count == 2), Arg.Any<CancellationToken>());

@@ -23,6 +23,7 @@ public sealed class SearchOrdersQueryHandler : IQueryHandler<SearchOrdersQuery, 
             query.CustomerId,
             query.Status,
             query.SearchTerm,
+            query.GarmentType,
             query.Page,
             query.PageSize,
             cancellationToken);

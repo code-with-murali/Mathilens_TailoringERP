@@ -31,7 +31,7 @@ public sealed record OrderDto(
 
 public sealed record OrderItemDto(
     Guid Id,
-    GarmentType GarmentType,
+    string GarmentType,
     int Quantity,
     decimal UnitPrice,
     FabricDetailsDto? Fabric);

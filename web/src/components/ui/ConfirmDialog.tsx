@@ -6,7 +6,8 @@ import { Button } from "./Button";
 type ConfirmDialogProps = {
   open: boolean;
   title: string;
-  description: string;
+  /** Omitted where the title already says the whole thing — the paragraph is then not rendered at all. */
+  description?: string;
   confirmLabel?: string;
   /** Text shown on the confirm button while isConfirming — defaults to matching confirmLabel's "-ing" destructive phrasing. */
   confirmingLabel?: string;
@@ -45,8 +46,12 @@ export function ConfirmDialog({
           two buttons, but a server's refusal quoted inside one can run long, and the buttons have
           to stay reachable on a phone held sideways. */}
       <div className="max-h-[92dvh] w-full max-w-sm overflow-y-auto rounded-lg border border-border bg-surface p-4 shadow-xl sm:p-6">
-        <h2 className="mb-2 text-lg font-semibold">{title}</h2>
-        <p className={children ? "mb-4 text-sm text-foreground/70" : "mb-6 text-sm text-foreground/70"}>{description}</p>
+        {/* The gap under the title carries whatever the description would have: without one, the
+            title needs the full space itself rather than leaving the buttons crowded against it. */}
+        <h2 className={description || children ? "mb-2 text-lg font-semibold" : "mb-6 text-lg font-semibold"}>{title}</h2>
+        {description && (
+          <p className={children ? "mb-4 text-sm text-foreground/70" : "mb-6 text-sm text-foreground/70"}>{description}</p>
+        )}
         {children && <div className="mb-6 flex flex-col gap-3">{children}</div>}
         <div className="flex flex-wrap justify-end gap-3">
           <Button type="button" variant="secondary" onClick={onCancel} disabled={isConfirming}>

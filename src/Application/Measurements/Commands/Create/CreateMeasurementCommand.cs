@@ -7,5 +7,5 @@ namespace MathilensERP.Application.Measurements.Commands.Create;
 
 public sealed record CreateMeasurementCommand(
     Guid CustomerId,
-    GarmentType GarmentType,
+    string GarmentType,
     IReadOnlyDictionary<string, decimal> Values) : ICommand<Result<MeasurementDto>>;

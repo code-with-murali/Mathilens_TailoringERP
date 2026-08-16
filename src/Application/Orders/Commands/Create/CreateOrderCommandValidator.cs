@@ -1,4 +1,5 @@
 using FluentValidation;
+using MathilensERP.Application.Common.Validation;
 
 namespace MathilensERP.Application.Orders.Commands.Create;
 
@@ -29,7 +30,7 @@ public sealed class CreateOrderItemInputValidator : AbstractValidator<CreateOrde
     public CreateOrderItemInputValidator()
     {
         RuleFor(x => x.GarmentType)
-            .IsInEnum();
+            .MustBeAGarmentName();
 
         RuleFor(x => x.Quantity)
             .GreaterThan(0);

@@ -5,4 +5,4 @@ using MathilensERP.Shared.Results;
 
 namespace MathilensERP.Application.Orders.Commands.AddItem;
 
-public sealed record AddOrderItemCommand(Guid OrderId, GarmentType GarmentType, int Quantity, decimal UnitPrice) : ICommand<Result<OrderDto>>;
+public sealed record AddOrderItemCommand(Guid OrderId, string GarmentType, int Quantity, decimal UnitPrice) : ICommand<Result<OrderDto>>;

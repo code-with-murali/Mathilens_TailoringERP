@@ -14,5 +14,15 @@ namespace MathilensERP.Application.Orders.Queries.Search;
 /// three, because the person at the counter has been told one thing — a number off a receipt, or a
 /// name, or a phone — and should not have to know which box the shop files it under.
 /// </param>
-public sealed record SearchOrdersQuery(Guid? CustomerId, OrderStatus? Status, string? SearchTerm, int Page, int PageSize)
-    : IQuery<Result<PagedResult<OrderDto>>>;
+/// <param name="GarmentType">
+/// Keeps only orders with an item for this garment. Settings › Garments asks with a page size of
+/// one and reads the count: a garment somebody has already been billed for is not one the shop can
+/// take off the list, and the count is how that is known before the Delete button is offered.
+/// </param>
+public sealed record SearchOrdersQuery(
+    Guid? CustomerId,
+    OrderStatus? Status,
+    string? SearchTerm,
+    string? GarmentType,
+    int Page,
+    int PageSize) : IQuery<Result<PagedResult<OrderDto>>>;

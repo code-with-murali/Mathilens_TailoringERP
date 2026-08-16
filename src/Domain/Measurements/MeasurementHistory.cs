@@ -19,7 +19,9 @@ public sealed class MeasurementHistory : IAuditable
 
     public Guid MeasurementId { get; private set; }
 
-    public GarmentType GarmentType { get; private set; }
+    // Seeded so the EF materialisation constructor leaves no null behind; every path that
+    // creates one sets it. Free text since a shop names its own garments — see GarmentTypes.
+    public string GarmentType { get; private set; } = string.Empty;
 
     public string ValuesJson { get; private set; } = "{}";
 

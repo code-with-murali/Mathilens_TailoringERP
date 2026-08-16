@@ -1,8 +1,13 @@
-import { type InputHTMLAttributes, type TextareaHTMLAttributes } from "react";
+import { type InputHTMLAttributes, type Ref, type TextareaHTMLAttributes } from "react";
 
 type InputProps = InputHTMLAttributes<HTMLInputElement> & {
   label: string;
   error?: string;
+  /**
+   * Declared explicitly because InputHTMLAttributes does not carry it. React 19 passes ref through
+   * as an ordinary prop, so the spread below lands it on the input with no forwardRef wrapper.
+   */
+  ref?: Ref<HTMLInputElement>;
 };
 
 export function Input({ label, error, id, className = "", ...props }: InputProps) {

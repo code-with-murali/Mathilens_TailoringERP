@@ -25,7 +25,7 @@ var builder = WebApplication.CreateBuilder(args);
 builder.Services.AddControllers()
     .AddJsonOptions(options =>
     {
-        // Every enum in this API's contracts (OrderStatus, InvoiceStatus, GarmentType, etc.)
+        // Every enum in this API's contracts (OrderStatus, InvoiceStatus, PaymentMethod, etc.)
         // is otherwise serialized as its underlying integer by System.Text.Json's default —
         // fragile for API consumers and undocumented in Swagger. Readable names, matching the
         // C# member names exactly, over the wire in both directions.

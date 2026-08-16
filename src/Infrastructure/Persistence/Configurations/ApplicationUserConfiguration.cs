@@ -20,6 +20,11 @@ public class ApplicationUserConfiguration : IEntityTypeConfiguration<Application
         builder.Property(u => u.CreatedBy).IsRequired();
         builder.Property(u => u.CreatedAtUtc).IsRequired();
 
+        // Optional: accounts created before this column existed have no name to put in it, and the
+        // screens fall back to the email. 100 matches Customers.FullName, since it is the same kind
+        // of thing written by the same people.
+        builder.Property(u => u.FullName).HasMaxLength(100);
+
         // 02_DATABASE.md § 10.1 Index Recommendations.
         builder.HasIndex(u => u.IsDeleted);
     }

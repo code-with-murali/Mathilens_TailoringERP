@@ -68,7 +68,10 @@ export type CreateOrderInput = {
 };
 export type UpdateOrderInput = { customerId: string; employeeId: string | null; dueAtUtc: string; notes: string | null };
 
-/** @param search Matches the order number, the customer's name or their phone number. */
+/**
+ * @param search Matches the order number, the customer's name or their phone number.
+ * @param garmentType Keeps only orders with an item for this garment.
+ */
 export function searchOrders(
   customerId: string | null,
   status: OrderStatus | null,
@@ -76,6 +79,7 @@ export function searchOrders(
   pageSize: number,
   token: string | null,
   search?: string | null,
+  garmentType?: string | null,
 ) {
   const params = new URLSearchParams({ page: String(page), pageSize: String(pageSize) });
   if (customerId) {
@@ -87,7 +91,22 @@ export function searchOrders(
   if (search && search.trim() !== "") {
     params.set("search", search.trim());
   }
+  if (garmentType && garmentType.trim() !== "") {
+    params.set("garmentType", garmentType.trim());
+  }
   return apiGetPaged<Order>(`/api/v1/orders?${params}`, token);
+}
+
+/**
+ * How many orders have an item for this garment.
+ *
+ * Asked with a page size of one: the count in the pagination meta is the whole answer, and none of
+ * the rows themselves are wanted. Settings › Garments uses it to refuse removing a garment the shop
+ * has already booked work against.
+ */
+export async function countOrdersUsingGarment(garmentType: string, token: string | null): Promise<number> {
+  const { meta } = await searchOrders(null, null, 1, 1, token, null, garmentType);
+  return meta.totalCount;
 }
 
 export function getOrder(id: string, token: string | null) {

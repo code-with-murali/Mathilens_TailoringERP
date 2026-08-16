@@ -18,14 +18,14 @@ public class CreateMeasurementCommandHandlerTests
         var customerRepository = Substitute.For<ICustomerRepository>();
         customerRepository.GetByIdAsync(customer.Id, Arg.Any<CancellationToken>()).Returns(customer);
         var measurementRepository = Substitute.For<IMeasurementRepository>();
-        measurementRepository.ExistsForCustomerAndGarmentTypeAsync(customer.Id, GarmentType.Shirt, Arg.Any<CancellationToken>()).Returns(false);
+        measurementRepository.ExistsForCustomerAndGarmentTypeAsync(customer.Id, GarmentTypes.Shirt, Arg.Any<CancellationToken>()).Returns(false);
         var handler = new CreateMeasurementCommandHandler(measurementRepository, customerRepository);
 
-        var result = await handler.Handle(new CreateMeasurementCommand(customer.Id, GarmentType.Shirt, Values), CancellationToken.None);
+        var result = await handler.Handle(new CreateMeasurementCommand(customer.Id, GarmentTypes.Shirt, Values), CancellationToken.None);
 
         Assert.True(result.IsSuccess);
         Assert.Equal(customer.Id, result.Value.CustomerId);
-        Assert.Equal(GarmentType.Shirt, result.Value.GarmentType);
+        Assert.Equal(GarmentTypes.Shirt, result.Value.GarmentType);
         measurementRepository.Received(1).Add(Arg.Any<Measurement>());
         await measurementRepository.Received(1).SaveChangesAsync(Arg.Any<CancellationToken>());
     }
@@ -38,7 +38,7 @@ public class CreateMeasurementCommandHandlerTests
         var measurementRepository = Substitute.For<IMeasurementRepository>();
         var handler = new CreateMeasurementCommandHandler(measurementRepository, customerRepository);
 
-        var result = await handler.Handle(new CreateMeasurementCommand(Guid.NewGuid(), GarmentType.Shirt, Values), CancellationToken.None);
+        var result = await handler.Handle(new CreateMeasurementCommand(Guid.NewGuid(), GarmentTypes.Shirt, Values), CancellationToken.None);
 
         Assert.True(result.IsFailure);
         Assert.Equal("Customer.NotFound", result.Error.Code);
@@ -52,10 +52,10 @@ public class CreateMeasurementCommandHandlerTests
         var customerRepository = Substitute.For<ICustomerRepository>();
         customerRepository.GetByIdAsync(customer.Id, Arg.Any<CancellationToken>()).Returns(customer);
         var measurementRepository = Substitute.For<IMeasurementRepository>();
-        measurementRepository.ExistsForCustomerAndGarmentTypeAsync(customer.Id, GarmentType.Shirt, Arg.Any<CancellationToken>()).Returns(true);
+        measurementRepository.ExistsForCustomerAndGarmentTypeAsync(customer.Id, GarmentTypes.Shirt, Arg.Any<CancellationToken>()).Returns(true);
         var handler = new CreateMeasurementCommandHandler(measurementRepository, customerRepository);
 
-        var result = await handler.Handle(new CreateMeasurementCommand(customer.Id, GarmentType.Shirt, Values), CancellationToken.None);
+        var result = await handler.Handle(new CreateMeasurementCommand(customer.Id, GarmentTypes.Shirt, Values), CancellationToken.None);
 
         Assert.True(result.IsFailure);
         Assert.Equal("Measurement.AlreadyExists", result.Error.Code);

@@ -12,8 +12,7 @@ const STATUS_TILES: OrderStatus[] = ["Received", "InProgress", "ReadyForDelivery
 type Counts = Partial<Record<OrderStatus, number>>;
 
 /** Live counts of orders by status (Received/InProgress/ReadyForDelivery), read from each
- * status filter's pagination meta rather than fetching every order. Shared between the
- * Dashboard page and the New Order page's otherwise-blank Measurement panel. */
+ * status filter's pagination meta rather than fetching every order. Used by the Dashboard. */
 export function OrderStatusCounts() {
   const [counts, setCounts] = useState<Counts>({});
   const [isLoading, setIsLoading] = useState(true);

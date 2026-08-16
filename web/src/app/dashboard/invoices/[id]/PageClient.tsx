@@ -201,7 +201,7 @@ export default function InvoiceDetailPage() {
             <dd className="font-medium">{formatInvoiceDate(invoice.createdAtUtc)}</dd>
           </div>
           <div>
-            <dt className="text-foreground/70">Due date</dt>
+            <dt className="text-foreground/70">Collection date</dt>
             {/* dd/MM/yyyy like every other date in the app. toLocaleDateString followed the
                 browser's locale, so one counter read 19/08/2026 and another 8/19/2026. */}
             <dd className="font-medium">{order ? formatInvoiceDate(order.dueAtUtc) : "—"}</dd>

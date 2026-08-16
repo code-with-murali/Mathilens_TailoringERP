@@ -13,9 +13,20 @@ public interface IUserAdminService
     /// <summary>Every login, a page at a time — ordered by email so the order is stable across pages.</summary>
     Task<PagedResult<AppUserDto>> ListUsersAsync(int page, int pageSize, CancellationToken cancellationToken);
 
-    Task<Result<AppUserDto>> CreateUserAsync(string email, string password, string role, CancellationToken cancellationToken);
+    Task<Result<AppUserDto>> CreateUserAsync(string email, string password, string fullName, string role, CancellationToken cancellationToken);
 
     Task<Result> SetRoleAsync(Guid userId, string role, CancellationToken cancellationToken);
+
+    /// <summary>Changes what a person is called. Their email, and therefore how they sign in, is untouched.</summary>
+    Task<Result> SetFullNameAsync(Guid userId, string fullName, CancellationToken cancellationToken);
+
+    /// <summary>
+    /// One person's name, or null where the account has none or does not exist.
+    ///
+    /// Read on every <c>/users/me</c> rather than carried as a token claim, so a rename shows up on
+    /// the next request instead of whenever that person's token happens to be refreshed.
+    /// </summary>
+    Task<string?> GetFullNameAsync(Guid userId, CancellationToken cancellationToken);
 
     /// <summary>
     /// Sets a new password for someone who has lost theirs, without needing the old one — the shop
@@ -41,7 +52,8 @@ public interface IUserAdminService
     Task<Result<PasswordResetCodeDto>> IssueResetCodeAsync(Guid userId, CancellationToken cancellationToken);
 }
 
-public sealed record AppUserDto(Guid Id, string Email, string? Role);
+/// <param name="FullName">Null for an account created before names were recorded — screens show the email instead.</param>
+public sealed record AppUserDto(Guid Id, string Email, string? FullName, string? Role);
 
 /// <summary>The plaintext code and when it stops working. Shown once and never retrievable again.</summary>
 public sealed record PasswordResetCodeDto(string Code, DateTime ExpiresAtUtc);

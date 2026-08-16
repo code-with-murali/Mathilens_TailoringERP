@@ -16,7 +16,7 @@ public class AddOrderItemCommandHandlerTests
         repository.GetByIdAsync(order.Id, Arg.Any<CancellationToken>()).Returns(order);
         var handler = new AddOrderItemCommandHandler(repository);
 
-        var result = await handler.Handle(new AddOrderItemCommand(order.Id, GarmentType.Trousers, 2, 300m), CancellationToken.None);
+        var result = await handler.Handle(new AddOrderItemCommand(order.Id, GarmentTypes.Trousers, 2, 300m), CancellationToken.None);
 
         Assert.True(result.IsSuccess);
         Assert.Single(result.Value.Items);
@@ -30,7 +30,7 @@ public class AddOrderItemCommandHandlerTests
         repository.GetByIdAsync(Arg.Any<Guid>(), Arg.Any<CancellationToken>()).Returns((Order?)null);
         var handler = new AddOrderItemCommandHandler(repository);
 
-        var result = await handler.Handle(new AddOrderItemCommand(Guid.NewGuid(), GarmentType.Shirt, 1, 100m), CancellationToken.None);
+        var result = await handler.Handle(new AddOrderItemCommand(Guid.NewGuid(), GarmentTypes.Shirt, 1, 100m), CancellationToken.None);
 
         Assert.True(result.IsFailure);
         Assert.Equal("Order.NotFound", result.Error.Code);
@@ -47,7 +47,7 @@ public class AddOrderItemCommandHandlerTests
         repository.GetByIdAsync(order.Id, Arg.Any<CancellationToken>()).Returns(order);
         var handler = new AddOrderItemCommandHandler(repository);
 
-        var result = await handler.Handle(new AddOrderItemCommand(order.Id, GarmentType.Shirt, 1, 100m), CancellationToken.None);
+        var result = await handler.Handle(new AddOrderItemCommand(order.Id, GarmentTypes.Shirt, 1, 100m), CancellationToken.None);
 
         Assert.True(result.IsFailure);
         Assert.Equal("Order.NotModifiable", result.Error.Code);

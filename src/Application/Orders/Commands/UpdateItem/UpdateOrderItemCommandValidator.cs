@@ -1,4 +1,5 @@
 using FluentValidation;
+using MathilensERP.Application.Common.Validation;
 
 namespace MathilensERP.Application.Orders.Commands.UpdateItem;
 
@@ -13,7 +14,7 @@ public sealed class UpdateOrderItemCommandValidator : AbstractValidator<UpdateOr
             .NotEmpty();
 
         RuleFor(x => x.GarmentType)
-            .IsInEnum();
+            .MustBeAGarmentName();
 
         RuleFor(x => x.Quantity)
             .GreaterThan(0);

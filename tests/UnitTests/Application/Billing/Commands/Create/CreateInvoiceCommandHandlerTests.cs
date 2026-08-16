@@ -23,7 +23,7 @@ public class CreateInvoiceCommandHandlerTests
     public async Task Handle_WithExistingOrderWithItems_CreatesInvoiceFromOrderTotal()
     {
         var order = Order.Create(Guid.NewGuid(), DateTime.UtcNow, null);
-        order.AddItem(GarmentType.Shirt, 2, 500m);
+        order.AddItem(GarmentTypes.Shirt, 2, 500m);
         var orderRepository = Substitute.For<IOrderRepository>();
         orderRepository.GetByIdAsync(order.Id, Arg.Any<CancellationToken>()).Returns(order);
         var invoiceRepository = Substitute.For<IInvoiceRepository>();
@@ -72,7 +72,7 @@ public class CreateInvoiceCommandHandlerTests
     public async Task Handle_WithDiscountExceedingTotal_ReturnsConflict()
     {
         var order = Order.Create(Guid.NewGuid(), DateTime.UtcNow, null);
-        order.AddItem(GarmentType.Shirt, 1, 100m);
+        order.AddItem(GarmentTypes.Shirt, 1, 100m);
         var orderRepository = Substitute.For<IOrderRepository>();
         orderRepository.GetByIdAsync(order.Id, Arg.Any<CancellationToken>()).Returns(order);
         var invoiceRepository = Substitute.For<IInvoiceRepository>();

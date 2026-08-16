@@ -217,6 +217,30 @@ export async function apiDelete(path: string, token?: string | null): Promise<vo
   await throwIfError(response);
 }
 
+/**
+ * For PUT endpoints that return 204 No Content on success — never attempts to parse a body.
+ *
+ * apiPut always reads the response as JSON, so pointing it at a 204 throws a SyntaxError on an empty
+ * body. That is not an ApiError, so callers reported a generic failure for a change the server had
+ * already made — which is exactly what "changing a user's role does nothing" turned out to be.
+ */
+export async function apiPutNoContent(path: string, payload: unknown, token?: string | null): Promise<void> {
+  const response = await fetchWithAuthRetry(
+    path,
+    {
+      method: "PUT",
+      body: JSON.stringify(payload),
+      headers: {
+        "Content-Type": "application/json",
+        ...authHeaders(token),
+      },
+    },
+    token,
+  );
+
+  await throwIfError(response);
+}
+
 /** For DELETE endpoints that return the mutated resource in the standard envelope rather than 204. */
 export async function apiDeleteFor<T>(path: string, token?: string | null): Promise<T> {
   return request<T>(path, { method: "DELETE", headers: authHeaders(token) }, token);

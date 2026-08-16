@@ -11,8 +11,8 @@ import { MeasurementTemplatesSection } from "../MeasurementTemplatesSection";
  */
 export default function MeasurementTemplatesSettingsPage() {
   return (
-    <div className="flex flex-col gap-6">
-      <h1 className="text-2xl font-semibold">Measurement Templates</h1>
+    <div className="flex flex-col gap-4">
+      <h1 className="text-xl font-semibold">Measurement</h1>
       <MeasurementTemplatesSection />
     </div>
   );

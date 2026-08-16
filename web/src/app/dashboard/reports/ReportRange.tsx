@@ -41,6 +41,20 @@ export const RANGE_PRESETS = [
  */
 const QUICK_PRESETS = ["today", "7d", "30d"] as const;
 
+/**
+ * What the three shortcuts read on a phone.
+ *
+ * "Last" is what gets dropped, because it is the word carrying least: sitting under a control
+ * labelled Filter, "30 Days" is not open to a second reading. Losing it is what lets the dropdown
+ * and all three buttons share one row on a 360px screen — the full labels need about 100px more
+ * than such a screen has, and a row that wraps puts one shortcut on a line of its own.
+ */
+const QUICK_PRESET_SHORT_LABELS: Record<(typeof QUICK_PRESETS)[number], string> = {
+  today: "Today",
+  "7d": "7 Days",
+  "30d": "30 Days",
+};
+
 /** The windows that know their own dates — everything except Custom, which is told them. */
 export type PresetOptionKey = (typeof RANGE_PRESETS)[number]["key"];
 export type PresetKey = PresetOptionKey | "custom";
@@ -121,6 +135,55 @@ export function StatTile({ label, value, description }: { label: string; value: 
   );
 }
 
+export type StatFigure = { label: string; value: string; description?: string };
+
+/**
+ * The figures a report is made of — tiles on a wide screen, a table on a phone.
+ *
+ * A column of tiles read as seven separate boxes to scroll past. The same numbers in a table are one
+ * object with a column of values that line up, which is how a shop reads a report on paper. The
+ * tiles stay above sm, where a row of them fits and the descriptions have room to sit under each.
+ */
+export function StatFigures({ figures }: { figures: StatFigure[] }) {
+  return (
+    <>
+      <div className="hidden gap-3 sm:grid sm:grid-cols-2 lg:grid-cols-4">
+        {figures.map((figure) => (
+          <StatTile key={figure.label} {...figure} />
+        ))}
+      </div>
+
+      {/* No `stacked` class: this is the phone layout, and turning it back into cards is the thing
+          being replaced. Two columns fit 320px without scrolling sideways. */}
+      <div className="overflow-hidden rounded-lg border border-border sm:hidden">
+        <table className="w-full text-left text-sm">
+          <thead className="border-b border-border bg-surface-hover">
+            <tr>
+              <th className="px-3 py-2 font-medium">Figure</th>
+              <th className="px-3 py-2 text-right font-medium">Value</th>
+            </tr>
+          </thead>
+          <tbody>
+            {figures.map((figure) => (
+              <tr key={figure.label} className="border-b border-border last:border-0">
+                <td className="px-3 py-2 align-top">
+                  <span className="font-medium">{figure.label}</span>
+                  {figure.description && (
+                    <span className="mt-0.5 block text-xs leading-snug text-foreground/60">{figure.description}</span>
+                  )}
+                </td>
+                <td className="whitespace-nowrap px-3 py-2 text-right align-top font-semibold tabular-nums">
+                  {figure.value}
+                </td>
+              </tr>
+            ))}
+          </tbody>
+        </table>
+      </div>
+    </>
+  );
+}
+
 export type ReportRange = ReturnType<typeof useReportRange>;
 
 /**
@@ -170,49 +233,67 @@ export function ReportRangeFilter({ range }: { range: ReportRange }) {
   const { preset, fromDate, toDate, applyPreset, setCustomFrom, setCustomTo } = range;
 
   return (
-    <div className="flex flex-wrap items-end gap-4">
-      <div className="flex flex-col gap-1">
-        <label htmlFor="reportRange" className="text-sm font-medium">
-          Filter by date
-        </label>
-        <select
-          id="reportRange"
-          value={preset}
-          onChange={(e) => applyPreset(e.target.value as PresetKey)}
-          className={`max-w-xs ${fieldClassName}`}
-        >
-          {RANGE_PRESETS.map((option) => (
-            <option key={option.key} value={option.key}>
-              {option.label}
-            </option>
-          ))}
-          <option value="custom">Custom range…</option>
-        </select>
-      </div>
+    <div className="flex flex-wrap items-end gap-x-3 gap-y-2">
+      {/*
+        The dropdown and its three shortcuts, on one line at every width.
 
-      {/* Same padding and border as the select, so the row sits on one line rather than stepping. */}
-      <div className="flex flex-wrap gap-2">
-        {QUICK_PRESETS.map((key) => {
-          const option = RANGE_PRESETS.find((p) => p.key === key)!;
-          const isActive = preset === key;
-          return (
-            <button
-              key={key}
-              type="button"
-              onClick={() => applyPreset(key)}
-              /* aria-pressed, not colour alone — which of the three is on is otherwise carried by
-                 nothing a screen reader reads out. */
-              aria-pressed={isActive}
-              className={
-                isActive
-                  ? "rounded-md border border-primary bg-primary px-3 py-2 text-sm font-medium text-white"
-                  : "rounded-md border border-border bg-surface px-3 py-2 text-sm text-foreground/70 transition-colors hover:border-primary hover:text-foreground"
-              }
-            >
-              {option.label}
-            </button>
-          );
-        })}
+        Full width on a phone so the four of them own the row, and w-auto from sm up so the custom
+        date boxes can come back alongside. Both the select and the buttons run at the smaller type
+        and tighter padding below sm — that, plus the short labels, is what fits four controls into
+        the ~328px a 360px screen leaves after the page padding.
+      */}
+      <div className="flex w-full items-end gap-2 sm:w-auto sm:gap-3">
+        <div className="flex shrink-0 flex-col gap-1">
+          <label htmlFor="reportRange" className="text-sm font-medium">
+            Filter
+          </label>
+          {/* Sized to its longest option rather than stretching to the container: a full-width box
+              on a phone pushed the three shortcuts onto a row of their own, when they belong beside
+              the thing they set. */}
+          <select
+            id="reportRange"
+            value={preset}
+            onChange={(e) => applyPreset(e.target.value as PresetKey)}
+            className="w-28 rounded-md border border-border bg-surface px-2 py-2 text-xs outline-none transition-colors focus:border-primary focus:ring-2 focus:ring-primary/25 sm:w-40 sm:px-3 sm:text-sm"
+          >
+            {RANGE_PRESETS.map((option) => (
+              <option key={option.key} value={option.key}>
+                {option.label}
+              </option>
+            ))}
+            <option value="custom">Custom range…</option>
+          </select>
+        </div>
+
+        {/* Same padding and border as the select, so the row sits on one line rather than stepping. */}
+        <div className="flex min-w-0 flex-1 gap-1.5 sm:flex-none sm:gap-2">
+          {QUICK_PRESETS.map((key) => {
+            const option = RANGE_PRESETS.find((p) => p.key === key)!;
+            const isActive = preset === key;
+            const base =
+              "whitespace-nowrap rounded-md border px-2 py-2 text-xs transition-colors sm:px-3 sm:text-sm";
+            return (
+              <button
+                key={key}
+                type="button"
+                onClick={() => applyPreset(key)}
+                /* aria-pressed, not colour alone — which of the three is on is otherwise carried by
+                   nothing a screen reader reads out. */
+                aria-pressed={isActive}
+                className={
+                  isActive
+                    ? `${base} border-primary bg-primary font-medium text-white`
+                    : `${base} border-border bg-surface text-foreground/70 hover:border-primary hover:text-foreground`
+                }
+              >
+                {/* Two spellings of the same shortcut rather than one that has to serve both: the
+                    screen reader gets whichever is rendered, and both say the same thing. */}
+                <span className="sm:hidden">{QUICK_PRESET_SHORT_LABELS[key]}</span>
+                <span className="hidden sm:inline">{option.label}</span>
+              </button>
+            );
+          })}
+        </div>
       </div>
 
       {preset === "custom" && (

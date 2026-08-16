@@ -1,7 +1,21 @@
 import { apiDelete, apiGet, apiGetPaged, apiPost, apiPut } from "@/lib/api-client";
 
+/**
+ * A garment is whatever the shop calls it — "Shirt", "Saree", "Chudidhar".
+ *
+ * This was a union of eight fixed names, matching a C# enum the API validated against. It is plain
+ * text on both sides now: the garments a shop stitches are its own list, kept under
+ * Settings › Garments, and a tailor working in sarees and chudidhars had nowhere to put them.
+ */
+export type GarmentType = string;
+
+/**
+ * The garments this system ships with, and the ones that arrive with standard measurement points.
+ *
+ * Only a starting list — a shop adds its own and may remove any of these. Read the shop's actual
+ * list with getGarments (lib/api/garments), never this.
+ */
 export const GARMENT_TYPES = ["Shirt", "Trousers", "Suit", "Blazer", "Kurta", "Blouse", "Dress", "Other"] as const;
-export type GarmentType = (typeof GARMENT_TYPES)[number];
 
 export type Measurement = {
   id: string;
@@ -59,10 +73,12 @@ export function listMeasurementTemplates(token: string | null) {
   return apiGet<MeasurementTemplate[]>("/api/v1/measurements/templates", token);
 }
 
+// Encoded, because a garment is named by the shop and "Saree Blouse" is an ordinary name — the
+// space, and anything else that means something in a URL, has to survive the trip as itself.
 export function setMeasurementTemplate(garmentType: GarmentType, points: string[], token: string | null) {
-  return apiPut<MeasurementTemplate>(`/api/v1/measurements/templates/${garmentType}`, { points }, token);
+  return apiPut<MeasurementTemplate>(`/api/v1/measurements/templates/${encodeURIComponent(garmentType)}`, { points }, token);
 }
 
 export function resetMeasurementTemplate(garmentType: GarmentType, token: string | null) {
-  return apiDelete(`/api/v1/measurements/templates/${garmentType}`, token);
+  return apiDelete(`/api/v1/measurements/templates/${encodeURIComponent(garmentType)}`, token);
 }

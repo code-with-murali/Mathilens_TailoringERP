@@ -45,7 +45,7 @@ export default function OutstandingInvoicesReportPage() {
     <div className="flex flex-col gap-6">
       <div className="flex items-start justify-between gap-4">
         <div>
-          <h1 className="text-2xl font-semibold">Outstanding Invoices</h1>
+          <h1 className="text-2xl font-semibold">Invoice</h1>
           <p className="mt-1 text-sm text-foreground/70">Every invoice with a balance still to collect, oldest first.</p>
         </div>
         {/* No range to pass — this report deliberately has none. */}

@@ -1,12 +1,15 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { useRouter, usePathname } from "next/navigation";
 import Link from "next/link";
-import { isAuthenticated, clearTokens } from "@/lib/auth";
+import { isAuthenticated, clearTokens, getAccessToken } from "@/lib/auth";
 import { useBranding } from "@/lib/use-branding";
 import { usePermissions } from "@/lib/use-permissions";
-import { PERMISSIONS } from "@/lib/api/users";
+import { PERMISSIONS, displayNameOf } from "@/lib/api/users";
+import { Modal } from "@/components/ui/Modal";
+import { ChangePasswordForm } from "@/components/users/ChangePasswordForm";
+import { getUserPhoto, initialsFor } from "@/lib/api/user-profile";
 
 /**
  * A single navigable screen.
@@ -61,12 +64,14 @@ const NAV_ITEMS: NavEntry[] = [
     label: "Reports",
     icon: ReportsIcon,
     children: [
-      { href: "/dashboard/reports/order-collections", label: "Orders & Collections", icon: ReportsIcon, permission: PERMISSIONS.reportsView },
+      // One word each. Sitting under a "Reports" heading, "Birthday Report" said Report twice, and
+      // the longer names were what pushed the rail wider than the labels needed.
+      { href: "/dashboard/reports/order-collections", label: "Orders", icon: ReportsIcon, permission: PERMISSIONS.reportsView },
       { href: "/dashboard/reports/revenue", label: "Revenue", icon: RevenueIcon, permission: PERMISSIONS.reportsView },
-      { href: "/dashboard/reports/order-status", label: "Orders by Status", icon: OrdersIcon, permission: PERMISSIONS.reportsView },
-      { href: "/dashboard/reports/outstanding-invoices", label: "Outstanding Invoices", icon: InvoicesIcon, permission: PERMISSIONS.reportsView },
-      { href: "/dashboard/reports/birthday", label: "Birthday Report", icon: CakeIcon, permission: PERMISSIONS.reportsView },
-      { href: "/dashboard/reports/wedding", label: "Wedding Report", icon: RingsIcon, permission: PERMISSIONS.reportsView },
+      { href: "/dashboard/reports/order-status", label: "Order Status", icon: OrdersIcon, permission: PERMISSIONS.reportsView },
+      { href: "/dashboard/reports/outstanding-invoices", label: "Invoice", icon: InvoicesIcon, permission: PERMISSIONS.reportsView },
+      { href: "/dashboard/reports/birthday", label: "Birthday", icon: CakeIcon, permission: PERMISSIONS.reportsView },
+      { href: "/dashboard/reports/wedding", label: "Wedding", icon: RingsIcon, permission: PERMISSIONS.reportsView },
     ],
   },
   { href: "/dashboard/whatsapp", label: "WhatsApp", icon: WhatsAppIcon, permission: PERMISSIONS.whatsAppView },
@@ -90,15 +95,23 @@ const NAV_ITEMS: NavEntry[] = [
     icon: SettingsIcon,
     children: [
       { href: "/dashboard/settings/order-duration", label: "Order Duration", icon: ClockIcon, permission: PERMISSIONS.settingsView },
+      // Sits next to Order Duration because the two decide the same thing between them: how far
+      // ahead a collection date is pre-filled, and which days it is allowed to land on.
+      { href: "/dashboard/settings/working-days", label: "Working Days", icon: CalendarIcon, permission: PERMISSIONS.settingsView },
+      // Ahead of Tailoring Cost because it decides what that screen has rows for: the garment list
+      // is the master, the price is a column against it.
+      { href: "/dashboard/settings/garments", label: "Garments", icon: GarmentIcon, permission: PERMISSIONS.settingsView },
+      // Beside Measurement, since both are per-garment settings the New Order screen reads.
+      { href: "/dashboard/settings/tailoring-cost", label: "Tailoring Cost", icon: ScissorsIcon, permission: PERMISSIONS.settingsView },
       { href: "/dashboard/settings/order-number", label: "Order Number", icon: HashIcon, permission: PERMISSIONS.settingsView },
       { href: "/dashboard/settings/invoice", label: "Invoice Settings", icon: InvoicesIcon, permission: PERMISSIONS.settingsView },
       { href: "/dashboard/settings/measurement-templates", label: "Measurement", icon: RulerIcon, permission: PERMISSIONS.settingsView },
       // No permission at all: Front Desk and Tailor hold no Settings.View, and the theme toggle no
       // longer sits in the header, so gating this would leave them unable to change it anywhere.
       { href: "/dashboard/settings/appearance", label: "Appearance", icon: ThemeIcon, permission: null },
-      // Also permission-free: changing your own password is the one password action that is nobody
-      // else's business, and every role needs it.
-      { href: "/dashboard/settings/change-password", label: "Change Password", icon: KeyIcon, permission: null },
+      // Change Password is off this menu: it is the one thing here that changes the person rather
+      // than the shop, and it is reached from the profile menu at the foot of this rail instead.
+      // The route still answers, so a bookmark to it keeps working.
       // Advanced is off the menu — the raw settings store is not something the shop uses. The route
       // still answers for the rare case a value needs changing before it has a proper editor.
     ],
@@ -124,6 +137,7 @@ export default function DashboardLayout({ children }: LayoutProps<"/dashboard">)
   // regardless, so this only records deliberate opening and closing — it starts empty rather than
   // pre-seeded, which would fight the auto-open below on the very first render.
   const [openGroups, setOpenGroups] = useState<Record<string, boolean>>({});
+  const [photo, setPhoto] = useState<string | null>(null);
   // Also applies the shop's colour to the theme's CSS variables, which is why it lives in the
   // shell rather than on the Branding page — every screen inside gets it.
   const branding = useBranding();
@@ -142,6 +156,24 @@ export default function DashboardLayout({ children }: LayoutProps<"/dashboard">)
     // eslint-disable-next-line react-hooks/set-state-in-effect
     setChecked(true);
   }, [router]);
+
+  useEffect(() => {
+    // The signed-in person's own picture, for the rail. Silent on failure: an avatar that cannot be
+    // read falls back to initials, which is not worth an error anywhere on screen.
+    if (!user?.id) {
+      return;
+    }
+    let cancelled = false;
+    getUserPhoto(user.id, getAccessToken()).then((stored) => {
+      if (!cancelled) {
+        setPhoto(stored);
+      }
+    });
+
+    return () => {
+      cancelled = true;
+    };
+  }, [user?.id]);
 
   function handleLogout() {
     clearTokens();
@@ -199,8 +231,12 @@ export default function DashboardLayout({ children }: LayoutProps<"/dashboard">)
           className="fixed inset-0 z-30 bg-black/50 lg:hidden"
         />
       )}
+      {/* On desktop the rail is stuck to the viewport and exactly its height, so a nav longer than
+          the window scrolls inside its own nav rather than making the whole page taller. As a plain
+          static column it stretched to its content, and expanding a group put a scrollbar on screens
+          whose content fit comfortably. */}
       <aside
-        className={`fixed inset-y-0 left-0 z-40 flex shrink-0 flex-col border-r border-border bg-surface transition-[transform,width] duration-200 lg:static lg:translate-x-0 print:hidden ${
+        className={`fixed inset-y-0 left-0 z-40 flex shrink-0 flex-col border-r border-border bg-surface transition-[transform,width] duration-200 lg:sticky lg:bottom-auto lg:top-0 lg:h-dvh lg:translate-x-0 lg:self-start print:hidden ${
           isDrawerOpen ? "w-60 translate-x-0" : "w-60 -translate-x-full"
         } ${isCollapsed ? "lg:w-16" : "lg:w-60"}`}
       >
@@ -311,15 +347,15 @@ export default function DashboardLayout({ children }: LayoutProps<"/dashboard">)
             );
           })}
         </nav>
-        <div className="border-t border-border px-3 py-4">
-          <button
-            type="button"
-            onClick={handleLogout}
-            className="flex w-full items-center gap-3 rounded-md px-3 py-2 text-sm text-foreground/65 transition-colors hover:bg-surface-hover hover:text-foreground"
-          >
-            <LogoutIcon className="h-4 w-4 shrink-0" />
-            <span className={isCollapsed ? "lg:hidden" : ""}>Sign out</span>
-          </button>
+        <div className="border-t border-border px-3 py-3">
+          <ProfileMenu
+            name={user ? displayNameOf(user) : null}
+            email={user?.email ?? null}
+            photo={photo}
+            isCollapsed={isCollapsed}
+            onNavigate={() => setIsDrawerOpen(false)}
+            onLogout={handleLogout}
+          />
         </div>
       </aside>
       <div className="flex min-h-full flex-1 flex-col">
@@ -373,7 +409,164 @@ function NavLink({
   );
 }
 
+/**
+ * The signed-in person, at the foot of the rail.
+ *
+ * A button rather than a link: the two things wanted here are their profile and the way out, and
+ * putting Sign out one deliberate step behind the avatar is what stops it being pressed by someone
+ * reaching for the last nav row above it.
+ */
+function ProfileMenu({
+  name,
+  email,
+  photo,
+  isCollapsed,
+  onNavigate,
+  onLogout,
+}: {
+  /** Already fallen back to the email where the account has no name — see displayNameOf. */
+  name: string | null;
+  email: string | null;
+  photo: string | null;
+  isCollapsed: boolean;
+  onNavigate: () => void;
+  onLogout: () => void;
+}) {
+  const [isOpen, setIsOpen] = useState(false);
+  const [isChangingPassword, setIsChangingPassword] = useState(false);
+  const ref = useRef<HTMLDivElement>(null);
+
+  useEffect(() => {
+    if (!isOpen) {
+      return;
+    }
+
+    // Clicking anywhere else closes it, as a menu opened by a click should.
+    function onPointerDown(event: MouseEvent) {
+      if (ref.current && !ref.current.contains(event.target as Node)) {
+        setIsOpen(false);
+      }
+    }
+    function onKeyDown(event: KeyboardEvent) {
+      if (event.key === "Escape") {
+        setIsOpen(false);
+      }
+    }
+
+    document.addEventListener("mousedown", onPointerDown);
+    document.addEventListener("keydown", onKeyDown);
+    return () => {
+      document.removeEventListener("mousedown", onPointerDown);
+      document.removeEventListener("keydown", onKeyDown);
+    };
+  }, [isOpen]);
+
+  const avatar = photo ? (
+    // A plain img, not next/image: a data URI has nothing for the image optimiser to fetch.
+    // eslint-disable-next-line @next/next/no-img-element
+    <img src={photo} alt="" className="h-8 w-8 shrink-0 rounded-full border border-border object-cover" />
+  ) : (
+    <span
+      aria-hidden="true"
+      className="flex h-8 w-8 shrink-0 items-center justify-center rounded-full border border-border bg-surface-hover text-xs font-semibold text-foreground/60"
+    >
+      {initialsFor(name)}
+    </span>
+  );
+
+  // Dropped when there is no name, because `name` is then the email already and the rail is too
+  // narrow to print it twice.
+  const showEmailUnderName = Boolean(email) && name !== email;
+
+  return (
+    <div ref={ref} className="relative">
+      <button
+        type="button"
+        onClick={() => setIsOpen((open) => !open)}
+        aria-haspopup="menu"
+        aria-expanded={isOpen}
+        title={isCollapsed ? name ?? "Profile" : undefined}
+        className="flex w-full items-center gap-3 rounded-md px-2 py-2 text-sm text-foreground/70 transition-colors hover:bg-surface-hover hover:text-foreground"
+      >
+        {avatar}
+        {/* Name over email, the pairing every account menu uses: the name is who you are, the
+            address is only how you got in. Both truncate — the rail is 240px and neither is
+            allowed to widen it. */}
+        <span className={`flex min-w-0 flex-1 flex-col text-left ${isCollapsed ? "lg:hidden" : ""}`}>
+          <span className="truncate">{name ?? "Profile"}</span>
+          {showEmailUnderName && <span className="truncate text-xs text-foreground/50">{email}</span>}
+        </span>
+        <ChevronIcon className={`h-3.5 w-3.5 shrink-0 -rotate-90 ${isCollapsed ? "lg:hidden" : ""}`} />
+      </button>
+
+      {isOpen && (
+        // Opens upward — it is the last thing in the rail, so there is nothing below it to open into.
+        <div
+          role="menu"
+          className="absolute bottom-full left-0 z-50 mb-1 w-full min-w-44 overflow-hidden rounded-md border border-border bg-surface py-1 shadow-lg"
+        >
+          <Link
+            href="/dashboard/profile"
+            role="menuitem"
+            onClick={() => {
+              setIsOpen(false);
+              onNavigate();
+            }}
+            className="flex items-center gap-3 px-3 py-2 text-sm text-foreground/70 transition-colors hover:bg-surface-hover hover:text-foreground"
+          >
+            <ProfileIcon className="h-4 w-4 shrink-0" />
+            View profile
+          </Link>
+          {/* Opens in place rather than navigating: changing a password is a short form with
+              nothing on the page around it, and leaving the screen you were on to do it means
+              finding your way back afterwards. Above Sign out, which this menu must never put
+              anything below. */}
+          <button
+            type="button"
+            role="menuitem"
+            onClick={() => {
+              setIsOpen(false);
+              setIsChangingPassword(true);
+            }}
+            className="flex w-full items-center gap-3 px-3 py-2 text-left text-sm text-foreground/70 transition-colors hover:bg-surface-hover hover:text-foreground"
+          >
+            <KeyIcon className="h-4 w-4 shrink-0" />
+            Change password
+          </button>
+          <button
+            type="button"
+            role="menuitem"
+            onClick={() => {
+              setIsOpen(false);
+              onLogout();
+            }}
+            className="flex w-full items-center gap-3 px-3 py-2 text-left text-sm text-foreground/70 transition-colors hover:bg-surface-hover hover:text-foreground"
+          >
+            <LogoutIcon className="h-4 w-4 shrink-0" />
+            Sign out
+          </button>
+        </div>
+      )}
+
+      {/* Outside the menu, so dismissing the menu does not take the dialog with it. */}
+      <Modal open={isChangingPassword} title="Change Password" onClose={() => setIsChangingPassword(false)}>
+        <ChangePasswordForm onDone={() => setIsChangingPassword(false)} />
+      </Modal>
+    </div>
+  );
+}
+
 type IconProps = { className?: string };
+
+/** Head and shoulders — the person signed in, as opposed to the Users screen's crowd. */
+function ProfileIcon({ className }: IconProps) {
+  return (
+    <svg className={className} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+      <circle cx="12" cy="8" r="3.5" />
+      <path d="M5 20a7 7 0 0 1 14 0" />
+    </svg>
+  );
+}
 
 function RevenueIcon({ className }: IconProps) {
   return (
@@ -469,6 +662,37 @@ function ClockIcon({ className }: IconProps) {
     <svg className={className} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
       <circle cx="12" cy="12" r="9" />
       <path d="M12 7v5l3 2" />
+    </svg>
+  );
+}
+
+/** Tailor's shears — what the shop charges for the cutting and stitching. */
+function ScissorsIcon({ className }: IconProps) {
+  return (
+    <svg className={className} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+      <circle cx="6" cy="6" r="2.5" />
+      <circle cx="6" cy="18" r="2.5" />
+      <path d="M8 7.5 20 18M20 6 8 16.5" />
+    </svg>
+  );
+}
+
+/** A shirt on its hanger — the garment list itself, as opposed to the shears that price it. */
+function GarmentIcon({ className }: IconProps) {
+  return (
+    <svg className={className} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+      <path d="M9 4a3 3 0 0 0 6 0" />
+      <path d="M9 4 4 7l2 3 2-1v10h8V9l2 1 2-3-5-3" />
+    </svg>
+  );
+}
+
+/** Month grid with its hanging rings — working days and holidays. */
+function CalendarIcon({ className }: IconProps) {
+  return (
+    <svg className={className} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+      <rect x="3" y="5" width="18" height="16" rx="2" />
+      <path d="M3 10h18M8 3v4M16 3v4" />
     </svg>
   );
 }

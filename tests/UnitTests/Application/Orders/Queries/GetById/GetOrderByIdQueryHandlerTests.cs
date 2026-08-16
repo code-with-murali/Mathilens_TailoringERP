@@ -16,7 +16,7 @@ public class GetOrderByIdQueryHandlerTests
     public async Task Handle_WithExistingOrder_ReturnsDto()
     {
         var order = Order.Create(Guid.NewGuid(), DateTime.UtcNow, null);
-        order.AddItem(GarmentType.Shirt, 3, 250m);
+        order.AddItem(GarmentTypes.Shirt, 3, 250m);
         _orderRepository.GetByIdAsync(order.Id, Arg.Any<CancellationToken>()).Returns(order);
         _invoiceRepository.GetPaidAmountsForOrdersAsync(Arg.Any<IReadOnlyCollection<Guid>>(), Arg.Any<CancellationToken>())
             .Returns(new Dictionary<Guid, decimal> { [order.Id] = 300m });

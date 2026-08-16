@@ -6,7 +6,7 @@ namespace MathilensERP.Api.Contracts.Orders;
 
 public sealed record CreateOrderRequest(Guid CustomerId, Guid? EmployeeId, DateTime DueAtUtc, IReadOnlyList<CreateOrderItemRequest> Items, string? Notes = null);
 
-public sealed record CreateOrderItemRequest(GarmentType GarmentType, int Quantity, decimal UnitPrice, CreateOrderItemFabricRequest? Fabric);
+public sealed record CreateOrderItemRequest(string GarmentType, int Quantity, decimal UnitPrice, CreateOrderItemFabricRequest? Fabric);
 
 /// <summary><c>ClothCode</c> is resolved against the price list; a match is what lets stock fall.</summary>
 public sealed record CreateOrderItemFabricRequest(

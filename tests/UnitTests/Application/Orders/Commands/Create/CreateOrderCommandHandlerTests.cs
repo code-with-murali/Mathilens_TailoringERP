@@ -15,7 +15,7 @@ namespace MathilensERP.UnitTests.Application.Orders.Commands.Create;
 public class CreateOrderCommandHandlerTests
 {
     private static readonly IReadOnlyList<CreateOrderItemInput> OneItem =
-        [new CreateOrderItemInput(GarmentType.Shirt, 1, 500m, new CreateOrderItemFabricInput("Cotton", FabricSource.ShopSupplied, "Blue", 2m))];
+        [new CreateOrderItemInput(GarmentTypes.Shirt, 1, 500m, new CreateOrderItemFabricInput("Cotton", FabricSource.ShopSupplied, "Blue", 2m))];
 
     /// <summary>
     /// A fixed number, because these tests are about what the handler builds rather than how the

@@ -13,7 +13,7 @@ public class SetOrderItemFabricCommandHandlerTests
     public async Task Handle_WithExistingItem_SetsFabric()
     {
         var order = Order.Create(Guid.NewGuid(), DateTime.UtcNow, null);
-        var item = order.AddItem(GarmentType.Shirt, 1, 500m);
+        var item = order.AddItem(GarmentTypes.Shirt, 1, 500m);
         var repository = Substitute.For<IOrderRepository>();
         repository.GetByIdAsync(order.Id, Arg.Any<CancellationToken>()).Returns(order);
         var handler = new SetOrderItemFabricCommandHandler(repository, Substitute.For<IClothPriceRepository>());

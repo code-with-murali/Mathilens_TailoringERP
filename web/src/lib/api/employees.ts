@@ -26,6 +26,19 @@ export type Employee = {
   createdAtUtc: string;
 };
 
+/**
+ * Retirement has been recorded for this person.
+ *
+ * Not the same question as `isActive`, which the server answers as "still employed *today*". Retiring
+ * someone with today as their last working day leaves `isActive` true until midnight, so a screen
+ * reading it showed "Active" immediately after the shop pressed Retire. Every screen that reports
+ * standing asks this instead; anything deciding whether they may be given work today still wants
+ * `isActive`.
+ */
+export function isRetired(employee: Employee): boolean {
+  return employee.lastWorkingDate !== null;
+}
+
 export type EmployeeInput = {
   employeeCode: string;
   fullName: string;

@@ -115,6 +115,9 @@ public sealed class OrdersController : ApiControllerBase
     ///
     /// <paramref name="search"/> matches the order number, the customer's name or their phone
     /// number — whichever of the three the caller happens to have been given.
+    ///
+    /// <paramref name="garmentType"/> keeps only orders with an item for that garment, which is how
+    /// Settings › Garments finds out whether one is still in use before offering to remove it.
     /// </summary>
     [HttpGet]
     [ProducesResponseType(typeof(ApiResponse<IReadOnlyList<OrderDto>>), StatusCodes.Status200OK)]
@@ -123,11 +126,12 @@ public sealed class OrdersController : ApiControllerBase
         [FromQuery] Guid? customerId,
         [FromQuery] OrderStatus? status,
         [FromQuery] string? search,
+        [FromQuery] string? garmentType,
         [FromQuery] int page = PaginationDefaults.DefaultPage,
         [FromQuery] int pageSize = PaginationDefaults.DefaultPageSize,
         CancellationToken cancellationToken = default)
     {
-        var result = await _sender.Send(new SearchOrdersQuery(customerId, status, search, page, pageSize), cancellationToken);
+        var result = await _sender.Send(new SearchOrdersQuery(customerId, status, search, garmentType, page, pageSize), cancellationToken);
         return ToPagedActionResult(result);
     }
 

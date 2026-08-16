@@ -200,7 +200,7 @@ export default function OrderDetailPage() {
 
     const customerId = editCustomer?.id ?? order.customerId;
     if (!editDueAt) {
-      setDetailsError("Choose a due date.");
+      setDetailsError("Choose a collection date.");
       return;
     }
 
@@ -367,7 +367,7 @@ export default function OrderDetailPage() {
             />
             <div className="flex flex-col gap-1">
               <label htmlFor="editDueAt" className="text-sm">
-                Due date
+                Collection date
               </label>
               <input
                 id="editDueAt"
