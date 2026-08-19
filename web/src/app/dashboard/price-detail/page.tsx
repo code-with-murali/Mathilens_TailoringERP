@@ -5,6 +5,7 @@ import { Button } from "@/components/ui/Button";
 import { Input } from "@/components/ui/Input";
 import { DEFAULT_PAGE_SIZE, Pagination } from "@/components/ui/Pagination";
 import { ConfirmDialog } from "@/components/ui/ConfirmDialog";
+import { Modal, ModalActions } from "@/components/ui/Modal";
 import { ImportExportButtons } from "@/components/ui/ImportExportButtons";
 import { useToast } from "@/components/ui/ToastProvider";
 import { getAccessToken } from "@/lib/auth";
@@ -124,6 +125,10 @@ export default function PriceDetailPage() {
       setPendingDelete(null);
       await load();
     } catch (error) {
+      // Closed on failure too, not just on success. The refusal that actually happens here is a
+      // permanent one — the cloth is on an order and always will be — so leaving the dialog up
+      // invites pressing Delete again against an answer that will not change.
+      setPendingDelete(null);
       showToast(error instanceof ApiError ? error.message : "Unable to delete this price.", "error");
     } finally {
       setIsDeleting(false);
@@ -136,37 +141,14 @@ export default function PriceDetailPage() {
         <h1 className="text-2xl font-semibold">Price Detail</h1>
         <div className="flex items-start gap-2">
           <ImportExportButtons resource="cloth-prices" label="prices" onImported={load} />
-          {formState === null && (
-            <Button type="button" onClick={openCreateForm}>
-              New Price
-            </Button>
-          )}
+          {/* "New", as on Customers — the heading above already says what is being added. The
+              aria-label keeps it unambiguous for a screen reader, which reads the button on its
+              own without the heading beside it. */}
+          <Button type="button" aria-label="New price" onClick={openCreateForm}>
+            New
+          </Button>
         </div>
       </div>
-
-      {formState && (
-        <form onSubmit={handleSubmit} className="flex flex-col gap-4 rounded-lg border border-border bg-surface p-6">
-          <div className="grid grid-cols-1 gap-4 sm:grid-cols-4">
-            <Input id="clothCode" label="Cloth code" value={formClothCode} onChange={(e) => setFormClothCode(e.target.value)} />
-            <Input id="clothName" label="Cloth name" value={formClothName} onChange={(e) => setFormClothName(e.target.value)} />
-            <Input id="costPrice" label="Cost price" type="number" min="0" step="0.01" value={formCostPrice} onChange={(e) => setFormCostPrice(e.target.value)} />
-            <Input id="sellingPrice" label="Selling price" type="number" min="0" step="0.01" value={formSellingPrice} onChange={(e) => setFormSellingPrice(e.target.value)} />
-          </div>
-          {formError && (
-            <p role="alert" className="text-sm text-danger">
-              {formError}
-            </p>
-          )}
-          <div className="flex justify-end gap-3">
-            <button type="button" onClick={() => setFormState(null)} className="text-sm text-foreground/70 hover:text-foreground">
-              Cancel
-            </button>
-            <Button type="submit" disabled={isSubmitting}>
-              {isSubmitting ? "Saving…" : formState.mode === "create" ? "Add price" : "Save changes"}
-            </Button>
-          </div>
-        </form>
-      )}
 
       {isLoading ? (
         <p className="text-sm text-foreground/70">Loading…</p>
@@ -222,6 +204,37 @@ export default function PriceDetailPage() {
             setPage(1);
           }}
         />}
+
+      {/* Add and edit are one dialog, as they are on Customers — the fields are identical and only
+          the title and the submit word differ. It opens over the list rather than pushing it down
+          the page, so the row being edited stays where it was and the table does not jump. */}
+      <Modal
+        open={formState !== null}
+        title={formState?.mode === "edit" ? "Edit Price" : "New Price"}
+        onClose={() => setFormState(null)}
+      >
+        <form onSubmit={handleSubmit} className="flex flex-col gap-4">
+          <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
+            <Input id="clothCode" label="Cloth code" value={formClothCode} onChange={(e) => setFormClothCode(e.target.value)} />
+            <Input id="clothName" label="Cloth name" value={formClothName} onChange={(e) => setFormClothName(e.target.value)} />
+            <Input id="costPrice" label="Cost price" type="number" min="0" step="0.01" value={formCostPrice} onChange={(e) => setFormCostPrice(e.target.value)} />
+            <Input id="sellingPrice" label="Selling price" type="number" min="0" step="0.01" value={formSellingPrice} onChange={(e) => setFormSellingPrice(e.target.value)} />
+          </div>
+          {formError && (
+            <p role="alert" className="text-sm text-danger">
+              {formError}
+            </p>
+          )}
+          <ModalActions>
+            <Button type="button" variant="secondary" onClick={() => setFormState(null)} disabled={isSubmitting}>
+              Cancel
+            </Button>
+            <Button type="submit" disabled={isSubmitting}>
+              {isSubmitting ? "Saving…" : formState?.mode === "edit" ? "Save changes" : "Add price"}
+            </Button>
+          </ModalActions>
+        </form>
+      </Modal>
 
       <ConfirmDialog
         open={pendingDelete !== null}

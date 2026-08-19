@@ -4,6 +4,7 @@ import Link from "next/link";
 import { Button } from "@/components/ui/Button";
 import { Modal } from "@/components/ui/Modal";
 import type { CustomerDuplicate } from "@/lib/api/customers";
+import { toDisplayPhoneNumber } from "@/lib/contact";
 
 /**
  * Warns that a contact detail being typed already belongs to someone (FR-04).
@@ -59,7 +60,7 @@ export function DuplicateWarningModal({
               <div className="min-w-0">
                 <p className="truncate font-medium">{match.fullName}</p>
                 <p className="truncate text-foreground/70">
-                  {match.phoneNumber}
+                  {toDisplayPhoneNumber(match.phoneNumber)}
                   {match.email && ` · ${match.email}`}
                 </p>
               </div>

@@ -8,6 +8,7 @@ import { getAccessToken } from "@/lib/auth";
 import { ApiError } from "@/lib/api-client";
 import { previewImport, summarizeImport, uploadImport, type ImportPreview, type ImportResult } from "@/lib/api/import-export";
 import { ExportButton } from "./ExportButton";
+import { toDisplayPhoneNumber } from "@/lib/contact";
 
 type ImportExportButtonsProps = {
   /** The API resource segment, e.g. "customers" — both endpoints hang off it. */
@@ -122,7 +123,7 @@ export function ImportExportButtons({ resource, label, onImported, previewBefore
                 <ul className="mt-1 flex max-h-40 flex-col gap-0.5 overflow-y-auto text-foreground/80">
                   {pending.preview.duplicates.map((duplicate) => (
                     <li key={duplicate.rowNumber}>
-                      Row {duplicate.rowNumber} ({duplicate.name} — {duplicate.phoneNumber}): {duplicate.reason}
+                      Row {duplicate.rowNumber} ({duplicate.name} — {toDisplayPhoneNumber(duplicate.phoneNumber)}): {duplicate.reason}
                     </li>
                   ))}
                 </ul>

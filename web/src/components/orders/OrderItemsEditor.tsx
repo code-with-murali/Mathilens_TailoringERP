@@ -7,15 +7,13 @@ import { getAccessToken } from "@/lib/auth";
 import { useDebouncedValue } from "@/lib/use-debounced-value";
 import type { TailoringRates } from "@/lib/api/tailoring-rates";
 import type { Garment } from "@/lib/api/garments";
+import type { BusinessMode } from "@/lib/api/business-mode";
 
 /**
- * What the shop is selling on this order.
- *
- * "tailoring" is a shop that only stitches — the customer brings the cloth and pays for the work.
- * "tailoringFabric" is a shop that also sells cloth, so each garment says whose fabric it is made
- * from and, when it is the shop's own, what that cloth costs.
+ * What the shop is selling — now a shop-wide setting (Settings › Business Mode) rather than a
+ * choice made per order. Re-exported here because the row helpers below are typed on it.
  */
-export type BusinessMode = "tailoring" | "tailoringFabric";
+export type { BusinessMode };
 
 /** Whose cloth the garment is cut from — the shop's own roll, or one the customer walked in with. */
 export type FabricSourceMode = "internal" | "external";
@@ -36,6 +34,13 @@ export type ItemRow = {
   ratePerMetre: string;
 };
 
+/**
+ * One lakh garments on a line — far past any real order, which is the point: it is the wall a
+ * typo hits, not a limit anyone should reach. Mirrors `OrderLimits.MaxItemQuantity` on the server,
+ * which rejects anything above it; this only saves the round trip.
+ */
+export const MAX_ITEM_QUANTITY = 100_000;
+
 let nextItemRowId = 0;
 
 function emptyRow(garmentType: GarmentType = GARMENT_TYPES[0]): ItemRow {
@@ -44,10 +49,10 @@ function emptyRow(garmentType: GarmentType = GARMENT_TYPES[0]): ItemRow {
     garmentType,
     quantity: "1",
     tailoringRate: "",
-    // Most orders at a tailoring-and-fabric shop are cut from the shop's own roll — that is the
-    // business it is in. A customer walking in with cloth is the exception, so it is the one that
-    // has to be chosen.
-    fabricSource: "internal",
+    // The customer's own cloth is the default, and the first of the two choices. It is the case
+    // that needs nothing else filled in, so a row starts complete and only asks for a cloth code
+    // once someone says the shop is supplying the fabric.
+    fabricSource: "external",
     clothCode: "",
     clothName: "",
     metres: "",
@@ -56,9 +61,11 @@ function emptyRow(garmentType: GarmentType = GARMENT_TYPES[0]): ItemRow {
 }
 
 const fieldClassName =
-  "w-full rounded-md border border-border bg-surface px-3 py-1 text-sm outline-none transition-colors focus:border-primary focus:ring-2 focus:ring-primary/25";
+  "w-full rounded-md border border-border bg-surface px-3 py-1.5 text-sm outline-none transition-colors placeholder:text-foreground/40 focus:border-primary focus:ring-2 focus:ring-primary/25 disabled:cursor-not-allowed disabled:bg-surface-hover disabled:text-foreground/50";
 
-const readOnlyFieldClassName = `${fieldClassName} cursor-default bg-surface`;
+/** A figure the row works out, not one anybody types: no field chrome, and it does not take focus. */
+const readOnlyFieldClassName =
+  "w-full cursor-default rounded-md border border-transparent bg-transparent px-0 py-1.5 text-sm tabular-nums";
 
 function toNumber(value: string): number {
   const parsed = Number(value);
@@ -108,6 +115,13 @@ function ClothCodeField({ value, onChange, onSelectMatch, disabled = false }: Cl
   const fieldRef = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
+    // Nothing to search for a field that cannot be typed in. This field is now rendered on every
+    // item row rather than only the shop-fabric ones, so without this a four-item order asked the
+    // price list for a catalogue four times over on load, for four fields nobody can use.
+    if (disabled) {
+      return;
+    }
+
     let cancelled = false;
     searchClothPrices(debouncedValue, 1, 8, getAccessToken())
       .then(({ items }) => {
@@ -124,7 +138,7 @@ function ClothCodeField({ value, onChange, onSelectMatch, disabled = false }: Cl
     return () => {
       cancelled = true;
     };
-  }, [debouncedValue]);
+  }, [debouncedValue, disabled]);
 
   useEffect(() => {
     if (!isOpen) {
@@ -150,8 +164,8 @@ function ClothCodeField({ value, onChange, onSelectMatch, disabled = false }: Cl
   }
 
   return (
-    <div ref={fieldRef} className="relative flex flex-col gap-1">
-      <label className="text-sm">Cloth code</label>
+    <div ref={fieldRef} className="relative flex flex-col gap-0.5">
+      <label className="text-xs text-foreground/70">Cloth Code</label>
       <input
         value={value}
         disabled={disabled}
@@ -160,7 +174,7 @@ function ClothCodeField({ value, onChange, onSelectMatch, disabled = false }: Cl
           setIsOpen(true);
         }}
         onFocus={() => setIsOpen(true)}
-        className={`${fieldClassName} disabled:cursor-not-allowed disabled:opacity-50`}
+        className={fieldClassName}
       />
       {!disabled && isOpen && matches.length > 0 && (
         <ul className="absolute top-full z-10 mt-1 max-h-40 w-full min-w-[10rem] overflow-y-auto rounded-md border border-border bg-surface shadow-lg">
@@ -282,13 +296,17 @@ export function OrderItemsEditor({ onChange, mode, tailoringRates, garments, act
   return (
     <div className="flex h-full flex-col gap-3">
       <span className="order-heading shrink-0 text-sm font-medium">Garment items</span>
-      {rows.map((row, index) => (
+      {rows.map((row, index) => {
+        // Whether this row's cloth is the shop's — what decides if the cloth fields below take
+        // input, and the same condition the New Order page validates and prices the row on.
+        const usesShopFabric = row.fabricSource === "internal";
+        return (
         <div
           key={row.id}
           onClick={() => onItemClick?.(row)}
-          className={`flex shrink-0 flex-col gap-2 rounded-md border p-3 ${
-            onItemClick ? "cursor-pointer hover:border-foreground/40" : ""
-          } ${activeItemId === row.id ? "border-foreground ring-1 ring-foreground" : "border-border"}`}
+          className={`flex shrink-0 flex-col gap-2 rounded-lg border bg-surface p-3 transition-colors ${
+            onItemClick ? "cursor-pointer" : ""
+          } ${activeItemId === row.id ? "border-primary ring-1 ring-primary" : "border-border hover:border-primary/40"}`}
         >
           <div className="flex items-center justify-between gap-2">
             <span className="text-sm font-medium">Item {index + 1}</span>
@@ -296,11 +314,11 @@ export function OrderItemsEditor({ onChange, mode, tailoringRates, garments, act
               {/* Whose cloth, right in the item's header — it decides whether the row carries a
                   cloth charge at all, so it belongs above the fields it governs, not among them. */}
               {sellsFabric && (
-                <div className="flex items-center gap-1" onClick={(e) => e.stopPropagation()}>
+                <div className="inline-flex items-center rounded-md border border-border bg-surface p-0.5" onClick={(e) => e.stopPropagation()}>
                   {(
                     [
-                      { value: "internal", label: "Shop fabric" },
                       { value: "external", label: "Customer fabric" },
+                      { value: "internal", label: "Shop fabric" },
                     ] as const
                   ).map((choice) => (
                     <button
@@ -309,10 +327,10 @@ export function OrderItemsEditor({ onChange, mode, tailoringRates, garments, act
                       disabled={disabled}
                       aria-pressed={row.fabricSource === choice.value}
                       onClick={() => updateRow(row.id, { fabricSource: choice.value })}
-                      className={`rounded-full border px-3 py-0.5 text-xs transition-colors disabled:cursor-not-allowed disabled:opacity-50 ${
+                      className={`rounded px-3 py-1 text-xs font-medium transition-colors disabled:cursor-not-allowed disabled:opacity-60 ${
                         row.fabricSource === choice.value
-                          ? "border-primary bg-primary text-primary-foreground"
-                          : "border-border text-foreground/70 hover:bg-surface-hover"
+                          ? "bg-primary text-primary-foreground"
+                          : "text-foreground/70 hover:bg-surface-hover hover:text-foreground"
                       }`}
                     >
                       {choice.label}
@@ -338,9 +356,9 @@ export function OrderItemsEditor({ onChange, mode, tailoringRates, garments, act
           {/* No stopPropagation here — a click anywhere in the fields (including a blank input)
               should still bubble up and open the measurement panel for this item, same as
               clicking the card itself. Only Remove and the fabric choice opt out. */}
-          <div className="grid max-w-2xl grid-cols-2 gap-3 sm:grid-cols-4">
-            <div className="flex flex-col gap-1">
-              <label className="text-sm">Garment</label>
+          <div className={`grid max-w-2xl grid-cols-2 gap-x-3 gap-y-2 ${sellsFabric ? "sm:grid-cols-5" : "sm:grid-cols-4"}`}>
+            <div className="flex flex-col gap-0.5">
+              <label className="text-xs text-foreground/70">Garment</label>
               <select
                 value={row.garmentType}
                 disabled={disabled}
@@ -351,7 +369,7 @@ export function OrderItemsEditor({ onChange, mode, tailoringRates, garments, act
                   const garmentType = e.target.value as GarmentType;
                   updateRow(row.id, { garmentType, tailoringRate: rateFor(garmentType) });
                 }}
-                className={`${fieldClassName} disabled:cursor-not-allowed disabled:opacity-50`}
+                className={fieldClassName}
               >
                 {/* Only garments the shop lists and has priced. A garment with no price would put
                     a zero on the bill, so it is not offered at all rather than offered and blank. */}
@@ -362,21 +380,22 @@ export function OrderItemsEditor({ onChange, mode, tailoringRates, garments, act
                 ))}
               </select>
             </div>
-            <div className="flex flex-col gap-1">
-              <label className="text-sm">Quantity</label>
+            <div className="flex flex-col gap-0.5">
+              <label className="text-xs text-foreground/70">Quantity</label>
               <input
                 type="number"
                 min="1"
+                max={MAX_ITEM_QUANTITY}
                 value={row.quantity}
                 disabled={disabled}
                 onChange={(e) => updateRow(row.id, { quantity: e.target.value })}
-                className={`${fieldClassName} disabled:cursor-not-allowed disabled:opacity-50`}
+                className={fieldClassName}
               />
             </div>
-            <div className="flex flex-col gap-1">
+            <div className="flex flex-col gap-0.5">
               {/* Named for what it is. "Unit price" said nothing about which of the two amounts on
                   a fabric order it was. */}
-              <label className="text-sm">Tailoring</label>
+              <label className="text-xs text-foreground/70">Tailoring Cost</label>
               <input
                 type="number"
                 min="0"
@@ -384,25 +403,51 @@ export function OrderItemsEditor({ onChange, mode, tailoringRates, garments, act
                 value={row.tailoringRate}
                 disabled={disabled}
                 onChange={(e) => updateRow(row.id, { tailoringRate: e.target.value })}
-                className={`${fieldClassName} disabled:cursor-not-allowed disabled:opacity-50`}
+                className={fieldClassName}
               />
             </div>
-            <div className="flex flex-col gap-1">
-              <label className="text-sm">Total</label>
+            {/* Cloth Cost sits beside Tailoring rather than only down in the fabric block, so the
+                two halves of the price are read together and the Item Total below them adds up in
+                plain sight. Shown only when the shop sells cloth — otherwise there is no second
+                half. Its value is the same clothAmount the totals use; nothing is recalculated. */}
+            {sellsFabric && (
+              <div className="flex flex-col gap-0.5">
+                <label className="text-xs text-foreground/70">Cloth Cost</label>
+                <input
+                  type="text"
+                  readOnly
+                  tabIndex={-1}
+                  value={clothAmount(row, mode).toFixed(2)}
+                  className={readOnlyFieldClassName}
+                />
+              </div>
+            )}
+            <div className="flex flex-col gap-0.5">
+              <label className="text-xs text-foreground/70">Item Total</label>
               <input
                 type="text"
                 readOnly
                 tabIndex={-1}
                 value={rowTotal(row, mode).toFixed(2)}
-                className={readOnlyFieldClassName}
+                className={`${readOnlyFieldClassName} font-semibold text-primary`}
               />
             </div>
           </div>
 
-          {/* Only the shop's own cloth is priced. A customer's fabric needs no code, no metres and
-              no rate — the shop is being paid to stitch it, nothing more. */}
-          {sellsFabric && row.fabricSource === "internal" && (
-            <div className="grid max-w-2xl grid-cols-2 gap-3 rounded-md bg-surface p-2 sm:grid-cols-4">
+          {/* Only the shop's own cloth is priced — a customer's fabric needs no code, no metres and
+              no rate, because the shop is being paid to stitch it and nothing more.
+
+              The block is rendered for both choices rather than only for shop fabric, and locked
+              when the cloth is the customer's. Removing it outright made the row change height on
+              every toggle, so the item below jumped and the fields moved out from under the cursor;
+              this way the row is the same shape whichever choice is showing, and which fields are
+              live is the only thing that changes.
+
+              Set off by a hairline rather than by being a filled, padded box inside the card. The
+              nested box cost sixteen vertical pixels a row and read as a card within a card, which
+              is a lot of weight for four fields already grouped by sitting together. */}
+          {sellsFabric && (
+            <div className="grid max-w-2xl grid-cols-2 gap-x-3 gap-y-2 border-t border-border pt-2 sm:grid-cols-4">
               <ClothCodeField
                 value={row.clothCode}
                 onChange={(clothCode) => updateRow(row.id, { clothCode })}
@@ -413,45 +458,48 @@ export function OrderItemsEditor({ onChange, mode, tailoringRates, garments, act
                     ratePerMetre: String(match.sellingPrice),
                   })
                 }
-                disabled={disabled}
+                disabled={disabled || !usesShopFabric}
               />
-              <div className="flex flex-col gap-1">
-                <label className="text-sm">Metres</label>
+              <div className="flex flex-col gap-0.5">
+                <label className="text-xs text-foreground/70">Metres</label>
                 <input
                   type="number"
                   min="0"
                   step="0.1"
                   value={row.metres}
-                  disabled={disabled}
+                  disabled={disabled || !usesShopFabric}
                   onChange={(e) => updateRow(row.id, { metres: e.target.value })}
-                  className={`${fieldClassName} disabled:cursor-not-allowed disabled:opacity-50`}
+                  className={fieldClassName}
                 />
               </div>
-              <div className="flex flex-col gap-1">
-                <label className="text-sm">Rate / m</label>
+              <div className="flex flex-col gap-0.5">
+                <label className="text-xs text-foreground/70">Rate / m</label>
                 <input
                   type="text"
                   readOnly
                   tabIndex={-1}
+                  disabled={disabled || !usesShopFabric}
                   value={row.ratePerMetre === "" ? "" : toNumber(row.ratePerMetre).toFixed(2)}
                   placeholder="Pick a cloth code"
-                  className={readOnlyFieldClassName}
+                  className={`${readOnlyFieldClassName} disabled:cursor-not-allowed disabled:opacity-50`}
                 />
               </div>
-              <div className="flex flex-col gap-1">
-                <label className="text-sm">Cloth</label>
+              <div className="flex flex-col gap-0.5">
+                <label className="text-xs text-foreground/70">Cloth Amount</label>
                 <input
                   type="text"
                   readOnly
                   tabIndex={-1}
+                  disabled={disabled || !usesShopFabric}
                   value={clothAmount(row, mode).toFixed(2)}
-                  className={readOnlyFieldClassName}
+                  className={`${readOnlyFieldClassName} disabled:cursor-not-allowed disabled:opacity-50`}
                 />
               </div>
             </div>
           )}
         </div>
-      ))}
+        );
+      })}
       {!disabled && (
         <button type="button" onClick={addRow} className="order-add-item self-start text-sm font-medium text-foreground/70 hover:text-foreground">
           + Add item

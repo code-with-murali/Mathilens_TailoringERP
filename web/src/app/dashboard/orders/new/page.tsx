@@ -11,9 +11,10 @@ import {
   OrderItemsEditor,
   clothAmount,
   rowTotal,
-  type BusinessMode,
+  MAX_ITEM_QUANTITY,
   type ItemRow,
 } from "@/components/orders/OrderItemsEditor";
+import { getBusinessMode, DEFAULT_BUSINESS_MODE, type BusinessMode } from "@/lib/api/business-mode";
 import { InvoicePrintModal } from "@/components/orders/InvoicePrintModal";
 import { useMeasurementFields } from "@/lib/use-measurement-templates";
 import { useToast } from "@/components/ui/ToastProvider";
@@ -30,9 +31,29 @@ import { getTailoringRates, type TailoringRates } from "@/lib/api/tailoring-rate
 import { getGarments, type Garment } from "@/lib/api/garments";
 import { createInvoice, recordPayment, PAYMENT_METHODS, type PaymentMethod, type Invoice } from "@/lib/api/billing";
 import { getInvoiceSettings, taxAmountFor, DEFAULT_INVOICE_SETTINGS } from "@/lib/api/invoice-settings";
-import "./theme.css";
+import { toDisplayPhoneNumber } from "@/lib/contact";
 
-const fieldClassName = "rounded-md border border-border bg-surface px-3 py-1 text-sm outline-none transition-colors focus:border-primary focus:ring-2 focus:ring-primary/25";
+/* One field treatment for the whole page, matching the Input component the rest of the app uses:
+   white fill, hairline border, blue focus ring, and a disabled state that stays readable rather
+   than fading to half opacity. */
+const fieldClassName =
+  "rounded-md border border-border bg-surface px-3 py-2 text-sm outline-none transition-colors placeholder:text-foreground/40 focus:border-primary focus:ring-2 focus:ring-primary/25 disabled:cursor-not-allowed disabled:bg-surface-hover disabled:text-foreground/50";
+
+/** Money, as this page shows it — the figures are read as amounts, not typed into. */
+function money(amount: number): string {
+  return `₹${amount.toFixed(2)}`;
+}
+
+/** A tape measure on its reel — the measurement panel's empty state, drawn inline like the nav's
+ *  own icons rather than pulled from a package for one glyph. */
+function TapeMeasureIcon({ className }: { className?: string }) {
+  return (
+    <svg className={className} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+      <rect x="2" y="8" width="20" height="9" rx="2" />
+      <path d="M6 8v3M10 8v4M14 8v3M18 8v4" />
+    </svg>
+  );
+}
 
 function digitsOnly(value: string): string {
   return value.replace(/\D/g, "");
@@ -100,10 +121,14 @@ export default function NewOrderPage() {
   const [dueDateText, setDueDateText] = useState("");
   const [orderNotes, setOrderNotes] = useState("");
   const [itemRows, setItemRows] = useState<ItemRow[]>([]);
-  // Chosen per order: the same owner may stitch a customer's own cloth one minute and sell a
-  // shirt length the next. Tailoring-only is the default because it is the simpler form, and a
-  // shop that never sells cloth should never see a fabric field.
-  const [businessMode, setBusinessMode] = useState<BusinessMode>("tailoring");
+  // A property of the shop, read from Settings › Business Mode — it used to be a pair of pills in
+  // this screen's title row, set per order, which was the same answer every time for any given shop
+  // and priced an order differently from the rest when it was set wrongly. A fabric shop that is
+  // handed a customer's own material still says so per item, on the item itself.
+  //
+  // Starts at the tailoring-only default so the form is never briefly asking for a cloth code it is
+  // about to stop asking for.
+  const [businessMode, setBusinessMode] = useState<BusinessMode>(DEFAULT_BUSINESS_MODE);
   const [tailoringRates, setTailoringRates] = useState<TailoringRates>({});
   const [garments, setGarments] = useState<Garment[]>([]);
   // What an item row may be for: on the shop's garment list and carrying a stitching price. A
@@ -238,6 +263,15 @@ export default function NewOrderPage() {
   const orderTotal = itemRows.reduce((sum, row) => sum + itemRowTotal(row), 0);
   const advanceValue = advanceAmount.trim() === "" ? 0 : Number(advanceAmount);
   const orderBalance = orderTotal - (Number.isFinite(advanceValue) ? advanceValue : 0);
+
+  // The two halves orderTotal is already made of, shown separately so the summary answers "what am
+  // I paying for?" rather than only "how much?". Nothing new is calculated: rowTotal is defined as
+  // cloth + quantity x tailoring, so these two necessarily add back up to orderTotal above, and the
+  // figure the order is created with is untouched.
+  const clothTotal = itemRows.reduce((sum, row) => sum + clothAmount(row, businessMode), 0);
+  const tailoringTotal = orderTotal - clothTotal;
+  // Garments, not rows — two shirts and a trousers is three items to the shop, on two lines.
+  const totalItems = itemRows.reduce((sum, row) => sum + (Number(row.quantity) || 0), 0);
 
   function selectCustomer(selected: Customer) {
     setCustomer(selected);
@@ -420,15 +454,21 @@ export default function NewOrderPage() {
   }, [applyDefaultDueDate]);
 
   useEffect(() => {
-    // The two lists that decide what an item row can be: the garments the shop stitches
-    // (Settings › Garments) and what it charges for them (Settings › Tailoring Cost). Read once
-    // here so no row has to ask for either. Neither rejects — a shop that has set no prices gets
-    // no garments to pick, which is the message below rather than an error.
+    // What an item row can be: the garments the shop stitches (Settings › Garments), what it
+    // charges for them (Settings › Tailoring Cost), and whether it sells the cloth as well
+    // (Settings › Business Mode). Read once here so no row has to ask for any of them. None
+    // rejects — a shop that has set no prices gets no garments to pick, which is the message below
+    // rather than an error, and an unconfigured business mode falls back to tailoring-only.
     let cancelled = false;
-    Promise.all([getTailoringRates(getAccessToken()), getGarments(getAccessToken())]).then(([rates, list]) => {
+    Promise.all([
+      getTailoringRates(getAccessToken()),
+      getGarments(getAccessToken()),
+      getBusinessMode(getAccessToken()),
+    ]).then(([rates, list, mode]) => {
       if (!cancelled) {
         setTailoringRates(rates);
         setGarments(list);
+        setBusinessMode(mode);
       }
     });
 
@@ -583,6 +623,12 @@ export default function NewOrderPage() {
         showToast("Every item needs a quantity and a tailoring amount.", "error");
         return;
       }
+      // Said here as well as by the field's own max, so a number that arrives by paste or by an
+      // older browser that ignores the attribute is still caught before it becomes a bill.
+      if (quantity > MAX_ITEM_QUANTITY) {
+        showToast(`Quantity can't be more than ${MAX_ITEM_QUANTITY.toLocaleString()}.`, "error");
+        return;
+      }
 
       const usesShopFabric = sellsFabric && row.fabricSource === "internal";
       const metres = Number(row.metres);
@@ -681,80 +727,72 @@ export default function NewOrderPage() {
 
   return (
     <>
-    <div className="orderNewSkin flex flex-col gap-3 print:hidden">
-      <div className="flex items-center justify-between">
-        {/* Shows the number the order was just given, which is what gets written on the job card.
-            One step down from the 2xl the other pages use: this screen is a working form, not a
-            page to be read, and the title only has to be found — every pixel it gives up is one
-            the item list and measurement panel get back. */}
-        <h1 className="text-xl font-semibold">
+    <div className="flex flex-col gap-5 print:hidden">
+      <div className="flex flex-wrap items-center justify-between gap-3">
+        {/* text-2xl to match Customers and every other page title. This screen used to run a size
+            smaller to buy height for the item list; the columns no longer share one locked
+            viewport height, so the pixels are not needed and the odd-one-out heading was the first
+            thing that gave away that this page was built to its own rules. */}
+        <h1 className="text-2xl font-semibold">
           {createdOrder
             ? `Order - ${createdOrder.orderNumber?.trim() || `#${createdOrder.id.slice(0, 8).toUpperCase()}`}`
             : "New Order"}
         </h1>
-        <div className="flex items-center gap-4">
-          {/* What this order is: stitching alone, or stitching plus the shop's own cloth. It sits
-              in the title row because it changes what every item below asks for, and it is frozen
-              once the order exists — the items are already priced by then. */}
-          <div className="flex items-center gap-1">
-            {(
-              [
-                { value: "tailoring", label: "Tailoring" },
-                { value: "tailoringFabric", label: "Tailoring + fabric" },
-              ] as const
-            ).map((choice) => (
-              <button
-                key={choice.value}
-                type="button"
-                disabled={isOrderCreated}
-                aria-pressed={businessMode === choice.value}
-                onClick={() => setBusinessMode(choice.value)}
-                className={`rounded-full border px-3 py-1 text-xs font-medium transition-colors disabled:cursor-not-allowed disabled:opacity-50 ${
-                  businessMode === choice.value
-                    ? "border-primary bg-primary text-primary-foreground"
-                    : "border-border text-foreground/70 hover:bg-surface-hover"
-                }`}
-              >
-                {choice.label}
-              </button>
-            ))}
-          </div>
-          <Link href="/dashboard/orders" className="text-sm text-foreground/70 hover:text-foreground">
-            Back to orders
-          </Link>
-        </div>
+        {/* Stitching alone, or stitching plus the shop's own cloth, used to be a pair of pills
+            here. It is a property of the shop rather than of one order, so it now lives in
+            Settings › Business Mode and this row is just the title and the way back. */}
+        <Link href="/dashboard/orders" className="text-sm font-medium text-primary hover:text-primary-hover">
+          Back to orders
+        </Link>
       </div>
 
-      <form onSubmit={handleCreateOrder} className="flex flex-col gap-3">
-        <div className="flex flex-col items-start gap-4 lg:h-[min(calc(100dvh-6rem),44rem)] lg:flex-row lg:items-stretch">
-          {/* Column 1: who the order is for, and what's being made. */}
-          <div className="flex w-full flex-1 flex-col gap-3 rounded-lg border border-border bg-surface p-4 lg:flex-[2]">
-          <div className="orderSection-customer flex flex-col gap-2">
+      <form onSubmit={handleCreateOrder} className="flex flex-col gap-4">
+        {/* items-start, and no shared height: the two columns are independent stacks of cards that
+            each end where their content does. The old lg:h-[min(100dvh,44rem)] pinned both to one
+            viewport-height box, which is why the measurement panel needed a frozen height and the
+            summary had to be squeezed into a two-across row — the right column now simply grows and
+            the page scrolls, like every other screen in the app. */}
+        <div className="flex flex-col items-start gap-4 lg:flex-row">
+          {/* Column 1: who the order is for, and what's being made — two cards now, because they
+              are two things. They shared one card only because the locked column height made a
+              second border look like clutter. */}
+          <div className="flex w-full flex-1 flex-col gap-4 lg:flex-[2]">
+          <div className="orderSection-customer flex flex-col gap-3 rounded-lg border border-border bg-surface p-4">
+            <h2 className="order-heading text-base font-semibold">Customer Details</h2>
             {/* The Customer field (a second, name/phone search picker) was removed as redundant
                 with Mobile Number below — this block now doubles as both the search UI and, once
                 a customer is picked, their name/phone display with a Change link back to search. */}
             {!customer ? (
               <div ref={mobileFieldRef} className="relative flex flex-col gap-1">
                 <label htmlFor="mobileNumber" className="text-sm font-medium">
-                  Customer Detail
+                  Search customer
                 </label>
-                <input
-                  id="mobileNumber"
-                  value={mobileNumber}
-                  onChange={(e) => {
-                    setMobileNumber(e.target.value);
-                    setIsMobileDropdownOpen(true);
-                  }}
-                  onFocus={() => setIsMobileDropdownOpen(true)}
-                  placeholder="Search by mobile number…"
-                  className={fieldClassName}
-                />
+                <div className="flex flex-wrap items-center gap-2">
+                  <input
+                    id="mobileNumber"
+                    value={mobileNumber}
+                    onChange={(e) => {
+                      setMobileNumber(e.target.value);
+                      setIsMobileDropdownOpen(true);
+                    }}
+                    onFocus={() => setIsMobileDropdownOpen(true)}
+                    placeholder="Search by name or mobile number…"
+                    className={`${fieldClassName} min-w-0 flex-1`}
+                  />
+                  {/* Adding a customer no longer depends on searching for one first. The old route
+                      in — type seven digits, get no match, click the row that appears under the
+                      dropdown — worked, but only if you already knew it was there, and not at all
+                      if you were searching by name. Same handler, just reachable. */}
+                  <Button type="button" variant="secondary" onClick={() => startAddingNewCustomer("")}>
+                    + New Customer
+                  </Button>
+                </div>
                 {isMobileDropdownOpen && debouncedMobileNumber && mobileMatches.length > 0 && (
                   <ul className="absolute top-full z-10 mt-1 max-h-48 w-full overflow-y-auto rounded-md border border-border bg-surface shadow-lg">
                     {mobileMatches.map((c) => (
                       <li key={c.id}>
                         <button type="button" onClick={() => selectCustomer(c)} className="block w-full px-3 py-2 text-left text-sm hover:bg-surface-hover">
-                          {c.fullName} ({c.phoneNumber})
+                          {c.fullName} ({toDisplayPhoneNumber(c.phoneNumber)})
                         </button>
                       </li>
                     ))}
@@ -774,16 +812,15 @@ export default function NewOrderPage() {
               </div>
             ) : (
               <div className="flex flex-col gap-1">
-                <label className="text-sm font-medium">Customer Detail</label>
-                {/* Same padding as the search input it replaces, so picking a customer swaps one
-                    control for another of exactly the same height — otherwise the whole item list
-                    below shifted down 8px the moment a customer was chosen. */}
-                <div className="flex items-center justify-between rounded-md border border-border bg-surface px-3 py-1 text-sm">
-                  <span>
-                    {customer.fullName} ({customer.phoneNumber})
+                <label className="text-sm font-medium">Selected customer</label>
+                {/* The picked customer reads as a filled chip rather than an empty field — it is a
+                    decision that has been made, not a box still waiting for one. */}
+                <div className="flex items-center justify-between gap-3 rounded-md border border-primary/20 bg-primary/5 px-3 py-2 text-sm">
+                  <span className="min-w-0 truncate font-medium">
+                    {customer.fullName} ({toDisplayPhoneNumber(customer.phoneNumber)})
                   </span>
                   {!isOrderCreated && (
-                    <button type="button" onClick={clearCustomer} className="text-foreground/70 hover:text-foreground">
+                    <button type="button" onClick={clearCustomer} className="shrink-0 font-medium text-primary hover:text-primary-hover">
                       Change
                     </button>
                   )}
@@ -792,7 +829,7 @@ export default function NewOrderPage() {
             )}
           </div>
 
-            <div ref={itemsAreaRef} className="orderSection-items min-h-0 lg:flex-1 lg:overflow-y-auto">
+            <div ref={itemsAreaRef} className="orderSection-items rounded-lg border border-border bg-surface p-4">
               <OrderItemsEditor
                 key={formKey}
                 mode={businessMode}
@@ -806,34 +843,23 @@ export default function NewOrderPage() {
             </div>
           </div>
 
-          {/* Right side: the measurement panel merges columns 2 and 3's top into one block when
-              an item is active; Due date/Assigned employee and Order summary sit below it, back
-              as two separate columns. */}
+          {/* Right side: a plain stack of cards — Measurement Details, Order Summary, Schedule,
+              Payment Details, Actions — in the order staff work down them. */}
           <div className="flex w-full flex-1 flex-col gap-4 lg:flex-[2]">
-            {/* Always present (blank when no item is active) so Due date/Assigned employee and
-                Order summary below stay pinned to the bottom, matching column 1's height, instead
-                of jumping up to fill the gap. */}
-            {/* Frozen height from the large breakpoint up: this box's three modes (measurement,
-                new customer, summary preview) are all different heights, and letting it size to
-                its content moved Order summary and Schedule below it every time one opened or
-                closed. A fixed height keeps them still; anything taller scrolls inside the box.
-                Left to size naturally on phones, where the whole column is stacked and a fixed
-                empty box would just be dead space to scroll past.
-
-                18rem starts from the measured fit — with the three garment items the form opens
-                with, column 1 is 618px, which leaves 240px here once Order summary/Schedule, the
-                action row and the two 12px gaps are taken out — and adds a row's worth on top, so
-                two more measurement points are readable before scrolling. The item list stretches
-                to meet it. */}
+            {/* Still one box with three modes (measurement, new customer, summary preview), and
+                still a minimum height, so opening and closing one does not shunt the cards below it
+                up and down the screen. It no longer needs a *frozen* height now that the columns
+                are independent — min-h lets a long measurement template grow the card instead of
+                scrolling inside a 18rem window. */}
             <div
               ref={measurementBlockRef}
-              className="flex flex-1 flex-col gap-3 overflow-y-auto rounded-lg border-2 border-foreground bg-surface p-4 lg:min-h-0"
+              className="flex flex-col gap-3 rounded-lg border border-border bg-surface p-4 lg:min-h-[18rem]"
             >
               {activeMeasurementItem && (
                 <div className="orderSection-measure flex shrink-0 flex-col gap-3">
-                  <div className="flex items-center justify-between gap-2 border-b-2 border-foreground/15 pb-3">
-                    <span className="order-heading min-w-0 flex-1 truncate text-sm font-medium">
-                      Measurement Detail - Item {activeMeasurementItemIndex + 1} - {activeMeasurementItem.garmentType}
+                  <div className="flex items-center justify-between gap-2 border-b border-border pb-3">
+                    <span className="order-heading min-w-0 flex-1 truncate text-base font-semibold">
+                      Measurement Details — Item {activeMeasurementItemIndex + 1} · {activeMeasurementItem.garmentType}
                     </span>
                     <button
                       type="button"
@@ -867,7 +893,7 @@ export default function NewOrderPage() {
                               onKeyDown={(e) => {
                                 if (e.key === "Enter") e.preventDefault();
                               }}
-                              className="w-24 rounded-md border-2 border-foreground bg-surface px-3 py-1 text-sm outline-none transition-colors focus:border-primary focus:ring-2 focus:ring-primary/25 disabled:cursor-not-allowed disabled:opacity-50"
+                              className="w-24 rounded-md border border-border bg-surface px-3 py-1.5 text-sm outline-none transition-colors focus:border-primary focus:ring-2 focus:ring-primary/25 disabled:cursor-not-allowed disabled:bg-surface-hover disabled:text-foreground/50"
                             />
                           </div>
                         ))}
@@ -888,7 +914,7 @@ export default function NewOrderPage() {
                               onKeyDown={(e) => {
                                 if (e.key === "Enter") e.preventDefault();
                               }}
-                              className="w-24 rounded-md border-2 border-foreground bg-surface px-3 py-1 text-sm outline-none transition-colors focus:border-primary focus:ring-2 focus:ring-primary/25 disabled:cursor-not-allowed disabled:opacity-50"
+                              className="w-24 rounded-md border border-border bg-surface px-3 py-1.5 text-sm outline-none transition-colors focus:border-primary focus:ring-2 focus:ring-primary/25 disabled:cursor-not-allowed disabled:bg-surface-hover disabled:text-foreground/50"
                             />
                           </div>
                         ))}
@@ -903,7 +929,7 @@ export default function NewOrderPage() {
                   )}
 
                   {customer && !isLoadingMeasurements && measurementFields.length > 0 && (
-                    <div className="flex justify-center gap-3 border-y-2 border-foreground/15 py-0.5">
+                    <div className="flex justify-end gap-3 border-t border-border pt-3">
                       <Button type="button" variant="secondary" onClick={handleClearMeasurement} disabled={isSavingMeasurement || isOrderCreated}>
                         Clear
                       </Button>
@@ -920,7 +946,7 @@ export default function NewOrderPage() {
                   clears the other's active state. */}
               {!activeMeasurementItem && isAddingNewCustomer && (
                 <div className="orderSection-customer flex shrink-0 flex-col gap-2">
-                  <span className="order-heading text-sm font-medium">New customer</span>
+                  <h2 className="order-heading text-base font-semibold">New Customer</h2>
                   <Input id="newCustomerName" label="Full name" value={newCustomerName} onChange={(e) => setNewCustomerName(e.target.value)} error={newCustomerFieldErrors.fullname} />
                   <PhoneNumberInput id="newCustomerPhone" value={newCustomerPhone} onChange={setNewCustomerPhone} error={newCustomerFieldErrors.phonenumber} />
                   <Input id="newCustomerEmail" label="Email (optional)" type="email" value={newCustomerEmail} onChange={(e) => setNewCustomerEmail(e.target.value)} error={newCustomerFieldErrors.email} />
@@ -944,8 +970,8 @@ export default function NewOrderPage() {
                   before committing to Create order. */}
               {!activeMeasurementItem && !isAddingNewCustomer && isViewingSummary && (
                 <div className="orderSection-summary flex shrink-0 flex-col gap-3">
-                  <div className="flex items-center justify-between border-b-2 border-foreground/15 pb-3">
-                    <span className="order-heading text-sm font-medium">Order Summary Preview</span>
+                  <div className="flex items-center justify-between border-b border-border pb-3">
+                    <h2 className="order-heading text-base font-semibold">Order Summary Preview</h2>
                     <button type="button" onClick={() => setSummarySource(null)} className="text-sm text-foreground/70 hover:text-foreground">
                       Close
                     </button>
@@ -976,7 +1002,7 @@ export default function NewOrderPage() {
                       ))}
                     </tbody>
                   </table>
-                  <div className="flex flex-col gap-1 border-t-2 border-foreground/15 pt-2 text-sm">
+                  <div className="flex flex-col gap-1 border-t border-border pt-2 text-sm">
                     <div className="flex items-center justify-between">
                       <span className="text-foreground/70">Total</span>
                       <span className="font-medium">{orderTotal.toFixed(2)}</span>
@@ -992,170 +1018,209 @@ export default function NewOrderPage() {
                   </div>
                 </div>
               )}
-              {/* Nothing fills this box when no item, new customer or summary is open. It is kept
-                  in the layout rather than collapsed so Order summary and Schedule below stay
-                  pinned to the bottom, level with column 1. */}
+              {/* An empty card said nothing about what it was for, so the panel sat blank until
+                  someone happened to click an item and discovered it. It now names itself and says
+                  what to do — the one instruction on the page that is not obvious from the form. */}
+              {!activeMeasurementItem && !isAddingNewCustomer && !isViewingSummary && (
+                <div className="orderSection-measure flex flex-1 flex-col items-center justify-center gap-2 py-8 text-center">
+                  <TapeMeasureIcon className="h-8 w-8 text-foreground/25" />
+                  <h2 className="order-heading text-base font-semibold">Measurement Details</h2>
+                  <p className="max-w-xs text-sm text-foreground/70">
+                    Select a customer and a garment item to view or add measurements.
+                  </p>
+                </div>
+              )}
             </div>
 
-            <div className="flex flex-col items-start gap-4 lg:flex-row lg:items-stretch">
-              {/* Column 2: money. Clicking the cell (outside the interactive advance fields) opens
-                  the invoice preview above. */}
-              <div
-                ref={orderSummaryRef}
-                onClick={() => handleOpenSummary("summary")}
-                className={`orderSection-summary flex w-full flex-1 cursor-pointer flex-col gap-2 rounded-lg border p-4 ${
-                  summarySource === "summary" ? "border-foreground bg-surface ring-1 ring-foreground" : "border-border bg-surface"
-                }`}
-              >
-                <span className="order-heading text-sm font-medium">Order summary</span>
-                <div className="flex items-center justify-between text-sm">
-                  <span className="text-foreground/70">Total</span>
-                  <span className="font-medium">{orderTotal.toFixed(2)}</span>
+            {/* Order Summary. Clicking it opens the itemised preview in the panel above — the
+                card is the headline, the preview is the detail behind it. */}
+            <div
+              ref={orderSummaryRef}
+              onClick={() => handleOpenSummary("summary")}
+              className={`orderSection-summary flex w-full cursor-pointer flex-col gap-2 rounded-lg border bg-surface p-4 transition-colors ${
+                summarySource === "summary" ? "border-primary ring-1 ring-primary" : "border-border"
+              }`}
+            >
+              <h2 className="order-heading text-base font-semibold">Order Summary</h2>
+              {/* What the total is made of, then the total; then what has been paid, then what is
+                  left. Two ruled-off figures in blue, because those are the two a customer is told. */}
+              <dl className="flex flex-col gap-1.5 text-sm">
+                <div className="flex items-center justify-between">
+                  <dt className="text-foreground/70">Total Items</dt>
+                  <dd className="font-medium tabular-nums">{totalItems}</dd>
                 </div>
-                <div className="flex flex-col gap-1">
-                  <label htmlFor="advanceAmount" className="text-sm font-medium">
-                    Advance received (optional)
-                  </label>
-                  <div className="grid grid-cols-2 gap-2">
-                    <input
-                      id="advanceAmount"
-                      type="number"
-                      min="0"
-                      step="0.01"
-                      value={advanceAmount}
-                      disabled={isOrderCreated}
-                      onChange={(e) => setAdvanceAmount(e.target.value)}
-                      placeholder="0.00"
-                      className={`${fieldClassName} disabled:cursor-not-allowed disabled:opacity-50`}
-                    />
-                    <select
-                      value={advanceMethod}
-                      disabled={isOrderCreated}
-                      onChange={(e) => setAdvanceMethod(e.target.value as PaymentMethod)}
-                      className={`${fieldClassName} disabled:cursor-not-allowed disabled:opacity-50`}
-                    >
-                      {PAYMENT_METHODS.map((method) => (
-                        <option key={method} value={method}>
-                          {method}
-                        </option>
-                      ))}
-                    </select>
+                <div className="flex items-center justify-between">
+                  <dt className="text-foreground/70">Tailoring Total</dt>
+                  <dd className="font-medium tabular-nums">{money(tailoringTotal)}</dd>
+                </div>
+                {businessMode === "tailoringFabric" && (
+                  <div className="flex items-center justify-between">
+                    <dt className="text-foreground/70">Cloth Total</dt>
+                    <dd className="font-medium tabular-nums">{money(clothTotal)}</dd>
                   </div>
+                )}
+                <div className="flex items-center justify-between border-t border-border pt-2">
+                  <dt className="font-semibold">Order Total</dt>
+                  <dd className="text-base font-semibold tabular-nums text-primary">{money(orderTotal)}</dd>
                 </div>
-                <div className="flex items-center justify-between border-t border-border pt-2 text-sm">
-                  <span className="text-foreground/70">Balance</span>
-                  <span className="font-medium">{orderBalance.toFixed(2)}</span>
+                <div className="flex items-center justify-between pt-1">
+                  <dt className="text-foreground/70">Advance Received</dt>
+                  <dd className="font-medium tabular-nums">{money(Number.isFinite(advanceValue) ? advanceValue : 0)}</dd>
+                </div>
+                <div className="flex items-center justify-between border-t border-border pt-2">
+                  <dt className="font-semibold">Balance Due</dt>
+                  <dd className="text-base font-semibold tabular-nums text-primary">{money(orderBalance)}</dd>
+                </div>
+              </dl>
+            </div>
+
+            {/* Scheduling. Clicking it opens the same preview as the summary above — the two are
+                one review step, and reaching the preview shouldn't depend on which card you click. */}
+            <div
+              ref={scheduleRef}
+              onClick={() => handleOpenSummary("schedule")}
+              className={`orderSection-schedule flex w-full cursor-pointer flex-col gap-3 rounded-lg border bg-surface p-4 transition-colors ${
+                summarySource === "schedule" ? "border-primary ring-1 ring-primary" : "border-border"
+              }`}
+            >
+              <div className="flex flex-col gap-1">
+                <label htmlFor="dueAtUtc" className="text-sm font-medium">
+                  Collection Date
+                </label>
+                {/* Weekday beside the field, on its line — it answers "is that a Sunday?" right
+                    where the date is read, and sharing the row costs no height. The field is given
+                    a fixed width and the day one of its own, wide enough for "Wednesday", so
+                    neither moves as the date changes.
+
+                    A text field rather than a native date input, because a native one renders in
+                    the browser's own locale — mm/dd/yyyy on these machines — and no attribute
+                    changes that ("lang" is ignored). The real date input is still there, kept
+                    rendered but invisible behind this one, purely so its picker can be opened. */}
+                <div className="flex items-center gap-3">
+                  <div className="relative shrink-0">
+                    <input
+                      id="dueAtUtc"
+                      type="text"
+                      inputMode="numeric"
+                      autoComplete="off"
+                      placeholder="DD-MM-YYYY"
+                      value={dueDateText}
+                      disabled={isOrderCreated}
+                      // Read-only because the click that opens the picker also takes focus away
+                      // from this field — a caret that can be placed but never typed into is
+                      // worse than a field that plainly belongs to the picker. Enter and Space
+                      // open it too, so this is still reachable without a mouse.
+                      readOnly
+                      onClick={() => datePickerRef.current?.showPicker?.()}
+                      onKeyDown={(e) => {
+                        if (e.key === "Enter" || e.key === " ") {
+                          e.preventDefault();
+                          datePickerRef.current?.showPicker?.();
+                        }
+                      }}
+                      className={`${fieldClassName} w-32 cursor-pointer`}
+                    />
+                    {/* Invisible, not hidden: showPicker throws on an element that is not being
+                        rendered. Sized over the text field so the picker opens against it. */}
+                    <input
+                      ref={datePickerRef}
+                      type="date"
+                      tabIndex={-1}
+                      aria-hidden="true"
+                      value={dueAtUtc}
+                      disabled={isOrderCreated}
+                      onChange={(e) => setDueAtUtc(e.target.value)}
+                      className="pointer-events-none absolute inset-0 h-full w-full opacity-0"
+                    />
+                  </div>
+                  {/* Rendered even when blank, so nothing shifts as the date is typed. */}
+                  <span className="min-w-[5.5rem] shrink-0 truncate text-sm font-medium text-foreground/70">
+                    {collectionWeekday?.label ?? ""}
+                  </span>
                 </div>
               </div>
 
-              {/* Column 3: scheduling. Clicking it opens the same Order Summary Preview as the cell
-                  beside it — the two cells are one review step, and reaching the preview shouldn't
-                  depend on which half of the row you happen to click. */}
-              <div
-                ref={scheduleRef}
-                onClick={() => handleOpenSummary("schedule")}
-                className={`orderSection-schedule flex w-full flex-1 cursor-pointer flex-col gap-3 rounded-lg border p-4 ${
-                  summarySource === "schedule" ? "border-foreground bg-surface ring-1 ring-foreground" : "border-border bg-surface"
-                }`}
-              >
-                <div className="flex flex-col gap-1">
-                  <label htmlFor="dueAtUtc" className="text-sm font-medium">
-                    Collection date
-                  </label>
-                  {/* Weekday beside the field, on its line — it answers "is that a Sunday?" right
-                      where the date is read, and sharing the row costs no height. The field is
-                      given a fixed width and the day one of its own, wide enough for "Wednesday",
-                      so neither moves as the date changes. The day sits just after the field
-                      rather than out at the card's edge — it reads as part of the date, not as a
-                      separate column.
+              <div className="flex flex-col gap-1">
+                <label htmlFor="employee" className="text-sm font-medium">
+                  Assigned Employee (optional)
+                </label>
+                {/* The whole roster in one list rather than a search box: a shop has tens of staff,
+                    not thousands, and picking from a list beats typing a name you have to spell
+                    right. "Not assigned" is the first option and the default — most orders are
+                    handed to a tailor later, not at the counter. */}
+                <select
+                  id="employee"
+                  value={employee?.id ?? ""}
+                  disabled={isOrderCreated || isLoadingEmployees}
+                  onChange={(e) => setEmployee(employees.find((candidate) => candidate.id === e.target.value) ?? null)}
+                  className={fieldClassName}
+                >
+                  <option value="">{isLoadingEmployees ? "Loading employees…" : "Not assigned"}</option>
+                  {employees.map((option) => (
+                    <option key={option.id} value={option.id}>
+                      {/* Code alongside the name — a shop can hold two Kumars. */}
+                      {option.fullName}
+                      {option.employeeCode ? ` (${option.employeeCode})` : ""}
+                    </option>
+                  ))}
+                </select>
+              </div>
 
-                      A text field rather than a native date input, because a native one renders
-                      in the browser's own locale — mm/dd/yyyy on these machines — and no attribute
-                      changes that ("lang" is ignored). The real date input is still there, kept
-                      rendered but invisible behind this one, purely so its picker can be opened. */}
-                  <div className="flex items-center gap-3">
-                    <div className="relative shrink-0">
-                      <input
-                        id="dueAtUtc"
-                        type="text"
-                        inputMode="numeric"
-                        autoComplete="off"
-                        placeholder="DD-MM-YYYY"
-                        value={dueDateText}
-                        disabled={isOrderCreated}
-                        // Read-only because the click that opens the picker also takes focus away
-                        // from this field — a caret that can be placed but never typed into is
-                        // worse than a field that plainly belongs to the picker. Enter and Space
-                        // open it too, so this is still reachable without a mouse.
-                        readOnly
-                        onClick={() => datePickerRef.current?.showPicker?.()}
-                        onKeyDown={(e) => {
-                          if (e.key === "Enter" || e.key === " ") {
-                            e.preventDefault();
-                            datePickerRef.current?.showPicker?.();
-                          }
-                        }}
-                        className={`${fieldClassName} w-28 cursor-pointer disabled:cursor-not-allowed disabled:opacity-50`}
-                      />
-                      {/* Invisible, not hidden: showPicker throws on an element that is not being
-                          rendered. Sized over the text field so the picker opens against it. */}
-                      <input
-                        ref={datePickerRef}
-                        type="date"
-                        tabIndex={-1}
-                        aria-hidden="true"
-                        value={dueAtUtc}
-                        disabled={isOrderCreated}
-                        onChange={(e) => setDueAtUtc(e.target.value)}
-                        className="pointer-events-none absolute inset-0 h-full w-full opacity-0"
-                      />
-                    </div>
-                    {/* Rendered even when blank, so nothing shifts as the date is typed. */}
-                    <span className="w-[5.5rem] shrink-0 truncate text-sm font-medium text-foreground/70">
-                      {collectionWeekday?.label ?? ""}
-                    </span>
-                  </div>
+              <div className="flex flex-col gap-1">
+                <label htmlFor="orderNotes" className="text-sm font-medium">
+                  Notes (optional)
+                </label>
+                <textarea
+                  id="orderNotes"
+                  rows={2}
+                  value={orderNotes}
+                  disabled={isOrderCreated}
+                  onChange={(e) => setOrderNotes(e.target.value)}
+                  placeholder="Anything the tailor should know…"
+                  className={fieldClassName}
+                />
+              </div>
+            </div>
+
+            {/* Payment. Its own card rather than a corner of the summary: the advance is something
+                staff enter, and the summary is something they read. Mixing the two put two editable
+                fields in the middle of a block of figures. */}
+            <div className="flex w-full flex-col gap-3 rounded-lg border border-border bg-surface p-4">
+              <h2 className="order-heading text-base font-semibold">Payment Details</h2>
+              <div className="grid gap-3 sm:grid-cols-2">
+                <div className="flex flex-col gap-1">
+                  <label htmlFor="advanceAmount" className="text-sm font-medium">
+                    Advance Received
+                  </label>
+                  <input
+                    id="advanceAmount"
+                    type="number"
+                    min="0"
+                    step="0.01"
+                    value={advanceAmount}
+                    disabled={isOrderCreated}
+                    onChange={(e) => setAdvanceAmount(e.target.value)}
+                    placeholder="0.00"
+                    className={fieldClassName}
+                  />
                 </div>
-
                 <div className="flex flex-col gap-1">
-                  <label htmlFor="employee" className="text-sm font-medium">
-                    Assigned employee (optional)
+                  <label htmlFor="advanceMethod" className="text-sm font-medium">
+                    Payment Method
                   </label>
-                  {/* The whole roster in one list rather than a search box: a shop has tens of
-                      staff, not thousands, and picking from a list beats typing a name you have
-                      to spell right. "Not assigned" is the first option and the default — most
-                      orders are handed to a tailor later, not at the counter. */}
                   <select
-                    id="employee"
-                    value={employee?.id ?? ""}
-                    disabled={isOrderCreated || isLoadingEmployees}
-                    onChange={(e) => setEmployee(employees.find((candidate) => candidate.id === e.target.value) ?? null)}
-                    className={`${fieldClassName} disabled:cursor-not-allowed disabled:opacity-50`}
+                    id="advanceMethod"
+                    value={advanceMethod}
+                    disabled={isOrderCreated}
+                    onChange={(e) => setAdvanceMethod(e.target.value as PaymentMethod)}
+                    className={fieldClassName}
                   >
-                    <option value="">{isLoadingEmployees ? "Loading employees…" : "Not assigned"}</option>
-                    {employees.map((option) => (
-                      <option key={option.id} value={option.id}>
-                        {/* Code alongside the name — a shop can hold two Kumars. */}
-                        {option.fullName}
-                        {option.employeeCode ? ` (${option.employeeCode})` : ""}
+                    {PAYMENT_METHODS.map((method) => (
+                      <option key={method} value={method}>
+                        {method}
                       </option>
                     ))}
                   </select>
-                </div>
-
-                <div className="flex flex-col gap-1">
-                  <label htmlFor="orderNotes" className="text-sm font-medium">
-                    Notes (optional)
-                  </label>
-                  <textarea
-                    id="orderNotes"
-                    rows={1}
-                    value={orderNotes}
-                    disabled={isOrderCreated}
-                    onChange={(e) => setOrderNotes(e.target.value)}
-                    placeholder="Anything the tailor should know…"
-                    className={`${fieldClassName} disabled:cursor-not-allowed disabled:opacity-50`}
-                  />
                 </div>
               </div>
             </div>

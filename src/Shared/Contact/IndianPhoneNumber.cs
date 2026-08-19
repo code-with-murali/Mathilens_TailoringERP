@@ -73,6 +73,27 @@ public static class IndianPhoneNumber
         TryNormalize(raw, out var normalized) ? normalized : raw?.Trim() ?? string.Empty;
 
     /// <summary>
+    /// The ten digits a customer would recite, for anything a person reads.
+    ///
+    /// <para>Storage is canonical and stays that way — it is what the import, the WhatsApp module
+    /// and the uniqueness checks all correlate on. But nobody at the counter says "+91" out loud,
+    /// and a message that quotes a number back with it reads as a different number from the one on
+    /// screen. This is the seam: canonical below, ten digits wherever it is shown.</para>
+    ///
+    /// <para>An unrecognized number is returned as it stands rather than trimmed to ten — cutting
+    /// one down would show a different, plausible number.</para>
+    /// </summary>
+    public static string ToDisplay(string? raw)
+    {
+        if (string.IsNullOrWhiteSpace(raw))
+        {
+            return string.Empty;
+        }
+
+        return TryNormalize(raw, out var normalized) ? normalized[CountryCode.Length..] : raw.Trim();
+    }
+
+    /// <summary>
     /// Whether <paramref name="raw"/> is a number the shop can actually dial: it normalizes, and
     /// its ten national digits open with 6-9 as every Indian mobile series does.
     /// </summary>

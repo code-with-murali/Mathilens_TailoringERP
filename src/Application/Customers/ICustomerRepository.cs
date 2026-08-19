@@ -22,6 +22,12 @@ public interface ICustomerRepository
     Task<Customer?> GetByPhoneNumberAsync(string phoneNumber, CancellationToken cancellationToken);
 
     /// <summary>
+    /// The customer holding this email, if one does — case-insensitively, since an address is the
+    /// same address whatever case it was typed in.
+    /// </summary>
+    Task<Customer?> GetByEmailAsync(string email, CancellationToken cancellationToken);
+
+    /// <summary>
     /// Customers who already hold this number or this email — what the counter is warned about
     /// before a second record for the same person is created.
     ///

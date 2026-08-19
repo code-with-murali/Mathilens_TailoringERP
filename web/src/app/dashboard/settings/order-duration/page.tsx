@@ -8,6 +8,24 @@ import { getAccessToken } from "@/lib/auth";
 import { ApiError } from "@/lib/api-client";
 import { getSetting, upsertSetting, DEFAULT_ORDER_DUE_DATE_DAYS_KEY } from "@/lib/api/settings";
 
+/**
+ * The longest turnaround a shop can commit to here: two digits, so 99 days and no more. A tailoring
+ * order measured in months is not a turnaround, it is a typo — and the pre-filled collection date is
+ * what a customer is told.
+ */
+const MAX_ORDER_DURATION_DIGITS = 2;
+const MAX_ORDER_DURATION_DAYS = 10 ** MAX_ORDER_DURATION_DIGITS - 1;
+
+/**
+ * What a keystroke may leave in the field: digits only, and never a third one.
+ *
+ * Capped as it is typed rather than complained about on save — the third digit cannot mean anything
+ * here, so refusing it at the moment it happens says so more plainly than an error would.
+ */
+function toDaysText(raw: string): string {
+  return raw.replace(/\D/g, "").slice(0, MAX_ORDER_DURATION_DIGITS);
+}
+
 /** How far ahead a new order's due date is pre-filled. */
 export default function OrderDurationSettingsPage() {
   const { showToast } = useToast();
@@ -45,6 +63,10 @@ export default function OrderDurationSettingsPage() {
       setError("Enter a whole number of days greater than zero.");
       return;
     }
+    if (value > MAX_ORDER_DURATION_DAYS) {
+      setError(`Order duration can be at most ${MAX_ORDER_DURATION_DAYS} days.`);
+      return;
+    }
 
     setIsSaving(true);
     try {
@@ -62,18 +84,15 @@ export default function OrderDurationSettingsPage() {
       <h1 className="text-2xl font-semibold">Order Duration</h1>
 
       <form onSubmit={handleSave} className="flex max-w-xl flex-col gap-4 rounded-lg border border-border bg-surface p-6">
-        <p className="text-sm text-foreground/70">
-          When staff create a new order, the collection date is pre-filled this many days from today. They
-          can still change it on the order itself — this only sets the starting point.
-        </p>
         <Input
           id="orderDurationDays"
           label="Number of days"
           type="number"
           min="1"
+          max={MAX_ORDER_DURATION_DAYS}
           step="1"
           value={days}
-          onChange={(e) => setDays(e.target.value)}
+          onChange={(e) => setDays(toDaysText(e.target.value))}
           disabled={isLoading}
           placeholder="e.g. 5"
         />

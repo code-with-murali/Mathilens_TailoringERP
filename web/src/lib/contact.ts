@@ -59,6 +59,27 @@ export function toNationalDigits(raw: string): string {
 }
 
 /**
+ * A stored number as it should be read on screen — the ten digits, without the country code.
+ *
+ * <p>Storage stays canonical: `+91XXXXXXXXXX` is what the import, the WhatsApp module and the
+ * uniqueness checks all correlate on, and it is not this function's business to change that. But
+ * nobody at the counter says "+91" out loud, and it is noise in every table, every invoice and
+ * every "already exists" message. This is the seam — canonical below, ten digits wherever a
+ * person reads it.</p>
+ *
+ * <p>Mirrors `IndianPhoneNumber.ToDisplay` on the server, which does the same for the messages
+ * the server writes. Anything it cannot read is handed back untouched rather than trimmed: cutting
+ * an unrecognized number down would show a different, plausible number.</p>
+ */
+export function toDisplayPhoneNumber(raw: string | null | undefined): string {
+  if (!raw) {
+    return "";
+  }
+  const normalized = normalizePhoneNumber(raw);
+  return normalized === null ? raw.trim() : normalized.slice(COUNTRY_CODE.length);
+}
+
+/**
  * The message for a phone number that won't do, or null when it will.
  *
  * The wording matches the server's exactly, so a number caught here and a number caught there

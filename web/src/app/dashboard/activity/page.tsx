@@ -11,8 +11,14 @@ import {
   type ActivityLogFilters,
 } from "@/lib/api/activity";
 
+// w-full + min-w-0 so a filter is exactly its quarter of the row and nothing else. A <select> is
+// otherwise as wide as its longest option, and this page's User list holds whole email addresses —
+// one long enough to push the Screen filter off the side of the screen.
 const fieldClassName =
-  "rounded-md border border-border bg-surface px-3 py-2 text-sm outline-none transition-colors focus:border-primary focus:ring-2 focus:ring-primary/25";
+  "w-full min-w-0 rounded-md border border-border bg-surface px-3 py-2 text-sm outline-none transition-colors focus:border-primary focus:ring-2 focus:ring-primary/25";
+
+/** The two dropdowns, whose options can be longer than the space they get — shown clipped, not wide. */
+const selectClassName = `${fieldClassName} truncate`;
 
 /**
  * Where each recorded area sits in the menu.
@@ -136,15 +142,12 @@ export default function ActivityLogPage() {
 
   return (
     <div className="flex flex-col gap-6">
-      <div>
-        <h1 className="text-2xl font-semibold">Activity Log</h1>
-        <p className="mt-1 text-sm text-foreground/70">
-          Every change a person made — who did it and when. Viewing a page is not recorded, and nor is anything the
-          system does on its own.
-        </p>
-      </div>
+      <h1 className="text-2xl font-semibold">Activity Log</h1>
 
-      <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
+      {/* The two dates need only as much room as "mm/dd/yyyy" and its calendar button; the two
+          dropdowns hold email addresses and screen names and can use everything left over. Equal
+          quarters gave the dates half the row for ten characters and squeezed the rest. */}
+      <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-[9.5rem_9.5rem_minmax(0,1fr)_minmax(0,1fr)]">
         <div className="flex min-w-0 flex-col gap-1">
           <label htmlFor="fromDate" className="text-sm font-medium">
             From
@@ -177,7 +180,7 @@ export default function ActivityLogPage() {
             id="userFilter"
             value={userId}
             onChange={(e) => applyFilter(() => setUserId(e.target.value))}
-            className={fieldClassName}
+            className={selectClassName}
           >
             <option value="">All users</option>
             {filters.users.map((user) => (
@@ -195,7 +198,7 @@ export default function ActivityLogPage() {
             id="screenFilter"
             value={screen}
             onChange={(e) => applyFilter(() => setScreen(e.target.value))}
-            className={fieldClassName}
+            className={selectClassName}
           >
             <option value="">All screens</option>
             {/* The stored key is the value, the menu name is what is read — otherwise the filter
@@ -218,8 +221,28 @@ export default function ActivityLogPage() {
       ) : logs.length === 0 ? (
         <p className="text-sm text-foreground/70">No activity recorded for these filters.</p>
       ) : (
-        <div className="table-wrap overflow-x-auto rounded-lg border border-border">
-          <table className="stacked w-full text-left text-sm">
+        <div className="table-wrap rounded-lg border border-border">
+          {/* table-fixed, so the columns are the widths declared below and nothing else. Under the
+              browser's own (automatic) layout every column was as wide as the longest thing in it,
+              which meant the whole table changed shape with the data: one long email address or one
+              description of a price change and the table outgrew the page, taking the filter row
+              above it along — the Screen filter ended up off the side of the screen.
+
+              Percentages rather than rem, so the seven columns always add up to exactly the space
+              available and the table can never be wider than the box it sits in, at any window size.
+              Content too long for its share wraps, which is why nothing here is nowrap any more. */}
+          <table className="stacked w-full table-fixed text-left text-sm">
+            {/* Off below md, where .stacked turns every row into a card and there are no columns
+                left for a ruler to measure. */}
+            <colgroup className="hidden md:table-column-group">
+              <col className="w-[9%]" />
+              <col className="w-[10%]" />
+              <col className="w-[17%]" />
+              <col className="w-[11%]" />
+              <col className="w-[11%]" />
+              <col className="w-[13%]" />
+              <col className="w-[29%]" />
+            </colgroup>
             <thead className="border-b border-border bg-surface">
               <tr>
                 <th className="px-4 py-3 font-medium">Date</th>
@@ -239,27 +262,32 @@ export default function ActivityLogPage() {
                 const location = locationOf(log.screen);
                 return (
                   <tr key={log.id} className="border-b border-border last:border-0">
-                    <td data-label="Date" className="px-4 py-3 whitespace-nowrap">
+                    {/* break-words on every cell: a column is now a fixed share of the table, so
+                        anything that does not fit has to wrap inside it rather than widen it. It
+                        earns its keep on the unbroken strings this log is full of — an email
+                        address, a GUID, a cloth code — which have no space to wrap at. */}
+                    <td data-label="Date" className="px-4 py-3 break-words">
                       {occurred.toLocaleDateString()}
                     </td>
-                    <td data-label="Time" className="px-4 py-3 whitespace-nowrap">
+                    <td data-label="Time" className="px-4 py-3 break-words">
                       {occurred.toLocaleTimeString()}
                     </td>
-                    <td data-label="User" className="px-4 py-3 whitespace-nowrap">
+                    <td data-label="User" className="px-4 py-3 break-words">
                       {log.userName ?? "—"}
                     </td>
-                    <td data-label="Module" className="px-4 py-3 whitespace-nowrap">
+                    <td data-label="Module" className="px-4 py-3 break-words">
                       {location.module}
                     </td>
-                    <td data-label="Screen" className="px-4 py-3 whitespace-nowrap">
+                    <td data-label="Screen" className="px-4 py-3 break-words">
                       {location.screen}
                     </td>
-                    <td data-label="Action" className="px-4 py-3 whitespace-nowrap">
+                    <td data-label="Action" className="px-4 py-3 break-words">
                       {log.action}
                     </td>
-                    {/* The widest column by far, so it is the one allowed to wrap — but it stays
-                        one entry on one row. */}
-                    <td data-label="Description" className="px-4 py-3 text-foreground/80 md:min-w-[18rem]">
+                    {/* The widest column by far, and the one that actually needs the room — a long
+                        edit reads as several "field: from → to" pairs. It wraps to as many lines as
+                        it takes; it is still one entry on one row. */}
+                    <td data-label="Description" className="px-4 py-3 break-words text-foreground/80">
                       {describe(log)}
                     </td>
                   </tr>

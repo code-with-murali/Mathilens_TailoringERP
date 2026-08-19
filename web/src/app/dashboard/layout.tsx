@@ -94,6 +94,9 @@ const NAV_ITEMS: NavEntry[] = [
     label: "Settings",
     icon: SettingsIcon,
     children: [
+      // First, because it decides what the New Order screen asks for at all — every setting below
+      // it is a detail within the trade this one names.
+      { href: "/dashboard/settings/business-mode", label: "Business Mode", icon: ShopIcon, permission: PERMISSIONS.settingsView },
       { href: "/dashboard/settings/order-duration", label: "Order Duration", icon: ClockIcon, permission: PERMISSIONS.settingsView },
       // Sits next to Order Duration because the two decide the same thing between them: how far
       // ahead a collection date is pre-filled, and which days it is allowed to land on.
@@ -241,28 +244,72 @@ export default function DashboardLayout({ children }: LayoutProps<"/dashboard">)
         } ${isCollapsed ? "lg:w-16" : "lg:w-60"}`}
       >
         {/* Brand row doubles as the collapse control's home. Collapsed, the rail is only 4rem wide
-            — too narrow for logo and button side by side — so the brand link steps aside and the
-            toggle centres, staying the one visible affordance for expanding again. */}
+            — too narrow for a mark and the button side by side — so the two stack instead of the
+            brand stepping aside entirely: the shop is still identifiable at a glance, and the
+            toggle stays put directly beneath it as the affordance for expanding again. */}
+        {/* px-20, not px-5: the nav below indents its icons 24px from the rail edge (px-3 on the
+            list, px-3 again on each row), so at 20px the logo started 4px further left than every
+            item under it and the rail had no single left edge. 24px puts the logo on that same
+            line. Overridden by lg:px-2 when collapsed, where the mark is centred instead. */}
         <div
-          className={`flex items-center gap-2 border-b border-border px-5 py-4 ${
-            isCollapsed ? "lg:justify-center lg:px-2" : ""
+          className={`flex items-center gap-2 border-b border-border px-6 py-4 ${
+            isCollapsed ? "lg:flex-col lg:justify-center lg:gap-1 lg:px-2" : ""
           }`}
         >
           <Link
             href="/dashboard"
             className={`flex min-w-0 items-center gap-2.5 whitespace-nowrap text-sm font-semibold ${
-              isCollapsed ? "lg:hidden" : "flex-1"
+              isCollapsed ? "lg:justify-center" : "flex-1"
             }`}
           >
+            {/* Three ways this header can be branded, in order of what a shop has actually given us.
+                A logo set in Settings › Branding still wins — it is the per-shop escape hatch and
+                predates this — but it is a URL pointing at a square badge, so it keeps the badge
+                treatment and the name beside it.
+
+                Failing that, the shipped wordmark. It carries the shop's name inside the artwork,
+                so the text beside it is dropped: printing "Radha Fabric" next to a logo that
+                already reads RADHA FABRIC & TAILORING says it twice. The square R stands in when
+                the rail is collapsed, where a 2:1 lockup would shrink to an illegible smudge.
+
+                Failing both, the initial in a blue tile, exactly as before. */}
             {branding.logoUrl ? (
-              // eslint-disable-next-line @next/next/no-img-element -- an arbitrary shop-supplied URL can't be known to next/image at build time
-              <img src={branding.logoUrl} alt="" className="h-7 w-7 shrink-0 rounded-md object-contain" />
+              <>
+                {/* eslint-disable-next-line @next/next/no-img-element -- an arbitrary shop-supplied URL can't be known to next/image at build time */}
+                <img src={branding.logoUrl} alt="" className="h-7 w-7 shrink-0 rounded-md object-contain" />
+                <span className={isCollapsed ? "lg:hidden" : ""}>{branding.shopName || "Mathilens ERP"}</span>
+              </>
             ) : (
-              <span className="flex h-7 w-7 shrink-0 items-center justify-center rounded-md bg-primary text-xs font-bold text-primary-foreground">
-                {(branding.shopName || "Mathilens").charAt(0).toUpperCase()}
-              </span>
+              <>
+                {/* h-8, not h-9. The artwork is trimmed hard to the ink — it carries no white
+                    margin of its own — so its height is exactly the height of the lettering. At 36px
+                    that matched the toggle button beside it and therefore filled the whole content
+                    row, leaving the glyphs flush against the header's padding on every side. 32px
+                    hands back 2px top and bottom while the 36px button goes on setting the header's
+                    height, so nothing below it moves.
+
+                    Breathing room now reads even: 20px to the rail's left edge (px-5), 18px to the
+                    top and bottom of the header. w-auto keeps the 2.45:1 ratio — height is the only
+                    dimension set, so it cannot stretch or crop.
+
+                    max-w is a guard, not a size: the row has 156px for the logo once the toggle and
+                    the gap are taken out, and 144px can never squeeze it. The natural width here is
+                    78px, so it never binds. */}
+                {/* eslint-disable-next-line @next/next/no-img-element -- a plain public asset; next/image would add a loader for no benefit at this size */}
+                <img
+                  src="/logo.png"
+                  alt={branding.shopName || "Radha Fabric"}
+                  className={`h-8 w-auto max-w-[9rem] shrink-0 object-contain ${isCollapsed ? "lg:hidden" : ""}`}
+                />
+                {/* eslint-disable-next-line @next/next/no-img-element -- as above */}
+                <img
+                  src="/logo-mark.png"
+                  alt=""
+                  aria-hidden="true"
+                  className={`h-7 w-7 shrink-0 object-contain ${isCollapsed ? "hidden lg:block" : "hidden"}`}
+                />
+              </>
             )}
-            <span className={isCollapsed ? "lg:hidden" : ""}>{branding.shopName || "Mathilens ERP"}</span>
           </Link>
           <button
             type="button"
@@ -673,6 +720,17 @@ function ScissorsIcon({ className }: IconProps) {
       <circle cx="6" cy="6" r="2.5" />
       <circle cx="6" cy="18" r="2.5" />
       <path d="M8 7.5 20 18M20 6 8 16.5" />
+    </svg>
+  );
+}
+
+/** A shopfront under its awning — what the shop trades in, as opposed to any one order. */
+function ShopIcon({ className }: IconProps) {
+  return (
+    <svg className={className} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+      <path d="M3 9h18l-1.5-5h-15L3 9Z" />
+      <path d="M4.5 9v11h15V9" />
+      <path d="M10 20v-6h4v6" />
     </svg>
   );
 }

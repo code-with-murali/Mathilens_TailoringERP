@@ -20,6 +20,17 @@ public class ClothPriceRepository : IClothPriceRepository
     public Task<ClothPrice?> GetByClothCodeAsync(string clothCode, CancellationToken cancellationToken) =>
         _dbContext.ClothPrices.SingleOrDefaultAsync(c => EF.Functions.ILike(c.ClothCode, clothCode), cancellationToken);
 
+    /// <summary>
+    /// Reaches across to the orders' fabric rows, the same way ClothReceiptRepository does for the
+    /// stock figures — the link is FabricDetails.ClothPriceId, which the create-order handler fills
+    /// in only when the typed cloth code matched a real catalogue entry.
+    ///
+    /// <para>The global soft-delete filters already exclude removed items and deleted orders, so a
+    /// price used only by an order that has since been deleted is free to go.</para>
+    /// </summary>
+    public Task<bool> IsUsedOnAnyOrderAsync(Guid clothPriceId, CancellationToken cancellationToken) =>
+        _dbContext.FabricDetails.AnyAsync(f => f.ClothPriceId == clothPriceId, cancellationToken);
+
     public async Task<PagedResult<ClothPrice>> SearchAsync(string? searchTerm, int page, int pageSize, CancellationToken cancellationToken)
     {
         var query = _dbContext.ClothPrices.AsQueryable();

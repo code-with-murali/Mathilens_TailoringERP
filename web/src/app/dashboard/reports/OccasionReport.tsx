@@ -16,6 +16,7 @@ import {
   type OccasionScope,
   type OccasionType,
 } from "@/lib/api/occasions";
+import { toDisplayPhoneNumber } from "@/lib/contact";
 
 const fieldClassName =
   "rounded-md border border-border bg-surface px-3 py-2 text-sm outline-none transition-colors focus:border-primary focus:ring-2 focus:ring-primary/25";
@@ -239,7 +240,7 @@ export function OccasionReport({
               {rows.map((row) => (
                 <tr key={row.customerId} className="border-b border-border align-top last:border-0">
                   <td data-label="Customer" className="px-4 py-3">{row.fullName}</td>
-                  <td data-label="Phone" className="px-4 py-3 text-foreground/70">{row.phoneNumber}</td>
+                  <td data-label="Phone" className="px-4 py-3 text-foreground/70">{toDisplayPhoneNumber(row.phoneNumber)}</td>
                   <td data-label="Date" className="px-4 py-3">{new Date(row.occasionOn).toLocaleDateString()}</td>
                   <td data-label="When" className="px-4 py-3 text-foreground/70">{whenLabel(row.daysAway)}</td>
                   <td data-label={milestoneLabel} className="px-4 py-3 text-foreground/70">{row.yearsCompleted ?? "—"}</td>

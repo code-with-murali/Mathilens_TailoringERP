@@ -23,16 +23,15 @@ public sealed class UpdateCustomerCommandHandler : ICommandHandler<UpdateCustome
                 Error.NotFound("Customer.NotFound", $"No customer was found with id '{command.Id}'."));
         }
 
-        // Canonical form before comparing, for the reason given in the create handler.
+        // Canonical form before comparing, for the reason given in CustomerUniqueness.
         var phoneNumber = IndianPhoneNumber.Normalize(command.PhoneNumber);
 
-        // Same uniqueness rule as create — but the customer's own current number is not a clash.
-        var duplicate = await _customerRepository.GetByPhoneNumberAsync(phoneNumber, cancellationToken);
-        if (duplicate is not null && duplicate.Id != command.Id)
+        // Same uniqueness rule as create — but the customer's own current details are not a clash.
+        var conflict = await CustomerUniqueness.FindConflictAsync(
+            _customerRepository, phoneNumber, command.Email, command.Id, cancellationToken);
+        if (conflict is { } error)
         {
-            return Result.Failure<CustomerDto>(Error.Conflict(
-                "Customer.DuplicatePhoneNumber",
-                $"A customer with mobile number '{phoneNumber}' already exists ({duplicate.FullName})."));
+            return Result.Failure<CustomerDto>(error);
         }
 
         customer.UpdateDetails(

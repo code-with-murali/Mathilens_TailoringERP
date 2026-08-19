@@ -107,7 +107,11 @@ export default function WorkingDaysSettingsPage() {
 
     setIsSaving(true);
     try {
-      await saveShopCalendar({ weeklyOffDays, holidays }, getAccessToken());
+      // upcomingHolidays, not holidays: saving is what clears out the dates that have passed, so
+      // the setting holds what the screen shows rather than that plus a growing tail of last
+      // year's festivals.
+      await saveShopCalendar({ weeklyOffDays, holidays: upcomingHolidays }, getAccessToken());
+      setHolidays(upcomingHolidays);
       showToast("Working days saved.");
     } catch (err) {
       setError(err instanceof ApiError ? err.message : "Unable to save these settings.");
@@ -116,10 +120,12 @@ export default function WorkingDaysSettingsPage() {
     }
   }
 
-  // Past holidays stay saved but are not worth a row — last year's Diwali tells nobody anything.
+  // A holiday that has been and gone can no longer change anything: the only thing that reads this
+  // list is nextOpenDay, walking forward from a collection date that is always in the future. So a
+  // past date is not hidden data, it is spent data — it is dropped from the list here and written
+  // out of the setting on the next save, rather than kept in a row nobody can see or remove.
   const today = toIsoDate(new Date());
   const upcomingHolidays = holidays.filter((holiday) => holiday.date >= today);
-  const pastCount = holidays.length - upcomingHolidays.length;
 
   return (
     <div className="flex flex-col gap-6">
@@ -127,13 +133,7 @@ export default function WorkingDaysSettingsPage() {
 
       <form onSubmit={handleSave} className="flex max-w-xl flex-col gap-6 rounded-lg border border-border bg-surface p-6">
         <div className="flex flex-col gap-3">
-          <div className="flex flex-col gap-1">
-            <h2 className="text-sm font-medium">Weekly off</h2>
-            <p className="text-sm text-foreground/70">
-              Tick the days the shop is closed every week. A new order&apos;s collection date never lands
-              on one — it moves to the next day the shop is open.
-            </p>
-          </div>
+          <h2 className="text-sm font-medium">Weekly off</h2>
           <div className="flex flex-wrap gap-2">
             {WEEKDAYS.map((day) => {
               const isOff = weeklyOffDays.includes(day.value);
@@ -239,11 +239,6 @@ export default function WorkingDaysSettingsPage() {
             </ul>
           )}
 
-          {pastCount > 0 && (
-            <p className="text-sm text-foreground/70">
-              {pastCount} past {pastCount === 1 ? "holiday is" : "holidays are"} saved but not shown.
-            </p>
-          )}
         </div>
 
         {error && (

@@ -49,6 +49,17 @@ public class CustomerRepository : ICustomerRepository
     public Task<Customer?> GetByPhoneNumberAsync(string phoneNumber, CancellationToken cancellationToken) =>
         _dbContext.Customers.FirstOrDefaultAsync(c => c.PhoneNumber == phoneNumber, cancellationToken);
 
+    public Task<Customer?> GetByEmailAsync(string email, CancellationToken cancellationToken)
+    {
+        // Lowered on both sides rather than matched with ILIKE, for the reason spelled out in
+        // FindPotentialDuplicatesAsync below: an underscore is legal in an address and ILIKE would
+        // read it as a wildcard.
+        var lowered = email.Trim().ToLowerInvariant();
+        return _dbContext.Customers.FirstOrDefaultAsync(
+            c => c.Email != null && c.Email.ToLower() == lowered,
+            cancellationToken);
+    }
+
     public async Task<IReadOnlyList<Customer>> FindPotentialDuplicatesAsync(
         string? phoneNumber,
         string? email,

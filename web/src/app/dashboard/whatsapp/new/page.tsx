@@ -11,6 +11,7 @@ import { getAccessToken } from "@/lib/auth";
 import { ApiError } from "@/lib/api-client";
 import { searchCustomers, type Customer } from "@/lib/api/customers";
 import { sendWhatsAppMessage, WHATSAPP_MESSAGE_TYPES, type WhatsAppMessageType } from "@/lib/api/whatsapp";
+import { toDisplayPhoneNumber } from "@/lib/contact";
 
 export default function NewWhatsAppMessagePage() {
   const router = useRouter();
@@ -59,12 +60,12 @@ export default function NewWhatsAppMessagePage() {
         <SearchPicker
           id="customer"
           label="Customer"
-          selectedLabel={customer ? `${customer.fullName} (${customer.phoneNumber})` : null}
+          selectedLabel={customer ? `${customer.fullName} (${toDisplayPhoneNumber(customer.phoneNumber)})` : null}
           onSelect={setCustomer}
           onClear={() => setCustomer(null)}
           search={searchCustomers}
           getId={(c) => c.id}
-          getLabel={(c) => `${c.fullName} (${c.phoneNumber})`}
+          getLabel={(c) => `${c.fullName} (${toDisplayPhoneNumber(c.phoneNumber)})`}
           placeholder="Search customers…"
         />
 

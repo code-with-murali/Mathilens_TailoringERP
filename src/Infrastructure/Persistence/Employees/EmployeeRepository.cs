@@ -46,6 +46,16 @@ public class EmployeeRepository : IEmployeeRepository
     public Task<Employee?> GetByPhoneNumberAsync(string phoneNumber, CancellationToken cancellationToken) =>
         _dbContext.Employees.FirstOrDefaultAsync(e => e.PhoneNumber == phoneNumber, cancellationToken);
 
+    public Task<Employee?> GetByEmailAsync(string email, CancellationToken cancellationToken)
+    {
+        // Lowered on both sides rather than matched with ILIKE: an underscore is legal in an
+        // address and ILIKE would read it as a single-character wildcard.
+        var lowered = email.Trim().ToLowerInvariant();
+        return _dbContext.Employees.FirstOrDefaultAsync(
+            e => e.Email != null && e.Email.ToLower() == lowered,
+            cancellationToken);
+    }
+
     public Task<Employee?> GetByEmployeeCodeAsync(string employeeCode, CancellationToken cancellationToken) =>
         _dbContext.Employees.FirstOrDefaultAsync(e => EF.Functions.ILike(e.EmployeeCode, employeeCode), cancellationToken);
 

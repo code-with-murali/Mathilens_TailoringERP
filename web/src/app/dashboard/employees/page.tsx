@@ -21,6 +21,7 @@ import {
   EMPLOYMENT_TYPE_LABELS,
   type Employee,
 } from "@/lib/api/employees";
+import { toDisplayPhoneNumber } from "@/lib/contact";
 
 /** yyyy-MM-dd off the local calendar — a last working day is a day in the shop, not a UTC instant. */
 function todayIsoDate(): string {
@@ -164,7 +165,7 @@ export default function EmployeesPage() {
                     {employee.jobTitle ?? "—"}
                   </td>
                   <td data-label="Phone" className="px-4 py-3">
-                    {employee.phoneNumber}
+                    {toDisplayPhoneNumber(employee.phoneNumber)}
                   </td>
                   <td data-label="Type" className="px-4 py-3 whitespace-nowrap">
                     {EMPLOYMENT_TYPE_LABELS[employee.employmentType]}

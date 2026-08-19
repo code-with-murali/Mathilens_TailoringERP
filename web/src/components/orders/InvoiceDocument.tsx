@@ -12,6 +12,7 @@ import {
 import type { Invoice } from "@/lib/api/billing";
 import type { Order } from "@/lib/api/orders";
 import type { Customer } from "@/lib/api/customers";
+import { toDisplayPhoneNumber } from "@/lib/contact";
 
 function money(amount: number): string {
   return amount.toFixed(2);
@@ -102,7 +103,7 @@ export function InvoiceDocument({
       <Line label="Date" value={showDate(invoice.createdAtUtc)} />
       <Line label="Order" value={orderNumber} />
       <Line label="Customer" value={customer.fullName} />
-      <Line label="Phone" value={customer.phoneNumber} />
+      <Line label="Phone" value={toDisplayPhoneNumber(customer.phoneNumber)} />
 
       <Rule />
 

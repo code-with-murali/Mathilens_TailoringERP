@@ -12,11 +12,26 @@ import {
 } from "@/lib/api/tailoring-rates";
 import { getGarments, type Garment } from "@/lib/api/garments";
 
-/** Digits and at most two decimal places — a price, as it is being typed. */
+/**
+ * The most a garment may be priced at: four digits, so 9,999 and no more.
+ *
+ * A stitching charge is tens or hundreds of rupees. The field took any number at all, which made a
+ * stuck key a mistake that nothing noticed until an order was priced from it.
+ */
+export const MAX_TAILORING_RATE_DIGITS = 4;
+const MAX_TAILORING_RATE = 10 ** MAX_TAILORING_RATE_DIGITS - 1;
+
+/**
+ * Digits and at most two decimal places — a price, as it is being typed.
+ *
+ * The whole part is capped as it is typed rather than complained about on save: there is nothing
+ * useful the sixth digit could mean, and refusing the keystroke says so at the moment it happens.
+ */
 function toAmountText(raw: string): string {
   const cleaned = raw.replace(/[^\d.]/g, "");
   const [whole, ...rest] = cleaned.split(".");
-  return rest.length === 0 ? whole : `${whole}.${rest.join("").slice(0, 2)}`;
+  const capped = whole.slice(0, MAX_TAILORING_RATE_DIGITS);
+  return rest.length === 0 ? capped : `${capped}.${rest.join("").slice(0, 2)}`;
 }
 
 /**
@@ -100,9 +115,16 @@ export default function TailoringCostSettingsPage() {
     const next: TailoringRates = {};
     for (const garment of garments) {
       const price = priceOf(amounts[garment.name] ?? "");
-      if (price !== undefined) {
-        next[garment.name] = price;
+      if (price === undefined) {
+        continue;
       }
+      // Backstop to the typing cap above, which the decimal places can still slip past — "99999.99"
+      // is five whole digits and over the limit.
+      if (price > MAX_TAILORING_RATE) {
+        setError(`${garment.name}: a price can be at most ${MAX_TAILORING_RATE.toLocaleString()}.`);
+        return;
+      }
+      next[garment.name] = price;
     }
 
     setIsSaving(true);

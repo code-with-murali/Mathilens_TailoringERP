@@ -14,6 +14,7 @@ internal static class EmployeeUniqueness
         IEmployeeRepository employeeRepository,
         string employeeCode,
         string phoneNumber,
+        string? email,
         Guid? excludeId,
         CancellationToken cancellationToken)
     {
@@ -47,7 +48,25 @@ internal static class EmployeeUniqueness
         {
             return Error.Conflict(
                 "Employee.DuplicatePhoneNumber",
-                $"An employee with mobile number '{canonical}' already exists ({byPhone.FullName}).");
+                // Quoted as the ten digits that were typed, not the stored canonical form — a
+                // message naming a number the operator does not recognize reads as being about
+                // somebody else's record.
+                $"An employee with mobile number '{IndianPhoneNumber.ToDisplay(canonical)}' already exists ({byPhone.FullName}).");
+        }
+
+        // Email is optional, and blank is not a value two employees can collide on.
+        if (string.IsNullOrWhiteSpace(email))
+        {
+            return null;
+        }
+
+        var address = email.Trim();
+        var byEmail = await employeeRepository.GetByEmailAsync(address, cancellationToken);
+        if (byEmail is not null && byEmail.Id != excludeId)
+        {
+            return Error.Conflict(
+                "Employee.DuplicateEmail",
+                $"An employee with email '{address}' already exists ({byEmail.FullName}).");
         }
 
         return null;

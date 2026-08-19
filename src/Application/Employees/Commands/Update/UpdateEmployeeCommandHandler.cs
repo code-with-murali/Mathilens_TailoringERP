@@ -24,7 +24,7 @@ public sealed class UpdateEmployeeCommandHandler : ICommandHandler<UpdateEmploye
 
         // Same uniqueness rule as create — but this employee's own code and number aren't clashes.
         var duplicate = await EmployeeUniqueness.FindConflictAsync(
-            _employeeRepository, command.EmployeeCode, command.PhoneNumber, command.Id, cancellationToken);
+            _employeeRepository, command.EmployeeCode, command.PhoneNumber, command.Email, command.Id, cancellationToken);
         if (duplicate is not null)
         {
             return Result.Failure<EmployeeDto>(duplicate);

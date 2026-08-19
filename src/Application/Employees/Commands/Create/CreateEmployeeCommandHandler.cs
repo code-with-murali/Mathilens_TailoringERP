@@ -20,7 +20,7 @@ public sealed class CreateEmployeeCommandHandler : ICommandHandler<CreateEmploye
         // conflict rather than a save. Soft-deleted employees sit outside the global query
         // filter, so a code or number belonging only to a deleted record is free to reuse.
         var duplicate = await EmployeeUniqueness.FindConflictAsync(
-            _employeeRepository, command.EmployeeCode, command.PhoneNumber, excludeId: null, cancellationToken);
+            _employeeRepository, command.EmployeeCode, command.PhoneNumber, command.Email, excludeId: null, cancellationToken);
         if (duplicate is not null)
         {
             return Result.Failure<EmployeeDto>(duplicate);

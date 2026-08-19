@@ -22,6 +22,7 @@ import {
   type Customer,
   type Religion,
 } from "@/lib/api/customers";
+import { toDisplayPhoneNumber } from "@/lib/contact";
 
 const filterClassName =
   "rounded-md border border-border bg-surface px-3 py-2 text-sm outline-none transition-colors focus:border-primary focus:ring-2 focus:ring-primary/25";
@@ -207,7 +208,7 @@ export default function CustomersPage() {
                       href={`/dashboard/customers/${customer.id}`}
                       className="font-medium text-primary underline underline-offset-2 hover:text-primary-hover"
                     >
-                      {customer.phoneNumber}
+                      {toDisplayPhoneNumber(customer.phoneNumber)}
                     </Link>
                   </td>
                   <td data-label="Name" className="px-4 py-3">

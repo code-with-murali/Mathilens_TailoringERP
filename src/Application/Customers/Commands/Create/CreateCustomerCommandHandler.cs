@@ -17,21 +17,14 @@ public sealed class CreateCustomerCommandHandler : ICommandHandler<CreateCustome
 
     public async Task<Result<CustomerDto>> Handle(CreateCustomerCommand command, CancellationToken cancellationToken)
     {
-        // Compared in canonical form, not as typed. The stored numbers are all +91XXXXXXXXXX, so
-        // looking up the raw "8220070363" would find nothing and happily create the duplicate this
-        // check exists to prevent.
+        // Canonical form before anything compares it — see CustomerUniqueness for why.
         var phoneNumber = IndianPhoneNumber.Normalize(command.PhoneNumber);
 
-        // The phone number identifies a customer at the counter and is what the WhatsApp module
-        // and spreadsheet import both correlate on — two customers sharing one would make all
-        // three ambiguous. Soft-deleted customers are outside the query filter, so a number
-        // belonging only to a deleted record is free to reuse.
-        var existing = await _customerRepository.GetByPhoneNumberAsync(phoneNumber, cancellationToken);
-        if (existing is not null)
+        var conflict = await CustomerUniqueness.FindConflictAsync(
+            _customerRepository, phoneNumber, command.Email, excludeId: null, cancellationToken);
+        if (conflict is { } error)
         {
-            return Result.Failure<CustomerDto>(Error.Conflict(
-                "Customer.DuplicatePhoneNumber",
-                $"A customer with mobile number '{phoneNumber}' already exists ({existing.FullName})."));
+            return Result.Failure<CustomerDto>(error);
         }
 
         var customer = Customer.Create(

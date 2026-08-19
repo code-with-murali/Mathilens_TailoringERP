@@ -62,7 +62,7 @@ public sealed class ImportEmployeesCommandHandler : ICommandHandler<ImportEmploy
                 // A row whose phone number belongs to a *different* employee is a row error, not
                 // a silent overwrite of somebody else's contact details.
                 var conflict = await EmployeeUniqueness.FindConflictAsync(
-                    _employeeRepository, row.EmployeeCode, row.PhoneNumber, existing?.Id, cancellationToken);
+                    _employeeRepository, row.EmployeeCode, row.PhoneNumber, row.Email, existing?.Id, cancellationToken);
                 if (conflict is not null)
                 {
                     errors.Add(new ImportRowErrorDto(row.RowNumber, conflict.Message));

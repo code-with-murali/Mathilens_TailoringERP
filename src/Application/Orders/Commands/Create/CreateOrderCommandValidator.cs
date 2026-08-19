@@ -1,5 +1,6 @@
 using FluentValidation;
 using MathilensERP.Application.Common.Validation;
+using MathilensERP.Shared.Constants;
 
 namespace MathilensERP.Application.Orders.Commands.Create;
 
@@ -33,7 +34,8 @@ public sealed class CreateOrderItemInputValidator : AbstractValidator<CreateOrde
             .MustBeAGarmentName();
 
         RuleFor(x => x.Quantity)
-            .GreaterThan(0);
+            .GreaterThan(0)
+            .LessThanOrEqualTo(OrderLimits.MaxItemQuantity);
 
         RuleFor(x => x.UnitPrice)
             .GreaterThan(0);

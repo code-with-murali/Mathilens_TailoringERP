@@ -26,6 +26,20 @@ public sealed class DeleteClothPriceCommandHandler : ICommandHandler<DeleteCloth
                 Error.NotFound("ClothPrice.NotFound", $"No price was found with id '{command.Id}'."));
         }
 
+        // A price an order was cut from is not the shop's to remove. Deleting it is a soft delete,
+        // so the row survives and nothing breaks at the database — but every screen reads through
+        // the query filter, so the order would show a cloth code that no longer resolves to
+        // anything, and the stock figures would stop counting what that order took out.
+        //
+        // Refused rather than cascaded: the shop's answer to "we do not sell this any more" is to
+        // stop using the code, not to erase the orders that already did.
+        if (await _clothPriceRepository.IsUsedOnAnyOrderAsync(command.Id, cancellationToken))
+        {
+            return Result.Failure(Error.Conflict(
+                "ClothPrice.InUse",
+                $"'{clothPrice.ClothCode}' is used on one or more orders and can't be deleted. Edit the price instead, or stop using the code on new orders."));
+        }
+
         var deletedBy = _currentUserService.UserId ?? SystemUsers.SystemUserId;
         clothPrice.SoftDelete(deletedBy, DateTime.UtcNow);
 

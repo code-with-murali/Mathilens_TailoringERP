@@ -16,6 +16,16 @@ public interface IClothPriceRepository
     /// <summary>Every price, unpaginated — for spreadsheet export, which has no page to scroll.</summary>
     Task<IReadOnlyList<ClothPrice>> ListAllAsync(CancellationToken cancellationToken);
 
+    /// <summary>
+    /// Whether any order was cut from this cloth — what stands between a price and being deleted.
+    ///
+    /// <para>Counts every order that used it, cancelled ones included: a cancelled order still
+    /// records what it was going to be made from, and the stock it released was released against
+    /// this entry. Deleting the price out from under any of them leaves an order naming a cloth
+    /// the shop can no longer look up.</para>
+    /// </summary>
+    Task<bool> IsUsedOnAnyOrderAsync(Guid clothPriceId, CancellationToken cancellationToken);
+
     void Add(ClothPrice clothPrice);
 
     Task SaveChangesAsync(CancellationToken cancellationToken);
