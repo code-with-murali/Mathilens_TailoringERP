@@ -26,6 +26,11 @@ jobs:
           # hosted URL (it currently falls back to localhost:5232, which won't resolve for
           # anyone but a local dev). Set via: gh variable set NEXT_PUBLIC_API_BASE_URL --body "..."
           NEXT_PUBLIC_API_BASE_URL: ${{ vars.NEXT_PUBLIC_API_BASE_URL }}
+          # The shop this deployment is customised for — the wordmark on the login screen. It was
+          # missing here, so every build fell back to the name compiled into lib/customer.ts and no
+          # database setting could change it; Shop.Name governs the rest of the app but not this.
+          # Set via: gh variable set NEXT_PUBLIC_CUSTOMER_NAME --body "..."
+          NEXT_PUBLIC_CUSTOMER_NAME: ${{ vars.NEXT_PUBLIC_CUSTOMER_NAME }}
         with:
           azure_static_web_apps_api_token: ${{ secrets.AZURE_STATIC_WEB_APPS_API_TOKEN_SWA_MATHILENS_ERP }}
           repo_token: ${{ secrets.GITHUB_TOKEN }}
