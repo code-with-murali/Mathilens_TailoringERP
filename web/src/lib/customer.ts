@@ -16,4 +16,4 @@
  * The fallback is the current deployment, so a build that forgets the variable still says something
  * true rather than showing an empty wordmark.
  */
-export const CUSTOMER_NAME = process.env.NEXT_PUBLIC_CUSTOMER_NAME?.trim() || "Radha Fabric";
+export const CUSTOMER_NAME = process.env.NEXT_PUBLIC_CUSTOMER_NAME?.trim() || "Radha Men's";
