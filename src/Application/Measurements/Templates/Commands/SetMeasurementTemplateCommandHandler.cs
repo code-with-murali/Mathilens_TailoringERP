@@ -20,7 +20,7 @@ public sealed class SetMeasurementTemplateCommandHandler
         SetMeasurementTemplateCommand command,
         CancellationToken cancellationToken)
     {
-        var points = command.Points.Select(p => p.Trim()).ToList();
+        var points = command.Points.Select(p => p with { Name = p.Name.Trim() }).ToList();
         var key = MeasurementTemplateKeys.For(command.GarmentType);
         var json = JsonSerializer.Serialize(points);
 

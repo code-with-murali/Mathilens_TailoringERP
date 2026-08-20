@@ -24,6 +24,11 @@ public class MeasurementConfiguration : IEntityTypeConfiguration<Measurement>
 
         builder.Ignore(m => m.Values);
 
+        // Nullable, and generous: a fitting note is a sentence or two, but it is the tailor's own
+        // words and a cap they can hit while writing one is a cap in the wrong place.
+        builder.Property(m => m.Notes)
+            .HasMaxLength(1000);
+
         builder.Property(m => m.CreatedBy).IsRequired();
         builder.Property(m => m.CreatedAtUtc).IsRequired();
 

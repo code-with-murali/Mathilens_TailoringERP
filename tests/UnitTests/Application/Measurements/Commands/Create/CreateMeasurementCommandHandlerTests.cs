@@ -9,7 +9,7 @@ namespace MathilensERP.UnitTests.Application.Measurements.Commands.Create;
 
 public class CreateMeasurementCommandHandlerTests
 {
-    private static readonly Dictionary<string, decimal> Values = new() { ["Chest"] = 40 };
+    private static readonly Dictionary<string, MeasurementValue> Values = new() { ["Chest"] = MeasurementValue.FromNumber(40m) };
 
     [Fact]
     public async Task Handle_WithExistingCustomerAndNoExistingMeasurement_CreatesMeasurement()

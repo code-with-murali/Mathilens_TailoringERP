@@ -10,6 +10,8 @@ import { ConfirmDialog } from "@/components/ui/ConfirmDialog";
 import { useToast } from "@/components/ui/ToastProvider";
 import { InvoiceDocument } from "@/components/orders/InvoiceDocument";
 import { InvoicePrintModal } from "@/components/orders/InvoicePrintModal";
+import { ShareViaWhatsAppButton } from "@/components/whatsapp/ShareViaWhatsAppButton";
+import { useBranding } from "@/lib/use-branding";
 import { OrderWorkflow } from "./OrderWorkflow";
 import { getAccessToken } from "@/lib/auth";
 import { useRouteId } from "@/lib/use-route-id";
@@ -50,6 +52,8 @@ const EMPLOYEE_PAGE_LIMIT = 5;
 export default function OrderDetailPage() {
   const orderId = useRouteId();
   const { showToast } = useToast();
+  // The shop's name, for the WhatsApp message to greet and sign off with.
+  const branding = useBranding();
   const [order, setOrder] = useState<Order | null>(null);
   const [customer, setCustomer] = useState<Customer | null>(null);
   const [assignedEmployee, setAssignedEmployee] = useState<Employee | null>(null);
@@ -570,6 +574,14 @@ export default function OrderDetailPage() {
                   >
                     Print Invoice
                   </Button>
+                  {/* Beside the invoice actions, as 10 asks: this is another way of handing the
+                      customer the same document. */}
+                  <ShareViaWhatsAppButton
+                    customer={customer}
+                    invoice={activeInvoice}
+                    order={{ orderNumber: order.orderNumber, dueAtUtc: order.dueAtUtc }}
+                    shopName={branding.shopName || "Mathilens"}
+                  />
                 </div>
               </div>
             ) : (

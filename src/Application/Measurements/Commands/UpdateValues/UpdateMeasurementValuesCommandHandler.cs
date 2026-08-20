@@ -32,6 +32,7 @@ public sealed class UpdateMeasurementValuesCommandHandler : ICommandHandler<Upda
         _measurementRepository.AddHistory(snapshot);
 
         measurement.UpdateValues(command.Values);
+        measurement.UpdateNotes(command.Notes);
 
         await _measurementRepository.SaveChangesAsync(cancellationToken);
 

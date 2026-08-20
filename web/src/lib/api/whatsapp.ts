@@ -1,4 +1,4 @@
-import { apiGet, apiGetPaged, apiPost } from "@/lib/api-client";
+import { apiGet, apiGetPaged, apiPost, apiPostNoContent } from "@/lib/api-client";
 
 export const WHATSAPP_MESSAGE_TYPES = ["OrderStatusUpdate", "DeliveryReminder", "Custom"] as const;
 export type WhatsAppMessageType = (typeof WHATSAPP_MESSAGE_TYPES)[number];
@@ -51,4 +51,18 @@ export function sendWhatsAppMessage(
   token: string | null,
 ) {
   return apiPost<WhatsAppMessage>("/api/v1/whatsapp-messages", { customerId, orderId, messageType, content }, token);
+}
+
+/**
+ * Notes that staff opened WhatsApp to share an invoice.
+ *
+ * Deliberately not "sent": the shop presses Send inside WhatsApp, on another company's servers, and
+ * this application never learns whether they did. The Activity Log records the share being started
+ * and claims nothing further.
+ */
+export function recordWhatsAppShareOpened(
+  input: { customerId: string; orderNumber: string; invoiceNumber: string },
+  token: string | null,
+): Promise<void> {
+  return apiPostNoContent("/api/v1/whatsapp-messages/share-opened", input, token);
 }

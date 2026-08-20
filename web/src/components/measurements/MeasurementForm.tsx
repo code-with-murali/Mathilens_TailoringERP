@@ -7,13 +7,15 @@ import { type GarmentType } from "@/lib/api/measurements";
 import { getGarments } from "@/lib/api/garments";
 import { getAccessToken } from "@/lib/auth";
 import { MeasurementValuesEditor, type ValueRowInput } from "./MeasurementValuesEditor";
+import { toMeasurementValue } from "@/components/measurements/MeasurementPointInput";
+import type { MeasurementValue } from "@/lib/api/measurements";
 
 type MeasurementFormProps = {
   /** Fixed (and the select disabled) when editing — a measurement's garment type never changes after creation. */
   garmentType?: GarmentType;
-  initialValues?: Record<string, number>;
+  initialValues?: Record<string, MeasurementValue>;
   submitLabel: string;
-  onSubmit: (garmentType: GarmentType, values: Record<string, number>) => Promise<void>;
+  onSubmit: (garmentType: GarmentType, values: Record<string, MeasurementValue>) => Promise<void>;
 };
 
 export function MeasurementForm({ garmentType: fixedGarmentType, initialValues, submitLabel, onSubmit }: MeasurementFormProps) {
@@ -58,19 +60,19 @@ export function MeasurementForm({ garmentType: fixedGarmentType, initialValues, 
     event.preventDefault();
     setFormError(null);
 
-    const values: Record<string, number> = {};
+    const values: Record<string, MeasurementValue> = {};
     for (const row of rows) {
-      if (row.value.trim() === "") {
-        // Fixed fields are individually optional — skip the ones not measured yet, rather than
-        // forcing every point to be filled in before anything can be saved.
+      // Points are individually optional — one nobody has filled in is skipped rather than
+      // blocking the save. A checkbox is never skipped, because "no" is an answer.
+      const value = toMeasurementValue(row.point, row.value);
+      if (value === null) {
+        if (row.point.type === "Number" && row.value.trim() !== "") {
+          setFormError(`"${row.point.name}" needs a value greater than zero.`);
+          return;
+        }
         continue;
       }
-      const numericValue = Number(row.value);
-      if (!Number.isFinite(numericValue) || numericValue <= 0) {
-        setFormError(`"${row.name}" needs a value greater than zero.`);
-        return;
-      }
-      values[row.name] = numericValue;
+      values[row.point.name] = value;
     }
 
     if (Object.keys(values).length === 0) {

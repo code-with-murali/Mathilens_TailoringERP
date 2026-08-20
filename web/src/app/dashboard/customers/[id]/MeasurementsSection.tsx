@@ -8,6 +8,7 @@ import { useToast } from "@/components/ui/ToastProvider";
 import { getAccessToken } from "@/lib/auth";
 import { ApiError } from "@/lib/api-client";
 import { listMeasurementsForCustomer, createMeasurement, updateMeasurementValues, type Measurement, type GarmentType } from "@/lib/api/measurements";
+import { formatMeasurementValue, type MeasurementValue } from "@/lib/api/measurements";
 
 type FormState = { mode: "create" } | { mode: "edit"; measurement: Measurement } | null;
 
@@ -39,14 +40,14 @@ export function MeasurementsSection({ customerId }: { customerId: string }) {
     load();
   }, [load]);
 
-  async function handleCreate(garmentType: GarmentType, values: Record<string, number>) {
+  async function handleCreate(garmentType: GarmentType, values: Record<string, MeasurementValue>) {
     await createMeasurement(customerId, garmentType, values, getAccessToken());
     showToast("Measurement added.");
     setFormState(null);
     await load();
   }
 
-  async function handleUpdate(measurementId: string, values: Record<string, number>) {
+  async function handleUpdate(measurementId: string, values: Record<string, MeasurementValue>) {
     await updateMeasurementValues(measurementId, values, getAccessToken());
     showToast("Measurement updated.");
     setFormState(null);
@@ -80,7 +81,7 @@ export function MeasurementsSection({ customerId }: { customerId: string }) {
                 <span className="font-medium">{measurement.garmentType}</span>
                 <span className="ml-2 text-foreground/70">
                   {Object.entries(measurement.values)
-                    .map(([name, value]) => `${name}: ${value}`)
+                    .map(([name, value]) => `${name}: ${formatMeasurementValue(value)}`)
                     .join(", ")}
                 </span>
               </div>

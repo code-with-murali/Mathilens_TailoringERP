@@ -20,6 +20,8 @@ import {
 } from "@/lib/api/billing";
 import { getOrder, type Order } from "@/lib/api/orders";
 import { getCustomer, type Customer } from "@/lib/api/customers";
+import { ShareViaWhatsAppButton } from "@/components/whatsapp/ShareViaWhatsAppButton";
+import { useBranding } from "@/lib/use-branding";
 import {
   getInvoiceSettings,
   formatInvoiceDate,
@@ -38,6 +40,8 @@ function invoiceNumber(invoice: Invoice) {
 export default function InvoiceDetailPage() {
   const invoiceId = useRouteId();
   const { showToast } = useToast();
+  // The shop's name, for the WhatsApp message to greet and sign off with.
+  const branding = useBranding();
   const [invoice, setInvoice] = useState<Invoice | null>(null);
   const [order, setOrder] = useState<Order | null>(null);
   const [customer, setCustomer] = useState<Customer | null>(null);
@@ -160,7 +164,18 @@ export default function InvoiceDetailPage() {
               from the one screen dedicated to a single invoice. */}
           <p className="mt-0.5 font-mono text-sm text-primary">{invoiceNumber(invoice)}</p>
         </div>
-        <div className="flex items-center gap-4">
+        <div className="flex flex-wrap items-center gap-3">
+          {/* Beside Print, as 10 asks — the two are the same document going to the same person by
+              different routes. Needs the order for its number and collection date, so it waits for
+              both to load rather than sharing a message with blanks in it. */}
+          {order && customer && (
+            <ShareViaWhatsAppButton
+              customer={customer}
+              invoice={invoice}
+              order={{ orderNumber: order.orderNumber, dueAtUtc: order.dueAtUtc }}
+              shopName={branding.shopName || "Mathilens"}
+            />
+          )}
           <button type="button" onClick={() => window.print()} className="text-sm text-foreground/70 hover:text-foreground">
             Print
           </button>

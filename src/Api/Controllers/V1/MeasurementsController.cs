@@ -41,7 +41,7 @@ public sealed class MeasurementsController : ApiControllerBase
     [ProducesResponseType(typeof(ApiErrorResponse), StatusCodes.Status409Conflict)]
     public async Task<IActionResult> Create(Guid customerId, [FromBody] CreateMeasurementRequest request, CancellationToken cancellationToken)
     {
-        var command = new CreateMeasurementCommand(customerId, request.GarmentType, request.Values);
+        var command = new CreateMeasurementCommand(customerId, request.GarmentType, request.Values, request.Notes);
         var result = await _sender.Send(command, cancellationToken);
         return ToActionResult(result);
     }
@@ -73,7 +73,7 @@ public sealed class MeasurementsController : ApiControllerBase
     [ProducesResponseType(typeof(ApiErrorResponse), StatusCodes.Status404NotFound)]
     public async Task<IActionResult> UpdateValues(Guid id, [FromBody] UpdateMeasurementValuesRequest request, CancellationToken cancellationToken)
     {
-        var result = await _sender.Send(new UpdateMeasurementValuesCommand(id, request.Values), cancellationToken);
+        var result = await _sender.Send(new UpdateMeasurementValuesCommand(id, request.Values, request.Notes), cancellationToken);
         return ToActionResult(result);
     }
 

@@ -24,7 +24,18 @@ import { ApiError } from "@/lib/api-client";
 import { searchCustomers, createCustomer, type Customer } from "@/lib/api/customers";
 import { searchEmployees, type Employee } from "@/lib/api/employees";
 import { createOrder, type CreateOrderItemInput, type Order } from "@/lib/api/orders";
-import { listMeasurementsForCustomer, createMeasurement, updateMeasurementValues, type Measurement } from "@/lib/api/measurements";
+import {
+  listMeasurementsForCustomer,
+  createMeasurement,
+  updateMeasurementValues,
+  type Measurement,
+  type MeasurementValue,
+} from "@/lib/api/measurements";
+import {
+  MeasurementPointInput,
+  toFieldText,
+  toMeasurementValue,
+} from "@/components/measurements/MeasurementPointInput";
 import { getSetting, DEFAULT_ORDER_DUE_DATE_DAYS_KEY } from "@/lib/api/settings";
 import { getShopCalendar, nextOpenDay, toIsoDate, WEEKDAYS } from "@/lib/api/shop-calendar";
 import { getTailoringRates, type TailoringRates } from "@/lib/api/tailoring-rates";
@@ -32,12 +43,19 @@ import { getGarments, type Garment } from "@/lib/api/garments";
 import { createInvoice, recordPayment, PAYMENT_METHODS, type PaymentMethod, type Invoice } from "@/lib/api/billing";
 import { getInvoiceSettings, taxAmountFor, DEFAULT_INVOICE_SETTINGS } from "@/lib/api/invoice-settings";
 import { toDisplayPhoneNumber } from "@/lib/contact";
+import { ShareViaWhatsAppButton } from "@/components/whatsapp/ShareViaWhatsAppButton";
+import { PaymentMethodPicker } from "@/components/billing/PaymentMethodPicker";
+import { useBranding } from "@/lib/use-branding";
 
 /* One field treatment for the whole page, matching the Input component the rest of the app uses:
    white fill, hairline border, blue focus ring, and a disabled state that stays readable rather
    than fading to half opacity. */
 const fieldClassName =
   "rounded-md border border-border bg-surface px-3 py-2 text-sm outline-none transition-colors placeholder:text-foreground/40 focus:border-primary focus:ring-2 focus:ring-primary/25 disabled:cursor-not-allowed disabled:bg-surface-hover disabled:text-foreground/50";
+
+/** Matches MeasurementConfiguration's column length, so the server never has to refuse a note the
+ *  field allowed someone to finish typing. */
+const MEASUREMENT_NOTES_MAX_LENGTH = 1000;
 
 /** Money, as this page shows it — the figures are read as amounts, not typed into. */
 function money(amount: number): string {
@@ -101,6 +119,8 @@ function weekdayOf(isoDate: string): (typeof WEEKDAYS)[number] | null {
 export default function NewOrderPage() {
   const router = useRouter();
   const { showToast } = useToast();
+  // The shop's name, for the WhatsApp message to greet and sign off with.
+  const branding = useBranding();
   const [customer, setCustomer] = useState<Customer | null>(null);
   const [mobileNumber, setMobileNumber] = useState("");
   const debouncedMobileNumber = useDebouncedValue(mobileNumber, 300);
@@ -149,6 +169,8 @@ export default function NewOrderPage() {
   const [advanceAmount, setAdvanceAmount] = useState("");
   const [advanceMethod, setAdvanceMethod] = useState<PaymentMethod>(PAYMENT_METHODS[0]);
   const [measurementValues, setMeasurementValues] = useState<Record<string, string>>({});
+  /** The fitting remark for the active item's garment — saved with the values, by the same button. */
+  const [measurementNotes, setMeasurementNotes] = useState("");
   const [measurementFormError, setMeasurementFormError] = useState<string | null>(null);
   const [isSavingMeasurement, setIsSavingMeasurement] = useState(false);
   // Which cell opened the Order Summary Preview — both the Order summary cell and the Schedule
@@ -244,7 +266,7 @@ export default function NewOrderPage() {
     const initial: Record<string, string> = {};
     if (activeMeasurement) {
       for (const [name, value] of Object.entries(activeMeasurement.values)) {
-        initial[name] = String(value);
+        initial[name] = toFieldText(value);
       }
     }
     // Keyed on the item/measurement identity, not the objects themselves — re-runs exactly when
@@ -253,6 +275,7 @@ export default function NewOrderPage() {
     // set-state-in-effect lint rule.
     // eslint-disable-next-line react-hooks/set-state-in-effect
     setMeasurementValues(initial);
+    setMeasurementNotes(activeMeasurement?.notes ?? "");
     setMeasurementFormError(null);
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [activeMeasurementItem?.id, activeMeasurement?.id]);
@@ -318,6 +341,7 @@ export default function NewOrderPage() {
   function handleClearMeasurement() {
     setMeasurementFormError(null);
     setMeasurementValues({});
+    setMeasurementNotes("");
   }
 
   async function handleSaveMeasurement() {
@@ -326,20 +350,20 @@ export default function NewOrderPage() {
     }
     setMeasurementFormError(null);
 
-    const values: Record<string, number> = {};
-    for (const field of measurementFields) {
-      const raw = (measurementValues[field] ?? "").trim();
-      if (raw === "") {
-        // Fixed fields are individually optional — skip the ones not measured yet, rather than
-        // forcing every point to be filled in before anything can be saved.
+    const values: Record<string, MeasurementValue> = {};
+    for (const point of measurementFields) {
+      const raw = measurementValues[point.name] ?? "";
+      // Points are individually optional — one nobody has filled in yet is skipped rather than
+      // blocking the save. A checkbox is never skipped: "no" is an answer.
+      const value = toMeasurementValue(point, raw);
+      if (value === null) {
+        if (point.type === "Number" && raw.trim() !== "") {
+          setMeasurementFormError(`"${point.name}" needs a value greater than zero.`);
+          return;
+        }
         continue;
       }
-      const numericValue = Number(raw);
-      if (!Number.isFinite(numericValue) || numericValue <= 0) {
-        setMeasurementFormError(`"${field}" needs a value greater than zero.`);
-        return;
-      }
-      values[field] = numericValue;
+      values[point.name] = value;
     }
 
     if (Object.keys(values).length === 0) {
@@ -350,8 +374,8 @@ export default function NewOrderPage() {
     setIsSavingMeasurement(true);
     try {
       const saved = activeMeasurement
-        ? await updateMeasurementValues(activeMeasurement.id, values, getAccessToken())
-        : await createMeasurement(customer.id, activeMeasurementItem.garmentType, values, getAccessToken());
+        ? await updateMeasurementValues(activeMeasurement.id, values, getAccessToken(), measurementNotes)
+        : await createMeasurement(customer.id, activeMeasurementItem.garmentType, values, getAccessToken(), measurementNotes);
       setCustomerMeasurements((prev) => [...prev.filter((m) => m.id !== saved.id), saved]);
       showToast("Measurement saved.");
       // Stays open after saving — closing would hide the panel the moment it's saved. Clear
@@ -545,6 +569,7 @@ export default function NewOrderPage() {
     setAdvanceAmount("");
     setAdvanceMethod(PAYMENT_METHODS[0]);
     setMeasurementValues({});
+    setMeasurementNotes("");
     setMeasurementFormError(null);
     setSummarySource(null);
     setFormKey((key) => key + 1);
@@ -727,7 +752,10 @@ export default function NewOrderPage() {
 
   return (
     <>
-    <div className="flex flex-col gap-5 print:hidden">
+    {/* no-spinner (globals.css): every number field on this screen — quantity, tailoring, metres,
+        advance, measurement points — is typed, never stepped, and the arrows were eating width
+        from the item rows' five-across layout. */}
+    <div className="no-spinner flex flex-col gap-5 print:hidden">
       <div className="flex flex-wrap items-center justify-between gap-3">
         {/* text-2xl to match Customers and every other page title. This screen used to run a size
             smaller to buy height for the item list; the columns no longer share one locked
@@ -756,6 +784,10 @@ export default function NewOrderPage() {
           {/* Column 1: who the order is for, and what's being made — two cards now, because they
               are two things. They shared one card only because the locked column height made a
               second border look like clutter. */}
+          {/* Equal halves. Tried at 43/57 and at 60/40, and neither read better than this: the item
+              editor's field grids cap at max-w-2xl and stop using width past 672px, so widening this
+              side leaves a gap, and narrowing it crowds the five-across item row. Even is the answer
+              here — please don't re-derive it. */}
           <div className="flex w-full flex-1 flex-col gap-4 lg:flex-[2]">
           <div className="orderSection-customer flex flex-col gap-3 rounded-lg border border-border bg-surface p-4">
             <h2 className="order-heading text-base font-semibold">Customer Details</h2>
@@ -843,9 +875,20 @@ export default function NewOrderPage() {
             </div>
           </div>
 
-          {/* Right side: a plain stack of cards — Measurement Details, Order Summary, Schedule,
-              Payment Details, Actions — in the order staff work down them. */}
-          <div className="flex w-full flex-1 flex-col gap-4 lg:flex-[2]">
+          {/* Right side: a stack of cards — Measurement Details, Order Summary, Payment Details,
+              Schedule, Actions — in the order staff work down them.
+
+              This column scrolls on its own from the large breakpoint up, and the left one does
+              not. That asymmetry is the point: the item list grows without limit as garments are
+              added, so it belongs to the page, while everything on this side has to stay reachable
+              while it does — measurements for the item being edited, the running total, and Create
+              order at the foot. Sticky keeps the column in view; max-h bounds it to the viewport so
+              overflow-y has something to scroll against; and the parent's items-start (rather than
+              stretch) is what lets sticky work at all inside a flex row.
+
+              Below lg the two columns are one stack, and an inner scrollbar there would be a second
+              scroll region on a phone — so none of this applies. */}
+          <div className="flex w-full flex-1 flex-col gap-4 lg:sticky lg:top-6 lg:max-h-[calc(100dvh-3rem)] lg:flex-[2] lg:overflow-y-auto lg:pr-1">
             {/* Still one box with three modes (measurement, new customer, summary preview), and
                 still a minimum height, so opening and closing one does not shunt the cards below it
                 up and down the screen. It no longer needs a *frozen* height now that the columns
@@ -878,47 +921,52 @@ export default function NewOrderPage() {
                   ) : (
                     <div className="flex flex-col gap-4 sm:flex-row sm:gap-8">
                       <div className="flex flex-1 flex-col gap-2">
-                        {measurementFieldsFirstHalf.map((field) => (
-                          <div key={field} className="flex items-center gap-3">
-                            <label className="w-32 shrink-0 text-sm text-foreground/80">{field}</label>
-                            <input
-                              aria-label={`${field} measurement value`}
-                              type="number"
-                              step="0.1"
-                              min="0"
-                              placeholder="cm"
-                              value={measurementValues[field] ?? ""}
-                              disabled={isOrderCreated}
-                              onChange={(e) => setMeasurementValues((prev) => ({ ...prev, [field]: e.target.value }))}
-                              onKeyDown={(e) => {
-                                if (e.key === "Enter") e.preventDefault();
-                              }}
-                              className="w-24 rounded-md border border-border bg-surface px-3 py-1.5 text-sm outline-none transition-colors focus:border-primary focus:ring-2 focus:ring-primary/25 disabled:cursor-not-allowed disabled:bg-surface-hover disabled:text-foreground/50"
-                            />
-                          </div>
+                        {measurementFieldsFirstHalf.map((point) => (
+                          <MeasurementPointInput
+                            key={point.name}
+                            point={point}
+                            value={measurementValues[point.name] ?? ""}
+                            disabled={isOrderCreated}
+                            onChange={(next) => setMeasurementValues((prev) => ({ ...prev, [point.name]: next }))}
+                          />
                         ))}
                       </div>
                       <div className="flex flex-1 flex-col gap-2">
-                        {measurementFieldsSecondHalf.map((field) => (
-                          <div key={field} className="flex items-center gap-3">
-                            <label className="w-32 shrink-0 text-sm text-foreground/80">{field}</label>
-                            <input
-                              aria-label={`${field} measurement value`}
-                              type="number"
-                              step="0.1"
-                              min="0"
-                              placeholder="cm"
-                              value={measurementValues[field] ?? ""}
-                              disabled={isOrderCreated}
-                              onChange={(e) => setMeasurementValues((prev) => ({ ...prev, [field]: e.target.value }))}
-                              onKeyDown={(e) => {
-                                if (e.key === "Enter") e.preventDefault();
-                              }}
-                              className="w-24 rounded-md border border-border bg-surface px-3 py-1.5 text-sm outline-none transition-colors focus:border-primary focus:ring-2 focus:ring-primary/25 disabled:cursor-not-allowed disabled:bg-surface-hover disabled:text-foreground/50"
-                            />
-                          </div>
+                        {measurementFieldsSecondHalf.map((point) => (
+                          <MeasurementPointInput
+                            key={point.name}
+                            point={point}
+                            value={measurementValues[point.name] ?? ""}
+                            disabled={isOrderCreated}
+                            onChange={(next) => setMeasurementValues((prev) => ({ ...prev, [point.name]: next }))}
+                          />
                         ))}
                       </div>
+                    </div>
+                  )}
+
+                  {/* The remark that goes with the numbers — "left shoulder sits lower", "loose at
+                      the waist", "cuff as per the shirt he brought in". It belongs to this
+                      customer's measurement for this garment, so it comes back on their next order
+                      for the same thing, which is exactly when a tailor wants to be reminded.
+
+                      Shown whenever the panel is showing measurement fields, and saved by the same
+                      Save button: a note is part of the fitting, not a separate errand. */}
+                  {customer && !isLoadingMeasurements && !isLoadingTemplate && measurementFields.length > 0 && (
+                    <div className="flex shrink-0 flex-col gap-1">
+                      <label htmlFor="measurementNotes" className="text-sm font-medium">
+                        Notes (optional)
+                      </label>
+                      <textarea
+                        id="measurementNotes"
+                        rows={2}
+                        value={measurementNotes}
+                        maxLength={MEASUREMENT_NOTES_MAX_LENGTH}
+                        disabled={isOrderCreated}
+                        onChange={(e) => setMeasurementNotes(e.target.value)}
+                        placeholder="Anything about the fit the tailor should know…"
+                        className={fieldClassName}
+                      />
                     </div>
                   )}
 
@@ -1074,6 +1122,46 @@ export default function NewOrderPage() {
               </dl>
             </div>
 
+            {/* Payment. Its own card rather than a corner of the summary: the advance is something
+                staff enter, and the summary is something they read. Mixing the two put two editable
+                fields in the middle of a block of figures. */}
+            <div className="flex w-full flex-col gap-3 rounded-lg border border-border bg-surface p-4">
+              <h2 className="order-heading text-base font-semibold">Payment Details</h2>
+              <div className="flex flex-col gap-3">
+                {/* Label and field on one line. This is a single short figure, not a form section,
+                    and stacking it left a full-width label over a box the amount barely fills. The
+                    label takes a fixed width so it cannot squeeze the field as the text changes. */}
+                <div className="flex items-center gap-3">
+                  <label htmlFor="advanceAmount" className="w-36 shrink-0 text-sm font-medium">
+                    Advance Received
+                  </label>
+                  <input
+                    id="advanceAmount"
+                    type="number"
+                    min="0"
+                    step="0.01"
+                    value={advanceAmount}
+                    disabled={isOrderCreated}
+                    onChange={(e) => setAdvanceAmount(e.target.value)}
+                    placeholder="0.00"
+                    className={`${fieldClassName} w-36`}
+                  />
+                </div>
+                {/* Full width beneath the amount rather than squeezed into a second column: four
+                    methods side by side need the room, and the order staff work in is amount first,
+                    then how it arrived. */}
+                <div className="flex flex-col gap-1.5">
+                  <span className="text-sm font-medium">Payment Method</span>
+                  <PaymentMethodPicker
+                    value={advanceMethod}
+                    onChange={setAdvanceMethod}
+                    disabled={isOrderCreated}
+                    label="Advance payment method"
+                  />
+                </div>
+              </div>
+            </div>
+
             {/* Scheduling. Clicking it opens the same preview as the summary above — the two are
                 one review step, and reaching the preview shouldn't depend on which card you click. */}
             <div
@@ -1182,49 +1270,6 @@ export default function NewOrderPage() {
               </div>
             </div>
 
-            {/* Payment. Its own card rather than a corner of the summary: the advance is something
-                staff enter, and the summary is something they read. Mixing the two put two editable
-                fields in the middle of a block of figures. */}
-            <div className="flex w-full flex-col gap-3 rounded-lg border border-border bg-surface p-4">
-              <h2 className="order-heading text-base font-semibold">Payment Details</h2>
-              <div className="grid gap-3 sm:grid-cols-2">
-                <div className="flex flex-col gap-1">
-                  <label htmlFor="advanceAmount" className="text-sm font-medium">
-                    Advance Received
-                  </label>
-                  <input
-                    id="advanceAmount"
-                    type="number"
-                    min="0"
-                    step="0.01"
-                    value={advanceAmount}
-                    disabled={isOrderCreated}
-                    onChange={(e) => setAdvanceAmount(e.target.value)}
-                    placeholder="0.00"
-                    className={fieldClassName}
-                  />
-                </div>
-                <div className="flex flex-col gap-1">
-                  <label htmlFor="advanceMethod" className="text-sm font-medium">
-                    Payment Method
-                  </label>
-                  <select
-                    id="advanceMethod"
-                    value={advanceMethod}
-                    disabled={isOrderCreated}
-                    onChange={(e) => setAdvanceMethod(e.target.value as PaymentMethod)}
-                    className={fieldClassName}
-                  >
-                    {PAYMENT_METHODS.map((method) => (
-                      <option key={method} value={method}>
-                        {method}
-                      </option>
-                    ))}
-                  </select>
-                </div>
-              </div>
-            </div>
-
             {/* Row 3: order creation and (once created) invoice generation, as two explicit steps.
                 Takes whatever height is left over so this column ends level with the item list
                 beside it — the frozen panel above rounds to a fixed size, and without this the
@@ -1276,6 +1321,17 @@ export default function NewOrderPage() {
                 >
                   View order
                 </Button>
+                {/* Only once there is an invoice to share. Rendered rather than hidden before then
+                    so the row does not reshuffle the moment one is generated — the button states
+                    its own reason when it cannot go ahead. */}
+                {createdOrder && (
+                  <ShareViaWhatsAppButton
+                    customer={customer}
+                    invoice={createdInvoice}
+                    order={{ orderNumber: createdOrder.orderNumber, dueAtUtc: createdOrder.dueAtUtc }}
+                    shopName={branding.shopName || "Mathilens"}
+                  />
+                )}
                 <Button type="button" variant="secondary" disabled={!isOrderCreated} onClick={handleStartNewOrder}>
                   New order
                 </Button>

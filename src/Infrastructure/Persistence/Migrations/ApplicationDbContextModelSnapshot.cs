@@ -591,6 +591,10 @@ namespace MathilensERP.Infrastructure.Persistence.Migrations
                     b.Property<Guid?>("LastModifiedBy")
                         .HasColumnType("uuid");
 
+                    b.Property<string>("Notes")
+                        .HasMaxLength(1000)
+                        .HasColumnType("character varying(1000)");
+
                     b.Property<string>("ValuesJson")
                         .IsRequired()
                         .HasColumnType("text")

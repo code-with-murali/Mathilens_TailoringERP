@@ -1,3 +1,4 @@
+using MathilensERP.Domain.Measurements;
 using FluentValidation;
 using MathilensERP.Application.Common.Validation;
 
@@ -7,6 +8,9 @@ public sealed class SetMeasurementTemplateCommandValidator : AbstractValidator<S
 {
     /// <summary>Keeps the serialized JSON comfortably inside the Settings value column's 4000 characters.</summary>
     private const int MaxPoints = 60;
+
+    /// <summary>Matched to what the old MaximumLength rule allowed, so nothing a shop already saved becomes invalid.</summary>
+    private const int MaxPointNameLength = 60;
 
     public SetMeasurementTemplateCommandValidator()
     {
@@ -20,15 +24,18 @@ public sealed class SetMeasurementTemplateCommandValidator : AbstractValidator<S
             .WithMessage($"A garment type can have at most {MaxPoints} measurement points.");
 
         RuleForEach(x => x.Points)
-            .NotEmpty()
+            .Must(point => !string.IsNullOrWhiteSpace(point.Name))
             .WithMessage("A measurement point name cannot be blank.")
-            .MaximumLength(60);
+            .Must(point => point.Name.Length <= MaxPointNameLength)
+            .WithMessage($"A measurement point name can be at most {MaxPointNameLength} characters.")
+            .Must(point => Enum.IsDefined(point.Type))
+            .WithMessage("A measurement point must take a number, a checkbox or text.");
 
         // Values are stored keyed by point name, so two points sharing a name would silently
         // collapse into one on save.
         RuleFor(x => x.Points)
             .Must(points => points
-                .Select(p => p?.Trim() ?? string.Empty)
+                .Select(p => p.Name?.Trim() ?? string.Empty)
                 .Distinct(StringComparer.OrdinalIgnoreCase)
                 .Count() == points.Count)
             .WithMessage("Each measurement point must have a distinct name.")

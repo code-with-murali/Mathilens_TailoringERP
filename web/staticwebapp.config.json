@@ -13,6 +13,7 @@
     { "route": "/dashboard/orders/*", "rewrite": "/dashboard/orders/_.html" },
     { "route": "/dashboard/invoices/*", "rewrite": "/dashboard/invoices/_.html" },
     { "route": "/dashboard/whatsapp/new" },
-    { "route": "/dashboard/whatsapp/*", "rewrite": "/dashboard/whatsapp/_.html" }
+    { "route": "/dashboard/whatsapp/*", "rewrite": "/dashboard/whatsapp/_.html" },
+    { "route": "/invoice/view/*", "rewrite": "/invoice/view/_.html" }
   ]
 }

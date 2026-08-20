@@ -10,7 +10,7 @@ public class CreateMeasurementCommandValidatorTests
     [Fact]
     public void Validate_WithValidCommand_Passes()
     {
-        var result = _validator.Validate(new CreateMeasurementCommand(Guid.NewGuid(), GarmentTypes.Shirt, new Dictionary<string, decimal> { ["Chest"] = 40 }));
+        var result = _validator.Validate(new CreateMeasurementCommand(Guid.NewGuid(), GarmentTypes.Shirt, new Dictionary<string, MeasurementValue> { ["Chest"] = MeasurementValue.FromNumber(40m) }));
 
         Assert.True(result.IsValid);
     }
@@ -18,7 +18,7 @@ public class CreateMeasurementCommandValidatorTests
     [Fact]
     public void Validate_WithEmptyCustomerId_Fails()
     {
-        var result = _validator.Validate(new CreateMeasurementCommand(Guid.Empty, GarmentTypes.Shirt, new Dictionary<string, decimal> { ["Chest"] = 40 }));
+        var result = _validator.Validate(new CreateMeasurementCommand(Guid.Empty, GarmentTypes.Shirt, new Dictionary<string, MeasurementValue> { ["Chest"] = MeasurementValue.FromNumber(40m) }));
 
         Assert.False(result.IsValid);
         Assert.Contains(result.Errors, e => e.PropertyName == nameof(CreateMeasurementCommand.CustomerId));
@@ -27,7 +27,7 @@ public class CreateMeasurementCommandValidatorTests
     [Fact]
     public void Validate_WithNoValues_Fails()
     {
-        var result = _validator.Validate(new CreateMeasurementCommand(Guid.NewGuid(), GarmentTypes.Shirt, new Dictionary<string, decimal>()));
+        var result = _validator.Validate(new CreateMeasurementCommand(Guid.NewGuid(), GarmentTypes.Shirt, new Dictionary<string, MeasurementValue>()));
 
         Assert.False(result.IsValid);
         Assert.Contains(result.Errors, e => e.PropertyName == nameof(CreateMeasurementCommand.Values));
@@ -36,7 +36,7 @@ public class CreateMeasurementCommandValidatorTests
     [Fact]
     public void Validate_WithNonPositiveValue_Fails()
     {
-        var result = _validator.Validate(new CreateMeasurementCommand(Guid.NewGuid(), GarmentTypes.Shirt, new Dictionary<string, decimal> { ["Chest"] = 0 }));
+        var result = _validator.Validate(new CreateMeasurementCommand(Guid.NewGuid(), GarmentTypes.Shirt, new Dictionary<string, MeasurementValue> { ["Chest"] = MeasurementValue.FromNumber(0m) }));
 
         Assert.False(result.IsValid);
     }
@@ -47,7 +47,7 @@ public class CreateMeasurementCommandValidatorTests
     [InlineData("Chudidhar\twith a tab")]
     public void Validate_WithAnUnusableGarmentName_Fails(string garmentType)
     {
-        var result = _validator.Validate(new CreateMeasurementCommand(Guid.NewGuid(), garmentType, new Dictionary<string, decimal> { ["Chest"] = 40 }));
+        var result = _validator.Validate(new CreateMeasurementCommand(Guid.NewGuid(), garmentType, new Dictionary<string, MeasurementValue> { ["Chest"] = MeasurementValue.FromNumber(40m) }));
 
         Assert.False(result.IsValid);
         Assert.Contains(result.Errors, e => e.PropertyName == nameof(CreateMeasurementCommand.GarmentType));
@@ -58,7 +58,7 @@ public class CreateMeasurementCommandValidatorTests
     {
         var tooLong = new string('a', GarmentTypes.MaxLength + 1);
 
-        var result = _validator.Validate(new CreateMeasurementCommand(Guid.NewGuid(), tooLong, new Dictionary<string, decimal> { ["Chest"] = 40 }));
+        var result = _validator.Validate(new CreateMeasurementCommand(Guid.NewGuid(), tooLong, new Dictionary<string, MeasurementValue> { ["Chest"] = MeasurementValue.FromNumber(40m) }));
 
         Assert.False(result.IsValid);
         Assert.Contains(result.Errors, e => e.PropertyName == nameof(CreateMeasurementCommand.GarmentType));
@@ -75,7 +75,7 @@ public class CreateMeasurementCommandValidatorTests
     [InlineData("Saree Blouse")]
     public void Validate_WithAGarmentTheShopAdded_Passes(string garmentType)
     {
-        var result = _validator.Validate(new CreateMeasurementCommand(Guid.NewGuid(), garmentType, new Dictionary<string, decimal> { ["Chest"] = 40 }));
+        var result = _validator.Validate(new CreateMeasurementCommand(Guid.NewGuid(), garmentType, new Dictionary<string, MeasurementValue> { ["Chest"] = MeasurementValue.FromNumber(40m) }));
 
         Assert.True(result.IsValid);
     }

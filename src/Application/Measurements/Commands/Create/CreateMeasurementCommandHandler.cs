@@ -34,7 +34,7 @@ public sealed class CreateMeasurementCommandHandler : ICommandHandler<CreateMeas
                 $"Measurements for garment type '{command.GarmentType}' already exist for this customer — use update instead."));
         }
 
-        var measurement = Measurement.Create(command.CustomerId, command.GarmentType, command.Values);
+        var measurement = Measurement.Create(command.CustomerId, command.GarmentType, command.Values, command.Notes);
 
         _measurementRepository.Add(measurement);
         await _measurementRepository.SaveChangesAsync(cancellationToken);

@@ -74,7 +74,10 @@ const NAV_ITEMS: NavEntry[] = [
       { href: "/dashboard/reports/wedding", label: "Wedding", icon: RingsIcon, permission: PERMISSIONS.reportsView },
     ],
   },
-  { href: "/dashboard/whatsapp", label: "WhatsApp", icon: WhatsAppIcon, permission: PERMISSIONS.whatsAppView },
+  // WhatsApp is off the menu. The way the shop actually messages a customer is Share via WhatsApp
+  // on the order and the invoice — the shop's own phone, the shop pressing Send — and a menu item
+  // leading to a list of provider-sent messages offered a second, unused way in. The routes still
+  // answer, so a bookmark to /dashboard/whatsapp keeps working, and none of the sharing changes.
   {
     label: "User Management",
     icon: UsersIcon,
@@ -281,25 +284,26 @@ export default function DashboardLayout({ children }: LayoutProps<"/dashboard">)
               </>
             ) : (
               <>
-                {/* h-8, not h-9. The artwork is trimmed hard to the ink — it carries no white
-                    margin of its own — so its height is exactly the height of the lettering. At 36px
-                    that matched the toggle button beside it and therefore filled the whole content
-                    row, leaving the glyphs flush against the header's padding on every side. 32px
-                    hands back 2px top and bottom while the 36px button goes on setting the header's
-                    height, so nothing below it moves.
+                {/* h-7 — 28px, rendering 86x28.
 
-                    Breathing room now reads even: 20px to the rail's left edge (px-5), 18px to the
-                    top and bottom of the header. w-auto keeps the 2.45:1 ratio — height is the only
-                    dimension set, so it cannot stretch or crop.
+                    Sized against the artwork as it is now, which is the whole RADHA lockup and
+                    nothing else. It is trimmed hard to the ink and carries no white margin of its
+                    own, so this height is the height of the lettering itself; when the strapline
+                    was still part of the file the same number covered three stacked bands, and
+                    dropping it made the letterforms half again as tall at an unchanged h-8.
 
-                    max-w is a guard, not a size: the row has 156px for the logo once the toggle and
-                    the gap are taken out, and 144px can never squeeze it. The natural width here is
-                    78px, so it never binds. */}
+                    28px against the 36px toggle beside it, which is what sets the header's height,
+                    leaves 20px above and below the logo and 24px to the rail's left edge — even
+                    enough to read as deliberate, and the nav below it has not moved.
+
+                    w-auto keeps the 3.06:1 ratio: height is the only dimension set, so nothing can
+                    stretch or crop. max-w is a guard rather than a size — the row has 148px for the
+                    logo once the toggle and the gap are taken out, and 86px never reaches it. */}
                 {/* eslint-disable-next-line @next/next/no-img-element -- a plain public asset; next/image would add a loader for no benefit at this size */}
                 <img
                   src="/logo.png"
                   alt={branding.shopName || "Radha Fabric"}
-                  className={`h-8 w-auto max-w-[9rem] shrink-0 object-contain ${isCollapsed ? "lg:hidden" : ""}`}
+                  className={`h-7 w-auto max-w-[9rem] shrink-0 object-contain ${isCollapsed ? "lg:hidden" : ""}`}
                 />
                 {/* eslint-disable-next-line @next/next/no-img-element -- as above */}
                 <img
@@ -847,15 +851,6 @@ function InvoicesIcon({ className }: IconProps) {
       <path d="M6 2h9l3 3v17H6V2Z" />
       <path d="M15 2v3h3" />
       <path d="M9 12h6M9 16h6M9 8h3" />
-    </svg>
-  );
-}
-
-function WhatsAppIcon({ className }: IconProps) {
-  return (
-    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" className={className}>
-      <path d="M12 3a8.5 8.5 0 0 0-7.4 12.7L3 21l5.4-1.6A8.5 8.5 0 1 0 12 3Z" />
-      <path d="M9 9.5c0 3 2.5 5.5 5.5 5.5 .5 0 1-.3 1-.8v-1l-2-1-1 1c-1-.5-1.7-1.2-2.2-2.2l1-1-1-2h-1c-.5 0-.8.5-.8 1Z" />
     </svg>
   );
 }

@@ -26,8 +26,18 @@ public sealed class Measurement : AuditableEntity
     /// provider-specific JSON column type, to keep the mapping simple and dependable.</summary>
     public string ValuesJson { get; private set; } = "{}";
 
-    public IReadOnlyDictionary<string, decimal> Values =>
-        JsonSerializer.Deserialize<Dictionary<string, decimal>>(ValuesJson) ?? [];
+    public IReadOnlyDictionary<string, MeasurementValue> Values =>
+        JsonSerializer.Deserialize<Dictionary<string, MeasurementValue>>(ValuesJson) ?? [];
+
+    /// <summary>
+    /// What the numbers do not say — "left shoulder sits lower", "customer wants it loose at the
+    /// waist", "cuff as per the shirt he brought in".
+    ///
+    /// <para>Per measurement set, so it belongs to this customer and this garment and follows them
+    /// onto every future order for it, which is exactly where a fitting note is wanted the second
+    /// time. Optional: most measurements have nothing to add.</para>
+    /// </summary>
+    public string? Notes { get; private set; }
 
     private Measurement()
     {
@@ -39,7 +49,11 @@ public sealed class Measurement : AuditableEntity
     {
     }
 
-    public static Measurement Create(Guid customerId, string garmentType, IReadOnlyDictionary<string, decimal> values)
+    public static Measurement Create(
+        Guid customerId,
+        string garmentType,
+        IReadOnlyDictionary<string, MeasurementValue> values,
+        string? notes = null)
     {
         var measurement = new Measurement(Guid.NewGuid())
         {
@@ -50,13 +64,26 @@ public sealed class Measurement : AuditableEntity
         };
 
         measurement.SetValues(values);
+        measurement.SetNotes(notes);
 
         return measurement;
     }
 
-    public void UpdateValues(IReadOnlyDictionary<string, decimal> values) => SetValues(values);
+    public void UpdateValues(IReadOnlyDictionary<string, MeasurementValue> values) => SetValues(values);
 
-    private void SetValues(IReadOnlyDictionary<string, decimal> values)
+    /// <summary>
+    /// Replaces the note. Separate from <see cref="UpdateValues"/> because the two are edited
+    /// together on one screen but mean different things: re-measuring a customer is a fact
+    /// changing, and rewriting the note is a remark changing.
+    /// </summary>
+    public void UpdateNotes(string? notes) => SetNotes(notes);
+
+    private void SetNotes(string? notes) =>
+        // Blank and whitespace collapse to null, so "no note" is one value in the column rather
+        // than three that every reader would have to test for.
+        Notes = string.IsNullOrWhiteSpace(notes) ? null : notes.Trim();
+
+    private void SetValues(IReadOnlyDictionary<string, MeasurementValue> values)
     {
         Guard.AgainstNull(values, nameof(values));
 
@@ -68,7 +95,19 @@ public sealed class Measurement : AuditableEntity
         foreach (var (point, value) in values)
         {
             Guard.AgainstNullOrWhiteSpace(point, nameof(values));
-            Guard.AgainstNegativeOrZero(value, nameof(values));
+
+            // Validated by what the value means rather than uniformly. A chest of zero is a point
+            // nobody measured; a checkbox of "no" and an empty style are perfectly good answers,
+            // and the old blanket AgainstNegativeOrZero would have refused both.
+            switch (value.Kind)
+            {
+                case MeasurementPointType.Number:
+                    Guard.AgainstNegativeOrZero(value.Number, nameof(values));
+                    break;
+                case MeasurementPointType.Text:
+                    Guard.AgainstNull(value.Text, nameof(values));
+                    break;
+            }
         }
 
         ValuesJson = JsonSerializer.Serialize(values);

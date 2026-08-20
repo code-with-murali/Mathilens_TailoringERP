@@ -48,11 +48,13 @@ public sealed class GetMeasurementTemplatesQueryHandler
         return Result.Success<IReadOnlyList<MeasurementTemplateDto>>(templates);
     }
 
-    private static IReadOnlyList<string>? Parse(string json)
+    private static IReadOnlyList<MeasurementPointDto>? Parse(string json)
     {
         try
         {
-            return JsonSerializer.Deserialize<List<string>>(json);
+            // MeasurementPointDto's converter reads both the original array-of-names format and
+            // the typed one, so a template saved before points had types still loads.
+            return JsonSerializer.Deserialize<List<MeasurementPointDto>>(json);
         }
         catch (JsonException)
         {

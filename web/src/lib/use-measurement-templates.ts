@@ -2,9 +2,14 @@
 
 import { useEffect, useState } from "react";
 import { getAccessToken } from "@/lib/auth";
-import { listMeasurementTemplates, type GarmentType, type MeasurementTemplate } from "@/lib/api/measurements";
+import {
+  listMeasurementTemplates,
+  type GarmentType,
+  type MeasurementPoint,
+  type MeasurementTemplate,
+} from "@/lib/api/measurements";
 
-type TemplateMap = Partial<Record<GarmentType, readonly string[]>>;
+type TemplateMap = Partial<Record<GarmentType, readonly MeasurementPoint[]>>;
 
 /**
  * Templates are shop-level configuration that changes about once a year, and both the New Order
@@ -77,11 +82,11 @@ export function useMeasurementTemplates(): { templates: TemplateMap; isLoading: 
 }
 
 /** Shared so "no fields" keeps a stable identity — callers use it as an effect dependency. */
-const NO_FIELDS: readonly string[] = [];
+const NO_FIELDS: readonly MeasurementPoint[] = [];
 
-/** One garment type's points, in the shop's configured order. */
+/** One garment type's points, in the shop's configured order, each with the kind of answer it takes. */
 export function useMeasurementFields(garmentType: GarmentType | null): {
-  fields: readonly string[];
+  fields: readonly MeasurementPoint[];
   isLoading: boolean;
 } {
   const { templates, isLoading } = useMeasurementTemplates();

@@ -91,3 +91,14 @@ export function recordPayment(invoiceId: string, amount: number, method: Payment
 export function voidInvoice(invoiceId: string, token: string | null): Promise<void> {
   return apiPostNoContent(`/api/v1/invoices/${invoiceId}/void`, {}, token);
 }
+
+/**
+ * The opaque half of the read-only link a customer is sent.
+ *
+ * The server holds the key and hands back a token only — the link itself is assembled in the
+ * browser from this deployment's own origin, since the API has no reliable idea which host the
+ * staff member reached the app on.
+ */
+export function getInvoiceShareToken(invoiceId: string, token: string | null) {
+  return apiGet<{ token: string }>(`/api/v1/invoices/${invoiceId}/share-token`, token);
+}

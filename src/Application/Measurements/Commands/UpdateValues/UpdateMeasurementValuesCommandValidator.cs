@@ -1,3 +1,4 @@
+using MathilensERP.Domain.Measurements;
 using FluentValidation;
 
 namespace MathilensERP.Application.Measurements.Commands.UpdateValues;
@@ -16,7 +17,9 @@ public sealed class UpdateMeasurementValuesCommandValidator : AbstractValidator<
         RuleForEach(x => x.Values)
             .Must(point => !string.IsNullOrWhiteSpace(point.Key))
             .WithMessage("Measurement point names cannot be blank.")
-            .Must(point => point.Value > 0)
+            // Only figures have to be positive. "No side pocket" and an empty style are answers,
+            // not missing data, so the old blanket rule would have refused both.
+            .Must(point => point.Value.Kind != MeasurementPointType.Number || point.Value.Number > 0)
             .WithMessage("Measurement values must be greater than zero.");
     }
 }

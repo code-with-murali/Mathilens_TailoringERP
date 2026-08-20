@@ -87,6 +87,31 @@ body {
 }
 
 /*
+  Number fields with no stepper.
+
+  Quantities, prices and measurement points are typed at the counter, never nudged one at a time,
+  and the arrows only eat width from already narrow columns — on the New Order screen's item rows
+  there are five fields to a line and the steppers were taking a character's worth from each. They
+  also invite a click that changes a price by one, which is never what anyone meant.
+
+  The inputs stay type="number", so a phone still opens the numeric keypad and the browser still
+  refuses letters. This lived in the New Order page's own stylesheet until that was deleted in
+  favour of the shared theme; it is a class here so any screen can opt in, rather than a blanket
+  rule on every number input in the application.
+*/
+.no-spinner input[type="number"]::-webkit-outer-spin-button,
+.no-spinner input[type="number"]::-webkit-inner-spin-button {
+  -webkit-appearance: none;
+  appearance: none;
+  margin: 0;
+}
+
+.no-spinner input[type="number"] {
+  -moz-appearance: textfield;
+  appearance: textfield;
+}
+
+/*
   Tables that become cards on a phone.
 
   A six-column table cannot be read on a 360px screen, and the usual answer — a horizontal

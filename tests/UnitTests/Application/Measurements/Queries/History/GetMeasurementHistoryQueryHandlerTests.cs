@@ -11,7 +11,7 @@ public class GetMeasurementHistoryQueryHandlerTests
     [Fact]
     public async Task Handle_MapsPagedHistoryToDtos()
     {
-        var measurement = Measurement.Create(Guid.NewGuid(), GarmentTypes.Shirt, new Dictionary<string, decimal> { ["Chest"] = 40 });
+        var measurement = Measurement.Create(Guid.NewGuid(), GarmentTypes.Shirt, new Dictionary<string, MeasurementValue> { ["Chest"] = MeasurementValue.FromNumber(40m) });
         var snapshot = MeasurementHistory.CaptureSnapshot(measurement);
         var repository = Substitute.For<IMeasurementRepository>();
         repository.GetHistoryAsync(measurement.Id, 1, 20, Arg.Any<CancellationToken>())

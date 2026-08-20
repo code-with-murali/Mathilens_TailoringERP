@@ -72,7 +72,7 @@ public class GetMeasurementTemplatesQueryHandlerTests
         var result = await handler.Handle(new GetMeasurementTemplatesQuery(), CancellationToken.None);
 
         var trousers = result.Value.Single(t => t.GarmentType == GarmentTypes.Trousers);
-        Assert.Equal(["Length", "Waist"], trousers.Points);
+        Assert.Equal([MeasurementPointDto.Number("Length"), MeasurementPointDto.Number("Waist")], trousers.Points);
         Assert.True(trousers.IsCustomised);
 
         // Configuring one garment type leaves the others on their defaults.

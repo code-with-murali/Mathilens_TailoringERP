@@ -22,6 +22,10 @@
     <ProjectReference Include="..\..\src\Domain\MathilensERP.Domain.csproj" />
     <ProjectReference Include="..\..\src\Application\MathilensERP.Application.csproj" />
     <ProjectReference Include="..\..\src\Shared\MathilensERP.Shared.csproj" />
+    <!-- For the few Infrastructure classes that are pure logic and deserve a unit test rather than
+         a database: the invoice share token, which is the whole of the authorisation on the API's
+         one anonymous endpoint. -->
+    <ProjectReference Include="..\..\src\Infrastructure\MathilensERP.Infrastructure.csproj" />
   </ItemGroup>
 
 </Project>

@@ -12,6 +12,7 @@ using MathilensERP.Application.Reports;
 using MathilensERP.Application.Settings;
 using MathilensERP.Application.WhatsApp;
 using MathilensERP.Application.Authorization;
+using MathilensERP.Infrastructure.Billing;
 using MathilensERP.Infrastructure.Identity;
 using MathilensERP.Infrastructure.Persistence;
 using MathilensERP.Infrastructure.Persistence.Activity;
@@ -113,6 +114,8 @@ public static class DependencyInjection
         services.AddScoped<IOrderNumberGenerator, OrderNumberGenerator>();
         services.AddScoped<IInvoiceRepository, InvoiceRepository>();
         services.AddScoped<IInvoiceNumberGenerator, InvoiceNumberGenerator>();
+        // Singleton: it holds a key derived once from configuration and is otherwise stateless.
+        services.AddSingleton<IInvoiceShareTokenService, InvoiceShareTokenService>();
         services.AddScoped<IWhatsAppMessageRepository, WhatsAppMessageRepository>();
         services.AddScoped<ISettingRepository, SettingRepository>();
         services.AddScoped<IClothPriceRepository, ClothPriceRepository>();

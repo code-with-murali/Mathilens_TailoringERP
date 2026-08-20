@@ -25,8 +25,8 @@ public sealed class MeasurementHistory : IAuditable
 
     public string ValuesJson { get; private set; } = "{}";
 
-    public IReadOnlyDictionary<string, decimal> Values =>
-        JsonSerializer.Deserialize<Dictionary<string, decimal>>(ValuesJson) ?? [];
+    public IReadOnlyDictionary<string, MeasurementValue> Values =>
+        JsonSerializer.Deserialize<Dictionary<string, MeasurementValue>>(ValuesJson) ?? [];
 
     public DateTime CreatedAtUtc { get; private set; }
 

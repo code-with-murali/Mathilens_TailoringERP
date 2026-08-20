@@ -7,6 +7,7 @@ using MathilensERP.Application.Billing.Commands.Create;
 using MathilensERP.Application.Billing.Commands.RecordPayment;
 using MathilensERP.Application.Billing.Commands.Void;
 using MathilensERP.Application.Billing.Queries.GetById;
+using MathilensERP.Application.Billing.Queries.GetShareToken;
 using MathilensERP.Application.Billing.Queries.Search;
 using MathilensERP.Application.Common.Mediator;
 using MathilensERP.Domain.Billing;
@@ -96,6 +97,21 @@ public sealed class InvoicesController : ApiControllerBase
     public async Task<IActionResult> RecordPayment(Guid id, [FromBody] RecordPaymentRequest request, CancellationToken cancellationToken)
     {
         var result = await _sender.Send(new RecordPaymentCommand(id, request.Amount, request.Method), cancellationToken);
+        return ToActionResult(result);
+    }
+
+    /// <summary>
+    /// The share token for an invoice — the opaque half of the read-only link a customer is sent.
+    ///
+    /// <para>Guarded by InvoicesView, the same right as reading the invoice itself: handing out a
+    /// link to a bill discloses exactly what opening the bill discloses.</para>
+    /// </summary>
+    [HttpGet("{id:guid}/share-token")]
+    [ProducesResponseType(typeof(ApiResponse<InvoiceShareTokenDto>), StatusCodes.Status200OK)]
+    [ProducesResponseType(typeof(ApiErrorResponse), StatusCodes.Status404NotFound)]
+    public async Task<IActionResult> GetShareToken(Guid id, CancellationToken cancellationToken)
+    {
+        var result = await _sender.Send(new GetInvoiceShareTokenQuery(id), cancellationToken);
         return ToActionResult(result);
     }
 

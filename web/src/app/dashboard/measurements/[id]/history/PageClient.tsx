@@ -7,6 +7,7 @@ import { getAccessToken } from "@/lib/auth";
 import { useRouteId } from "@/lib/use-route-id";
 import { ApiError, type PaginationMeta } from "@/lib/api-client";
 import { getMeasurementHistory, type MeasurementHistoryEntry } from "@/lib/api/measurements";
+import { formatMeasurementValue } from "@/lib/api/measurements";
 
 
 export default function MeasurementHistoryPage() {
@@ -73,7 +74,7 @@ export default function MeasurementHistoryPage() {
                   <td data-label="Garment" className="px-4 py-3">{entry.garmentType}</td>
                   <td data-label="Values" className="px-4 py-3">
                     {Object.entries(entry.values)
-                      .map(([name, value]) => `${name}: ${value}`)
+                      .map(([name, value]) => `${name}: ${formatMeasurementValue(value)}`)
                       .join(", ")}
                   </td>
                 </tr>
