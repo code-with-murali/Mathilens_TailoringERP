@@ -16,8 +16,8 @@ const SAMPLE_ADVANCE = 500;
 const DAYS_UNTIL_COLLECTION = 5;
 
 const SAMPLE_ITEMS = [
-  { garmentType: "Blouse" as const, quantity: 2, unitPrice: 350 },
-  { garmentType: "Kurta" as const, quantity: 1, unitPrice: 300 },
+  { garmentType: "Shirt" as const, quantity: 2, unitPrice: 350 },
+  { garmentType: "Pant" as const, quantity: 1, unitPrice: 300 },
 ];
 
 const SAMPLE_SUBTOTAL = SAMPLE_ITEMS.reduce((sum, item) => sum + item.quantity * item.unitPrice, 0);
@@ -36,7 +36,7 @@ export function buildInvoicePreview(nowIso: string, taxRatePercent: number, numb
 
   const customer: Customer = {
     id: "5a1e0000-0000-0000-0000-000000000000",
-    fullName: "Kanishkar",
+    fullName: "Nandha Kumar",
     phoneNumber: "82200 70369",
     email: null,
     address: null,
