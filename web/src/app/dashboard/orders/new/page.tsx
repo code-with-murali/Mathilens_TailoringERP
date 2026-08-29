@@ -751,6 +751,38 @@ export default function NewOrderPage() {
   }
 
   /**
+   * The inline "add a customer without leaving the order" form.
+   *
+   * Rendered in two places at once for the same reason as the measurement panel below: the second
+   * column it lives in from `lg` up becomes the bottom of the page once the layout is one stack, so
+   * on a phone this opens directly under the Customer Details card that asked for it. Only one copy
+   * is ever visible, but both are in the DOM, so the field ids take a suffix.
+   */
+  function renderNewCustomerForm(idSuffix: string) {
+    return (
+      <div className="orderSection-customer flex shrink-0 flex-col gap-2">
+        <h2 className="order-heading text-base font-semibold">New Customer</h2>
+        <Input id={`newCustomerName-${idSuffix}`} label="Full name" value={newCustomerName} onChange={(e) => setNewCustomerName(e.target.value)} error={newCustomerFieldErrors.fullname} />
+        <PhoneNumberInput id={`newCustomerPhone-${idSuffix}`} value={newCustomerPhone} onChange={setNewCustomerPhone} error={newCustomerFieldErrors.phonenumber} />
+        <Input id={`newCustomerEmail-${idSuffix}`} label="Email (optional)" type="email" value={newCustomerEmail} onChange={(e) => setNewCustomerEmail(e.target.value)} error={newCustomerFieldErrors.email} />
+        {newCustomerError && (
+          <p role="alert" className="text-sm text-danger">
+            {newCustomerError}
+          </p>
+        )}
+        <div className="flex justify-end gap-3">
+          <button type="button" onClick={() => setIsAddingNewCustomer(false)} className="text-sm text-foreground/70 hover:text-foreground">
+            Cancel
+          </button>
+          <Button type="button" variant="secondary" disabled={isCreatingCustomer} onClick={handleCreateNewCustomer}>
+            {isCreatingCustomer ? "Adding…" : "Add customer"}
+          </Button>
+        </div>
+      </div>
+    );
+  }
+
+  /**
    * The measurement editor for whichever item is open.
    *
    * Rendered in two places at once: in the second column from `lg` up, and inline beneath the item
@@ -964,6 +996,15 @@ export default function NewOrderPage() {
                 </div>
               </div>
             )}
+            {/* Phone-only: the form opens right here, under the search box and the button that
+                opened it. From lg up it opens in the second column instead, beside this card —
+                see the panel there. Set off by a hairline rather than nested in its own bordered
+                box, which inside a card reads as a card within a card. */}
+            {isAddingNewCustomer && (
+              <div className="border-t border-border pt-3 lg:hidden">
+                {renderNewCustomerForm("inline")}
+              </div>
+            )}
           </div>
 
             <div ref={itemsAreaRef} className="orderSection-items rounded-lg border border-border bg-surface p-4">
@@ -1011,41 +1052,25 @@ export default function NewOrderPage() {
             <div
               ref={measurementBlockRef}
               className={`flex-col gap-3 rounded-lg border border-border bg-surface p-4 lg:flex lg:min-h-[18rem] ${
-                // Below lg an open measurement panel is showing inline under its own item, so this
-                // card would be a second copy of it — and, with the panel's other two modes closed,
-                // an empty bordered box sitting under the item list. The New customer and Order
-                // summary modes still belong here at every width.
-                activeMeasurementItem ? "hidden" : "flex"
+                // Below lg, two of this card's three modes are showing inline where they were asked
+                // for instead — measurements under their own item, the new-customer form under
+                // Customer Details. Leaving the card rendered would put a second copy of one of
+                // them under the item list, or an empty bordered box once both are closed. The
+                // Order summary preview has no inline home and still opens here at every width.
+                activeMeasurementItem || isAddingNewCustomer ? "hidden" : "flex"
               }`}
             >
               {/* From lg up this is where measurements are edited. Below lg the same panel is
                   rendered inline under its own item instead (see renderItemDetail), and this whole
                   card is hidden — see the wrapper's className. */}
               <div className="hidden lg:contents">{renderMeasurementPanel("column")}</div>
-              {/* "+ Add new customer" (from the Mobile Number or Customer field) opens the New
-                  customer form here, in the same top block, instead of inline in column 1 —
-                  mutually exclusive with the measurement panel above since starting either one
-                  clears the other's active state. */}
+              {/* "+ New Customer" (the button beside the search box, or the prompt under the
+                  dropdown) opens the form here from lg up, in the same top block — mutually
+                  exclusive with the measurement panel above, since starting either one clears the
+                  other's active state. Below lg it opens under Customer Details instead, and this
+                  copy is hidden along with the rest of the card. */}
               {!activeMeasurementItem && isAddingNewCustomer && (
-                <div className="orderSection-customer flex shrink-0 flex-col gap-2">
-                  <h2 className="order-heading text-base font-semibold">New Customer</h2>
-                  <Input id="newCustomerName" label="Full name" value={newCustomerName} onChange={(e) => setNewCustomerName(e.target.value)} error={newCustomerFieldErrors.fullname} />
-                  <PhoneNumberInput id="newCustomerPhone" value={newCustomerPhone} onChange={setNewCustomerPhone} error={newCustomerFieldErrors.phonenumber} />
-                  <Input id="newCustomerEmail" label="Email (optional)" type="email" value={newCustomerEmail} onChange={(e) => setNewCustomerEmail(e.target.value)} error={newCustomerFieldErrors.email} />
-                  {newCustomerError && (
-                    <p role="alert" className="text-sm text-danger">
-                      {newCustomerError}
-                    </p>
-                  )}
-                  <div className="flex justify-end gap-3">
-                    <button type="button" onClick={() => setIsAddingNewCustomer(false)} className="text-sm text-foreground/70 hover:text-foreground">
-                      Cancel
-                    </button>
-                    <Button type="button" variant="secondary" disabled={isCreatingCustomer} onClick={handleCreateNewCustomer}>
-                      {isCreatingCustomer ? "Adding…" : "Add customer"}
-                    </Button>
-                  </div>
-                </div>
+                <div className="hidden lg:contents">{renderNewCustomerForm("column")}</div>
               )}
               {/* Clicking the Order summary cell opens an invoice-style preview here instead of
                   just closing whatever was open — a read-only recap of items/total/advance/balance
