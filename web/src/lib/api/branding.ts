@@ -5,6 +5,8 @@ export const SHOP_ADDRESS_KEY = "Shop.Address";
 export const SHOP_TAGLINE_KEY = "Shop.Tagline";
 export const BRANDING_LOGO_URL_KEY = "Branding.LogoUrl";
 export const BRANDING_PRIMARY_COLOR_KEY = "Branding.PrimaryColor";
+/** "business" or "standard" — which WhatsApp app a share opens. See `lib/whatsapp/provider`. */
+export const WHATSAPP_APP_KEY = "WhatsApp.PreferredApp";
 
 export type Branding = {
   shopName: string;
@@ -13,6 +15,8 @@ export type Branding = {
   address: string;
   logoUrl: string;
   primaryColor: string;
+  /** Blank until the shop chooses, which reads as the default rather than as an app named "". */
+  whatsAppApp: string;
 };
 
 export const EMPTY_BRANDING: Branding = {
@@ -22,6 +26,7 @@ export const EMPTY_BRANDING: Branding = {
   address: "",
   logoUrl: "",
   primaryColor: "",
+  whatsAppApp: "",
 };
 
 const KEYS: Record<keyof Branding, string> = {
@@ -31,12 +36,13 @@ const KEYS: Record<keyof Branding, string> = {
   address: SHOP_ADDRESS_KEY,
   logoUrl: BRANDING_LOGO_URL_KEY,
   primaryColor: BRANDING_PRIMARY_COLOR_KEY,
+  whatsAppApp: WHATSAPP_APP_KEY,
 };
 
 /**
- * Reads all five settings at once. A key that has never been set 404s, which is the normal state
+ * Reads all the settings at once. A key that has never been set 404s, which is the normal state
  * for a shop that hasn't customised anything — so a miss becomes an empty string rather than an
- * error, and one absent key never blanks the other four.
+ * error, and one absent key never blanks the others.
  */
 export async function getBranding(token: string | null): Promise<Branding> {
   const entries = await Promise.all(

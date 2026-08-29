@@ -581,6 +581,7 @@ export default function OrderDetailPage() {
                     invoice={activeInvoice}
                     order={{ orderNumber: order.orderNumber, dueAtUtc: order.dueAtUtc }}
                     shopName={branding.shopName || "Mathilens"}
+                    whatsAppApp={branding.whatsAppApp}
                   />
                 </div>
               </div>

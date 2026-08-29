@@ -152,6 +152,30 @@ export default function BrandingPage() {
           </div>
         </div>
 
+        <div className="flex flex-col gap-1">
+          <label htmlFor="whatsAppApp" className="text-sm font-medium">
+            WhatsApp app
+          </label>
+          {/* A phone with both apps installed remembers whichever one was tapped "Always" for, and
+              then sends every invoice from it. This is how that is overridden — and it is stated as
+              a choice rather than assumed, because a shop that shares from the personal number is
+              not doing anything wrong. */}
+          <select
+            id="whatsAppApp"
+            value={branding.whatsAppApp.trim().toLowerCase() === "standard" ? "standard" : "business"}
+            onChange={(e) => set("whatsAppApp", e.target.value)}
+            className="w-64 rounded-md border border-border bg-surface px-3 py-2 text-sm outline-none transition-colors focus:border-primary focus:ring-2 focus:ring-primary/25"
+          >
+            <option value="business">WhatsApp Business</option>
+            <option value="standard">WhatsApp (personal)</option>
+          </select>
+          <p className="text-xs text-foreground/60">
+            Which app &ldquo;Share via WhatsApp&rdquo; opens on an Android phone. If the chosen app
+            isn&apos;t installed, the other one opens instead. On iPhone and on desktop the phone
+            decides and this setting has no effect.
+          </p>
+        </div>
+
         {formError && (
           <p role="alert" className="text-sm text-danger">
             {formError}

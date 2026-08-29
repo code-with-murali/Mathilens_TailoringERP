@@ -1389,6 +1389,7 @@ export default function NewOrderPage() {
                     invoice={createdInvoice}
                     order={{ orderNumber: createdOrder.orderNumber, dueAtUtc: createdOrder.dueAtUtc }}
                     shopName={branding.shopName || "Mathilens"}
+                    whatsAppApp={branding.whatsAppApp}
                   />
                 )}
                 <Button type="button" variant="secondary" disabled={!isOrderCreated} onClick={handleStartNewOrder}>

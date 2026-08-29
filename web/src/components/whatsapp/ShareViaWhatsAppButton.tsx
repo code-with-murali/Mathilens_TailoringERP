@@ -14,6 +14,7 @@ import {
   SHARE_BLOCKED_MESSAGES,
   type ShareBlockedReason,
 } from "@/lib/whatsapp/whatsapp-service";
+import { createManualWhatsAppProvider, toWhatsAppApp } from "@/lib/whatsapp/provider";
 
 /**
  * What this button needs to share one invoice. All of it comes from records the calling screen has
@@ -26,6 +27,12 @@ export type ShareViaWhatsAppProps = {
   invoice: { id: string; invoiceNumber: string; totalAmount: number; amountPaid: number; remainingBalance: number } | null;
   order: { orderNumber: string; dueAtUtc: string };
   shopName: string;
+  /**
+   * The stored `WhatsApp.PreferredApp` setting, passed raw and read here — same as `shopName`, and
+   * for the same reason: this component is handed the shop's settings rather than fetching them.
+   * Anything unset or unrecognised means the default, so a blank is not an error.
+   */
+  whatsAppApp?: string;
   variant?: "primary" | "secondary";
 };
 
@@ -55,6 +62,7 @@ export function ShareViaWhatsAppButton({
   invoice,
   order,
   shopName,
+  whatsAppApp,
   variant = "secondary",
 }: ShareViaWhatsAppProps) {
   const { showToast } = useToast();
@@ -118,7 +126,11 @@ export function ShareViaWhatsAppButton({
       // Opened first, and from the click that asked for it: a browser only allows window.open
       // during a user gesture, and awaiting the activity record beforehand would spend that gesture
       // and get the tab blocked.
-      await shareInvoice(whatsAppNumber, message);
+      await shareInvoice(
+        whatsAppNumber,
+        message,
+        createManualWhatsAppProvider(toWhatsAppApp(whatsAppApp)),
+      );
       setIsPreviewOpen(false);
 
       // Best effort, and after the fact. A trail entry that failed to write is not a reason to tell

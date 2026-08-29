@@ -174,6 +174,7 @@ export default function InvoiceDetailPage() {
               invoice={invoice}
               order={{ orderNumber: order.orderNumber, dueAtUtc: order.dueAtUtc }}
               shopName={branding.shopName || "Mathilens"}
+              whatsAppApp={branding.whatsAppApp}
             />
           )}
           <button type="button" onClick={() => window.print()} className="text-sm text-foreground/70 hover:text-foreground">
