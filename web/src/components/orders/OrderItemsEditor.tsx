@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useRef, useState } from "react";
+import { Fragment, useEffect, useRef, useState, type ReactNode } from "react";
 import { GARMENT_TYPES, type GarmentType } from "@/lib/api/measurements";
 import { searchClothPrices, type ClothPrice } from "@/lib/api/clothPrices";
 import { getAccessToken } from "@/lib/auth";
@@ -209,13 +209,23 @@ type OrderItemsEditorProps = {
   garments: Garment[];
   activeItemId?: number | null;
   onItemClick?: (row: ItemRow) => void;
+  /**
+   * Rendered directly beneath the active row, below the `lg` breakpoint only — the measurement
+   * panel, in practice.
+   *
+   * On a wide screen the panel lives in the page's second column, beside the item it belongs to.
+   * A phone has no second column: that stack sits below every item, so tapping Item 2 scrolled the
+   * answer off-screen and the connection between the row and its measurements was lost. Here the
+   * panel opens where it was asked for, as row 2 of 4 rather than at the foot of the page.
+   */
+  renderItemDetail?: (row: ItemRow) => ReactNode;
   /** Freezes every field and the Add item/Remove buttons — used once an order has been created from this form. */
   disabled?: boolean;
 };
 
 /** Dynamic garment-line editor for the create-order form. In a tailoring-and-fabric order each
  * line also says whose cloth the garment is cut from, and prices the shop's own. */
-export function OrderItemsEditor({ onChange, mode, tailoringRates, garments, activeItemId, onItemClick, disabled = false }: OrderItemsEditorProps) {
+export function OrderItemsEditor({ onChange, mode, tailoringRates, garments, activeItemId, onItemClick, renderItemDetail, disabled = false }: OrderItemsEditorProps) {
   // Two rows to start — a shirt and a trousers is the order a counter takes most often, and a
   // third empty row was one more thing to look past. "+ Add item" covers the rest.
   const [rows, setRows] = useState<ItemRow[]>(() => [emptyRow("Shirt"), emptyRow("Trousers")]);
@@ -301,20 +311,24 @@ export function OrderItemsEditor({ onChange, mode, tailoringRates, garments, act
         // input, and the same condition the New Order page validates and prices the row on.
         const usesShopFabric = row.fabricSource === "internal";
         return (
+        <Fragment key={row.id}>
         <div
-          key={row.id}
           onClick={() => onItemClick?.(row)}
           className={`flex shrink-0 flex-col gap-2 rounded-lg border bg-surface p-3 transition-colors ${
             onItemClick ? "cursor-pointer" : ""
           } ${activeItemId === row.id ? "border-primary ring-1 ring-primary" : "border-border hover:border-primary/40"}`}
         >
-          <div className="flex items-center justify-between gap-2">
+          {/* Wraps below sm, where the three parts do not fit on one line: the fabric toggle alone
+              is around 190px of a 360px phone. Item N keeps the left, Remove keeps the right, and
+              the toggle drops to a full-width line of its own beneath them. From sm up the toggle
+              is pulled back onto the title's line (sm:ml-auto) and Remove sits beside it — which is
+              the layout this row has always had on a desktop. */}
+          <div className="flex flex-wrap items-center gap-x-3 gap-y-2">
             <span className="text-sm font-medium">Item {index + 1}</span>
-            <div className="flex items-center gap-3">
               {/* Whose cloth, right in the item's header — it decides whether the row carries a
                   cloth charge at all, so it belongs above the fields it governs, not among them. */}
               {sellsFabric && (
-                <div className="inline-flex items-center rounded-md border border-border bg-surface p-0.5" onClick={(e) => e.stopPropagation()}>
+                <div className="order-last inline-flex w-full items-center rounded-md border border-border bg-surface p-0.5 sm:order-none sm:ml-auto sm:w-auto" onClick={(e) => e.stopPropagation()}>
                   {(
                     [
                       { value: "external", label: "Customer fabric" },
@@ -327,7 +341,7 @@ export function OrderItemsEditor({ onChange, mode, tailoringRates, garments, act
                       disabled={disabled}
                       aria-pressed={row.fabricSource === choice.value}
                       onClick={() => updateRow(row.id, { fabricSource: choice.value })}
-                      className={`rounded px-3 py-1 text-xs font-medium transition-colors disabled:cursor-not-allowed disabled:opacity-60 ${
+                      className={`flex-1 rounded px-3 py-1 text-xs font-medium transition-colors disabled:cursor-not-allowed disabled:opacity-60 sm:flex-none ${
                         row.fabricSource === choice.value
                           ? "bg-primary text-primary-foreground"
                           : "text-foreground/70 hover:bg-surface-hover hover:text-foreground"
@@ -345,18 +359,22 @@ export function OrderItemsEditor({ onChange, mode, tailoringRates, garments, act
                     e.stopPropagation();
                     removeRow(row.id);
                   }}
-                  className="text-sm text-danger hover:text-danger-hover"
+                  // ml-auto holds Remove at the right edge on its own; from sm up the toggle beside
+                  // it has taken over that job, so it drops back to sitting next to it.
+                  className={`ml-auto text-sm text-danger hover:text-danger-hover ${sellsFabric ? "sm:ml-0" : ""}`}
                 >
                   Remove
                 </button>
               )}
-            </div>
           </div>
 
           {/* No stopPropagation here — a click anywhere in the fields (including a blank input)
               should still bubble up and open the measurement panel for this item, same as
               clicking the card itself. Only Remove and the fabric choice opt out. */}
-          <div className={`grid max-w-2xl grid-cols-2 gap-x-3 gap-y-2 ${sellsFabric ? "sm:grid-cols-5" : "sm:grid-cols-4"}`}>
+          {/* One field per line on a phone. Two-across put a 160px box under a label like
+              "Tailoring Cost", which is narrow enough that the amount and its heading stop reading
+              as a pair; from sm up the five-across row is unchanged. */}
+          <div className={`grid max-w-2xl grid-cols-1 gap-x-3 gap-y-2 ${sellsFabric ? "sm:grid-cols-5" : "sm:grid-cols-4"}`}>
             <div className="flex flex-col gap-0.5">
               <label className="text-xs text-foreground/70">Garment</label>
               <select
@@ -447,7 +465,7 @@ export function OrderItemsEditor({ onChange, mode, tailoringRates, garments, act
               nested box cost sixteen vertical pixels a row and read as a card within a card, which
               is a lot of weight for four fields already grouped by sitting together. */}
           {sellsFabric && (
-            <div className="grid max-w-2xl grid-cols-2 gap-x-3 gap-y-2 border-t border-border pt-2 sm:grid-cols-4">
+            <div className="grid max-w-2xl grid-cols-1 gap-x-3 gap-y-2 border-t border-border pt-2 sm:grid-cols-4">
               <ClothCodeField
                 value={row.clothCode}
                 onChange={(clothCode) => updateRow(row.id, { clothCode })}
@@ -498,6 +516,13 @@ export function OrderItemsEditor({ onChange, mode, tailoringRates, garments, act
             </div>
           )}
         </div>
+        {/* Row 2 of the list on a phone: the open item's measurements, directly under the item they
+            belong to. A sibling of the card rather than a child, so a click inside it does not
+            bubble back into the card's own open-this-item handler. */}
+        {activeItemId === row.id && renderItemDetail && (
+          <div className="lg:hidden">{renderItemDetail(row)}</div>
+        )}
+        </Fragment>
         );
       })}
       {!disabled && (

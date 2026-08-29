@@ -750,6 +750,111 @@ export default function NewOrderPage() {
     }
   }
 
+  /**
+   * The measurement editor for whichever item is open.
+   *
+   * Rendered in two places at once: in the second column from `lg` up, and inline beneath the item
+   * itself below `lg`, where there is no second column to put it in. Only one is ever visible — the
+   * other is hidden by a breakpoint, not unmounted — so the notes field takes an id suffix rather
+   * than shipping the same id twice and breaking its label.
+   */
+  function renderMeasurementPanel(idSuffix: string) {
+    if (!activeMeasurementItem) {
+      return null;
+    }
+    const notesId = `measurementNotes-${idSuffix}`;
+    return (
+      <div className="orderSection-measure flex shrink-0 flex-col gap-3">
+        <div className="flex items-center justify-between gap-2 border-b border-border pb-3">
+          <span className="order-heading min-w-0 flex-1 truncate text-base font-semibold">
+            Measurement Details — Item {activeMeasurementItemIndex + 1} · {activeMeasurementItem.garmentType}
+          </span>
+          <button
+            type="button"
+            onClick={() => setActiveMeasurementItemId(null)}
+            className="shrink-0 text-sm text-foreground/70 hover:text-foreground"
+          >
+            Close
+          </button>
+        </div>
+        {!customer ? (
+          <p className="text-sm text-foreground/70">Select a customer to view or add their measurements.</p>
+        ) : isLoadingMeasurements || isLoadingTemplate ? (
+          <p className="text-sm text-foreground/70">Loading measurements…</p>
+        ) : measurementFields.length === 0 ? (
+          <p className="text-sm text-foreground/70">No measurement points configured for {activeMeasurementItem.garmentType} yet.</p>
+        ) : (
+          <div className="flex flex-col gap-4 sm:flex-row sm:gap-8">
+            <div className="flex flex-1 flex-col gap-2">
+              {measurementFieldsFirstHalf.map((point) => (
+                <MeasurementPointInput
+                  key={point.name}
+                  point={point}
+                  value={measurementValues[point.name] ?? ""}
+                  disabled={isOrderCreated}
+                  onChange={(next) => setMeasurementValues((prev) => ({ ...prev, [point.name]: next }))}
+                />
+              ))}
+            </div>
+            <div className="flex flex-1 flex-col gap-2">
+              {measurementFieldsSecondHalf.map((point) => (
+                <MeasurementPointInput
+                  key={point.name}
+                  point={point}
+                  value={measurementValues[point.name] ?? ""}
+                  disabled={isOrderCreated}
+                  onChange={(next) => setMeasurementValues((prev) => ({ ...prev, [point.name]: next }))}
+                />
+              ))}
+            </div>
+          </div>
+        )}
+
+        {/* The remark that goes with the numbers — "left shoulder sits lower", "loose at
+            the waist", "cuff as per the shirt he brought in". It belongs to this
+            customer's measurement for this garment, so it comes back on their next order
+            for the same thing, which is exactly when a tailor wants to be reminded.
+
+            Shown whenever the panel is showing measurement fields, and saved by the same
+            Save button: a note is part of the fitting, not a separate errand. */}
+        {customer && !isLoadingMeasurements && !isLoadingTemplate && measurementFields.length > 0 && (
+          <div className="flex shrink-0 flex-col gap-1">
+            <label htmlFor={notesId} className="text-sm font-medium">
+              Notes (optional)
+            </label>
+            <textarea
+              id={notesId}
+              rows={2}
+              value={measurementNotes}
+              maxLength={MEASUREMENT_NOTES_MAX_LENGTH}
+              disabled={isOrderCreated}
+              onChange={(e) => setMeasurementNotes(e.target.value)}
+              placeholder="Anything about the fit the tailor should know…"
+              className={fieldClassName}
+            />
+          </div>
+        )}
+
+        {measurementFormError && (
+          <p role="alert" className="text-sm text-danger">
+            {measurementFormError}
+          </p>
+        )}
+
+        {customer && !isLoadingMeasurements && measurementFields.length > 0 && (
+          <div className="flex justify-end gap-3 border-t border-border pt-3">
+            <Button type="button" variant="secondary" onClick={handleClearMeasurement} disabled={isSavingMeasurement || isOrderCreated}>
+              Clear
+            </Button>
+            <Button type="button" onClick={handleSaveMeasurement} disabled={isSavingMeasurement || isOrderCreated}>
+              {isSavingMeasurement ? "Saving…" : "Save"}
+            </Button>
+          </div>
+        )}
+      </div>
+    );
+  }
+
   return (
     <>
     {/* no-spinner (globals.css): every number field on this screen — quantity, tailoring, metres,
@@ -870,6 +975,15 @@ export default function NewOrderPage() {
                 onChange={setItemRows}
                 activeItemId={activeMeasurementItemId}
                 onItemClick={handleItemClick}
+                // Phone-only: the measurement panel opens as the next row down, under the item it
+                // was opened from, instead of at the foot of the page where the second column
+                // lands once the layout is a single stack. Carries its own card border here
+                // because the second column's wrapper is what supplies one on a wide screen.
+                renderItemDetail={() => (
+                  <div className="flex flex-col gap-3 rounded-lg border border-primary bg-surface p-4">
+                    {renderMeasurementPanel("inline")}
+                  </div>
+                )}
                 disabled={isOrderCreated}
               />
             </div>
@@ -896,98 +1010,18 @@ export default function NewOrderPage() {
                 scrolling inside a 18rem window. */}
             <div
               ref={measurementBlockRef}
-              className="flex flex-col gap-3 rounded-lg border border-border bg-surface p-4 lg:min-h-[18rem]"
+              className={`flex-col gap-3 rounded-lg border border-border bg-surface p-4 lg:flex lg:min-h-[18rem] ${
+                // Below lg an open measurement panel is showing inline under its own item, so this
+                // card would be a second copy of it — and, with the panel's other two modes closed,
+                // an empty bordered box sitting under the item list. The New customer and Order
+                // summary modes still belong here at every width.
+                activeMeasurementItem ? "hidden" : "flex"
+              }`}
             >
-              {activeMeasurementItem && (
-                <div className="orderSection-measure flex shrink-0 flex-col gap-3">
-                  <div className="flex items-center justify-between gap-2 border-b border-border pb-3">
-                    <span className="order-heading min-w-0 flex-1 truncate text-base font-semibold">
-                      Measurement Details — Item {activeMeasurementItemIndex + 1} · {activeMeasurementItem.garmentType}
-                    </span>
-                    <button
-                      type="button"
-                      onClick={() => setActiveMeasurementItemId(null)}
-                      className="shrink-0 text-sm text-foreground/70 hover:text-foreground"
-                    >
-                      Close
-                    </button>
-                  </div>
-                  {!customer ? (
-                    <p className="text-sm text-foreground/70">Select a customer to view or add their measurements.</p>
-                  ) : isLoadingMeasurements || isLoadingTemplate ? (
-                    <p className="text-sm text-foreground/70">Loading measurements…</p>
-                  ) : measurementFields.length === 0 ? (
-                    <p className="text-sm text-foreground/70">No measurement points configured for {activeMeasurementItem.garmentType} yet.</p>
-                  ) : (
-                    <div className="flex flex-col gap-4 sm:flex-row sm:gap-8">
-                      <div className="flex flex-1 flex-col gap-2">
-                        {measurementFieldsFirstHalf.map((point) => (
-                          <MeasurementPointInput
-                            key={point.name}
-                            point={point}
-                            value={measurementValues[point.name] ?? ""}
-                            disabled={isOrderCreated}
-                            onChange={(next) => setMeasurementValues((prev) => ({ ...prev, [point.name]: next }))}
-                          />
-                        ))}
-                      </div>
-                      <div className="flex flex-1 flex-col gap-2">
-                        {measurementFieldsSecondHalf.map((point) => (
-                          <MeasurementPointInput
-                            key={point.name}
-                            point={point}
-                            value={measurementValues[point.name] ?? ""}
-                            disabled={isOrderCreated}
-                            onChange={(next) => setMeasurementValues((prev) => ({ ...prev, [point.name]: next }))}
-                          />
-                        ))}
-                      </div>
-                    </div>
-                  )}
-
-                  {/* The remark that goes with the numbers — "left shoulder sits lower", "loose at
-                      the waist", "cuff as per the shirt he brought in". It belongs to this
-                      customer's measurement for this garment, so it comes back on their next order
-                      for the same thing, which is exactly when a tailor wants to be reminded.
-
-                      Shown whenever the panel is showing measurement fields, and saved by the same
-                      Save button: a note is part of the fitting, not a separate errand. */}
-                  {customer && !isLoadingMeasurements && !isLoadingTemplate && measurementFields.length > 0 && (
-                    <div className="flex shrink-0 flex-col gap-1">
-                      <label htmlFor="measurementNotes" className="text-sm font-medium">
-                        Notes (optional)
-                      </label>
-                      <textarea
-                        id="measurementNotes"
-                        rows={2}
-                        value={measurementNotes}
-                        maxLength={MEASUREMENT_NOTES_MAX_LENGTH}
-                        disabled={isOrderCreated}
-                        onChange={(e) => setMeasurementNotes(e.target.value)}
-                        placeholder="Anything about the fit the tailor should know…"
-                        className={fieldClassName}
-                      />
-                    </div>
-                  )}
-
-                  {measurementFormError && (
-                    <p role="alert" className="text-sm text-danger">
-                      {measurementFormError}
-                    </p>
-                  )}
-
-                  {customer && !isLoadingMeasurements && measurementFields.length > 0 && (
-                    <div className="flex justify-end gap-3 border-t border-border pt-3">
-                      <Button type="button" variant="secondary" onClick={handleClearMeasurement} disabled={isSavingMeasurement || isOrderCreated}>
-                        Clear
-                      </Button>
-                      <Button type="button" onClick={handleSaveMeasurement} disabled={isSavingMeasurement || isOrderCreated}>
-                        {isSavingMeasurement ? "Saving…" : "Save"}
-                      </Button>
-                    </div>
-                  )}
-                </div>
-              )}
+              {/* From lg up this is where measurements are edited. Below lg the same panel is
+                  rendered inline under its own item instead (see renderItemDetail), and this whole
+                  card is hidden — see the wrapper's className. */}
+              <div className="hidden lg:contents">{renderMeasurementPanel("column")}</div>
               {/* "+ Add new customer" (from the Mobile Number or Customer field) opens the New
                   customer form here, in the same top block, instead of inline in column 1 —
                   mutually exclusive with the measurement panel above since starting either one
