@@ -48,6 +48,9 @@ const NAV_ITEMS: NavEntry[] = [
   { href: "/dashboard", label: "Dashboard", icon: DashboardIcon, permission: null },
   { href: "/dashboard/orders", label: "Orders", icon: OrdersIcon, permission: PERMISSIONS.ordersView },
   { href: "/dashboard/customers", label: "Customers", icon: CustomersIcon, permission: PERMISSIONS.customersView },
+  // Gated on measurements rather than a permission of its own: it shows nothing a tailor cannot
+  // already read off the Measurement screen, drawn instead of listed.
+  { href: "/dashboard/simulator", label: "Simulator", icon: GarmentIcon, permission: PERMISSIONS.measurementsView },
   { href: "/dashboard/invoices", label: "Invoices", icon: InvoicesIcon, permission: PERMISSIONS.invoicesView },
   {
     label: "Inventory",
