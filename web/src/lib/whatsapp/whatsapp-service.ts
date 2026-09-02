@@ -39,6 +39,31 @@ export type InvoiceShare = {
   collectionDateUtc: string;
 };
 
+/**
+ * Which message a share sends.
+ *
+ * Three, because an order is shared with a customer at three different moments and they are not the
+ * same news. The invoice one goes out when the order is taken; the other two follow the order's own
+ * status, so what the customer is told and what the shop's screen says can never disagree.
+ */
+export type ShareKind = "invoice" | "ready" | "delivered";
+
+/**
+ * What a status message quotes. Less than an invoice share needs, deliberately: telling somebody
+ * their clothes are ready does not depend on an invoice existing.
+ */
+export type StatusShare = {
+  customerName: string;
+  orderNumber: string;
+  /**
+   * What is still owed, or null to say nothing about money at all — no invoice raised, or nothing
+   * left to pay. A line reading "Balance Due: ₹0.00" invites a question that has no answer.
+   */
+  balanceDue: number | null;
+  /** The order's collection date, ISO or anything Date can read. */
+  collectionDateUtc: string;
+};
+
 /** Why a share cannot go ahead, in words a person at the counter can act on. */
 export type ShareBlockedReason =
   | "no-customer"
@@ -134,6 +159,57 @@ export function buildInvoiceMessage(share: InvoiceShare, shop: ShopIdentity): st
   lines.push("", "Thank you,", `*${shop.name}*`);
 
   return lines.join("\n");
+}
+
+/**
+ * "Your order is ready" — sent once the order reaches Ready For Delivery.
+ *
+ * The one message in this file the customer is expected to act on, so it ends by asking for the
+ * thing the shop actually wants: come and collect it. The balance is named rather than left as a
+ * surprise at the counter — somebody who knows what to bring brings it.
+ */
+export function buildReadyMessage(share: StatusShare, shop: ShopIdentity): string {
+  const lines: string[] = [
+    `Hi ${share.customerName} 👋`,
+    "",
+    `Your order from *${shop.name}* is *ready for collection*.`,
+    "",
+    `📦 *Order:* ${share.orderNumber}`,
+  ];
+
+  // Both dropped rather than printed empty, same as the invoice message: a heading with nothing
+  // after it reads as a fault in the shop's system.
+  if (share.balanceDue !== null && share.balanceDue > 0) {
+    lines.push(`💳 *Balance Due:* ${money(share.balanceDue)}`);
+  }
+
+  const collectionDate = formatCollectionDate(share.collectionDateUtc);
+  if (collectionDate !== "") {
+    lines.push(`📅 *Collection Date:* ${collectionDate}`);
+  }
+
+  lines.push("", "Please collect at your convenience.", "", "Thank you,", `*${shop.name}*`);
+
+  return lines.join("\n");
+}
+
+/**
+ * "Your order has been delivered" — the thank-you, sent once it is handed over.
+ *
+ * Says nothing about money, and not by omission: this shop blocks delivery while payment is
+ * pending, so by the time an order is Delivered there is nothing left to ask for. A balance line
+ * here would either read ₹0.00 or contradict the rule that let the order be delivered at all.
+ */
+export function buildDeliveredMessage(share: StatusShare, shop: ShopIdentity): string {
+  return [
+    `Hi ${share.customerName} 👋`,
+    "",
+    `Your order *${share.orderNumber}* has been *delivered*.`,
+    "",
+    `Thank you for choosing *${shop.name}*. We hope to see you again 🙏`,
+    "",
+    `*${shop.name}*`,
+  ].join("\n");
 }
 
 /**

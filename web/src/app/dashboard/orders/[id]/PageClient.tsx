@@ -11,6 +11,7 @@ import { useToast } from "@/components/ui/ToastProvider";
 import { InvoiceDocument } from "@/components/orders/InvoiceDocument";
 import { InvoicePrintModal } from "@/components/orders/InvoicePrintModal";
 import { ShareViaWhatsAppButton } from "@/components/whatsapp/ShareViaWhatsAppButton";
+import type { ShareKind } from "@/lib/whatsapp/whatsapp-service";
 import { useBranding } from "@/lib/use-branding";
 import { OrderWorkflow } from "./OrderWorkflow";
 import { getAccessToken } from "@/lib/auth";
@@ -22,6 +23,7 @@ import { createInvoice, recordPayment, type Invoice } from "@/lib/api/billing";
 import { findInvoicesForOrder, activeInvoiceOf, deliveryFactsFor } from "@/lib/api/order-invoices";
 import { DeliveryDialog, type DeliveryPayment } from "@/components/orders/DeliveryDialog";
 import { getInvoiceSettings, taxAmountFor, DEFAULT_INVOICE_SETTINGS } from "@/lib/api/invoice-settings";
+import { DateInput } from "@/components/ui/DateInput";
 import {
   getOrder,
   getPreviousOrders,
@@ -324,6 +326,12 @@ export default function OrderDetailPage() {
   // Work cannot start on an order nobody holds — the server refuses it, so the screen offers the
   // assignment as its own step rather than letting the click come back as an error.
   const needsAssignment = !order.employeeId && nextStatuses.includes("InProgress");
+  // The two moments an order is worth telling a customer about. Read off the status rather than
+  // fired by the transition, so the offer survives a reload and a share can be sent again if the
+  // first one never reached them — a message staff only get one chance at is a message that gets
+  // missed.
+  const statusShareKind: ShareKind | null =
+    order.status === "ReadyForDelivery" ? "ready" : order.status === "Delivered" ? "delivered" : null;
 
   const activeInvoice = activeInvoiceOf(invoices ?? []);
   const hasVoidedInvoice = (invoices ?? []).some((invoice) => invoice.status === "Void");
@@ -373,13 +381,7 @@ export default function OrderDetailPage() {
               <label htmlFor="editDueAt" className="text-sm">
                 Collection date
               </label>
-              <input
-                id="editDueAt"
-                type="date"
-                value={editDueAt}
-                onChange={(e) => setEditDueAt(e.target.value)}
-                className={fieldClassName}
-              />
+              <DateInput id="editDueAt" value={editDueAt} onChange={setEditDueAt} />
             </div>
             <div className="flex flex-col gap-1">
               <label htmlFor="editNotes" className="text-sm">
@@ -492,7 +494,10 @@ export default function OrderDetailPage() {
           </dl>
         )}
 
-        {nextStatuses.length > 0 && !isEditingDetails && (
+        {/* Delivered has no next status of its own, so the row has to be allowed to exist for the
+            thank-you alone — otherwise the one message sent after the last transition would have
+            nowhere to live. */}
+        {(nextStatuses.length > 0 || statusShareKind) && !isEditingDetails && (
           <div className="mt-4 flex flex-wrap gap-3">
             {/* Assigning stands in for starting work until it is done. The two never appear together:
                 one action at a time is the whole point of a workflow, and a disabled button asking to
@@ -516,6 +521,19 @@ export default function OrderDetailPage() {
                   Mark as {orderStatusLabel(target)}
                 </Button>
               ))}
+
+            {/* Beside the transition it follows from, not down with the invoice: this is news about
+                the order, and the moment to send it is the moment the status was just changed. */}
+            {statusShareKind && (
+              <ShareViaWhatsAppButton
+                kind={statusShareKind}
+                customer={customer}
+                invoice={activeInvoice}
+                order={{ orderNumber: order.orderNumber, dueAtUtc: order.dueAtUtc }}
+                shopName={branding.shopName || "Mathilens"}
+                whatsAppApp={branding.whatsAppApp}
+              />
+            )}
           </div>
         )}
       </div>

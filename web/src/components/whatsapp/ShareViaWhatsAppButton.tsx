@@ -9,10 +9,13 @@ import { toDisplayPhoneNumber } from "@/lib/contact";
 import { recordWhatsAppShareOpened } from "@/lib/api/whatsapp";
 import {
   buildInvoiceMessage,
+  buildReadyMessage,
+  buildDeliveredMessage,
   shareInvoice,
   toWhatsAppNumber,
   SHARE_BLOCKED_MESSAGES,
   type ShareBlockedReason,
+  type ShareKind,
 } from "@/lib/whatsapp/whatsapp-service";
 import { createManualWhatsAppProvider, toWhatsAppApp } from "@/lib/whatsapp/provider";
 
@@ -33,7 +36,32 @@ export type ShareViaWhatsAppProps = {
    * Anything unset or unrecognised means the default, so a blank is not an error.
    */
   whatsAppApp?: string;
+  /**
+   * Which message to send. Defaults to the invoice, which is what this button did before there was
+   * anything else to send.
+   */
+  kind?: ShareKind;
   variant?: "primary" | "secondary";
+};
+
+/**
+ * What each button says it will do.
+ *
+ * Three of these can appear on one order page at once, so "Share via WhatsApp" three times over
+ * would be three buttons asking to be tried to find out which is which. The label names the
+ * message; the glyph says where it goes.
+ */
+const BUTTON_LABELS: Record<ShareKind, string> = {
+  invoice: "Share via WhatsApp",
+  ready: "Tell customer it's ready",
+  delivered: "Send a thank-you",
+};
+
+/** The line under the dialog title, so the preview says which of the three is being previewed. */
+const MODAL_DESCRIPTIONS: Record<ShareKind, string> = {
+  invoice: "Check the message, then open WhatsApp and press Send there.",
+  ready: "Tells the customer their order is ready to collect. Check it, then send from WhatsApp.",
+  delivered: "Thanks the customer for a completed order. Check it, then send from WhatsApp.",
 };
 
 /** WhatsApp's own glyph, drawn inline — one icon is not worth a dependency. */
@@ -63,6 +91,7 @@ export function ShareViaWhatsAppButton({
   order,
   shopName,
   whatsAppApp,
+  kind = "invoice",
   variant = "secondary",
 }: ShareViaWhatsAppProps) {
   const { showToast } = useToast();
@@ -72,14 +101,19 @@ export function ShareViaWhatsAppButton({
 
   const whatsAppNumber = toWhatsAppNumber(customer?.phoneNumber);
 
-  /** The first thing standing in the way, or null when the share can go ahead. */
+  /**
+   * The first thing standing in the way, or null when the share can go ahead.
+   *
+   * A missing invoice only blocks the invoice message. Telling somebody their clothes are ready
+   * does not depend on having billed them yet — the message simply leaves the money line out.
+   */
   const blockedBy: ShareBlockedReason | null = !customer
     ? "no-customer"
     : !customer.phoneNumber?.trim()
       ? "no-phone-number"
       : whatsAppNumber === null
         ? "invalid-phone-number"
-        : !invoice
+        : !invoice && kind === "invoice"
           ? "no-invoice"
           : null;
 
@@ -90,34 +124,55 @@ export function ShareViaWhatsAppButton({
       showToast(SHARE_BLOCKED_MESSAGES[blockedBy], "error");
       return;
     }
-    if (!customer || !invoice) {
+    if (!customer) {
       return;
     }
 
-    // Composed from what is already on screen — no round trip. The message used to carry a link to
-    // the read-only invoice page, which meant fetching a share token first and a failure path when
-    // that did not come back; it carries no link now, so there is nothing left to fetch and nothing
-    // left to fail. The page and its token endpoint still exist for when a link is wanted again.
-    setMessage(
-      buildInvoiceMessage(
-        {
-          customerName: customer.fullName,
-          customerPhoneNumber: customer.phoneNumber,
-          orderNumber: order.orderNumber,
-          invoiceNumber: invoice.invoiceNumber,
-          orderTotal: invoice.totalAmount,
-          advancePaid: invoice.amountPaid,
-          balanceDue: invoice.remainingBalance,
-          collectionDateUtc: order.dueAtUtc,
-        },
-        { name: shopName },
-      ),
-    );
+    // Composed from what is already on screen — no round trip. The invoice message used to carry a
+    // link to the read-only invoice page, which meant fetching a share token first and a failure
+    // path when that did not come back; it carries no link now, so there is nothing left to fetch
+    // and nothing left to fail. The page and its token endpoint still exist for when a link is
+    // wanted again.
+    const shop = { name: shopName };
+
+    if (kind === "invoice") {
+      if (!invoice) {
+        return;
+      }
+
+      setMessage(
+        buildInvoiceMessage(
+          {
+            customerName: customer.fullName,
+            customerPhoneNumber: customer.phoneNumber,
+            orderNumber: order.orderNumber,
+            invoiceNumber: invoice.invoiceNumber,
+            orderTotal: invoice.totalAmount,
+            advancePaid: invoice.amountPaid,
+            balanceDue: invoice.remainingBalance,
+            collectionDateUtc: order.dueAtUtc,
+          },
+          shop,
+        ),
+      );
+    } else {
+      const status = {
+        customerName: customer.fullName,
+        orderNumber: order.orderNumber,
+        // null, not 0, when there is no invoice to read a balance from — the message treats the
+        // two differently, and "nothing owed" is not the same claim as "nothing billed yet".
+        balanceDue: invoice?.remainingBalance ?? null,
+        collectionDateUtc: order.dueAtUtc,
+      };
+
+      setMessage(kind === "ready" ? buildReadyMessage(status, shop) : buildDeliveredMessage(status, shop));
+    }
+
     setIsPreviewOpen(true);
   }
 
   async function handleOpenWhatsApp() {
-    if (!whatsAppNumber || !customer || !invoice) {
+    if (!whatsAppNumber || !customer) {
       return;
     }
 
@@ -136,7 +191,14 @@ export function ShareViaWhatsAppButton({
       // Best effort, and after the fact. A trail entry that failed to write is not a reason to tell
       // someone their share did not happen — it plainly did, in the tab that just opened.
       recordWhatsAppShareOpened(
-        { customerId: customer.id, orderNumber: order.orderNumber, invoiceNumber: invoice.invoiceNumber },
+        {
+          customerId: customer.id,
+          orderNumber: order.orderNumber,
+          // Blank on a status share with nothing billed yet. The field is the invoice's own
+          // reference, and inventing one to fill it would put a number in the trail that names no
+          // invoice — the order number is what makes the row followable either way.
+          invoiceNumber: invoice?.invoiceNumber ?? "",
+        },
         getAccessToken(),
       ).catch(() => {});
     } catch (error) {
@@ -156,14 +218,14 @@ export function ShareViaWhatsAppButton({
           {/* The glyph keeps WhatsApp's own green — it names another application, and this is the
               one place the ERP's palette should step aside. The button itself stays in theme. */}
           <WhatsAppIcon className="h-4 w-4 text-[#25D366]" />
-          Share via WhatsApp
+          {BUTTON_LABELS[kind]}
         </span>
       </Button>
 
       <Modal
         open={isPreviewOpen}
         title="Share via WhatsApp"
-        description="Check the message, then open WhatsApp and press Send there."
+        description={MODAL_DESCRIPTIONS[kind]}
         onClose={() => setIsPreviewOpen(false)}
       >
         <div className="flex flex-col gap-4">
