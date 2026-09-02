@@ -4,9 +4,7 @@ import { useState, type ReactNode } from "react";
 import { Button } from "@/components/ui/Button";
 import { Modal } from "@/components/ui/Modal";
 import { paymentMethodLabel, type PaymentMethod } from "@/lib/api/billing";
-
-const fieldClassName =
-  "rounded-md border border-border bg-surface px-3 py-2 text-sm outline-none transition-colors focus:border-primary focus:ring-2 focus:ring-primary/25";
+import { DateInput } from "@/components/ui/DateInput";
 
 /** Today, in the yyyy-MM-dd that <input type="date"> speaks. */
 function todayIsoDate(): string {
@@ -244,13 +242,11 @@ export function DeliveryDialog({
               <SectionHeading>Delivery Date</SectionHeading>
               {/* A late-entered handover keeps the day it happened, so this is editable rather
                   than stamped with now. */}
-              <input
+              <DateInput
                 id="deliveryDate"
-                type="date"
                 value={deliveryDate}
-                onChange={(e) => setDeliveryDate(e.target.value)}
+                onChange={setDeliveryDate}
                 disabled={isConfirming}
-                className={fieldClassName}
               />
             </section>
 

@@ -5,6 +5,7 @@ import { Button } from "@/components/ui/Button";
 import { useToast } from "@/components/ui/ToastProvider";
 import { getAccessToken } from "@/lib/auth";
 import { ApiError } from "@/lib/api-client";
+import { DateInput } from "@/components/ui/DateInput";
 import {
   getShopCalendar,
   saveShopCalendar,
@@ -174,16 +175,12 @@ export default function WorkingDaysSettingsPage() {
               <label htmlFor="holidayDate" className="text-sm font-medium">
                 Date
               </label>
-              <input
+              <DateInput
                 id="holidayDate"
-                type="date"
                 value={newHolidayDate}
                 min={today}
                 disabled={isLoading}
-                onChange={(e) => setNewHolidayDate(e.target.value)}
-                // Opens the picker wherever in the field you click, not just on the glyph.
-                onClick={(e) => e.currentTarget.showPicker?.()}
-                className={holidayFieldClassName}
+                onChange={setNewHolidayDate}
               />
             </div>
             <div className="flex min-w-0 flex-1 flex-col gap-1">

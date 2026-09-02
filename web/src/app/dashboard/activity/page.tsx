@@ -4,6 +4,7 @@ import { useCallback, useEffect, useState } from "react";
 import { DEFAULT_PAGE_SIZE, Pagination } from "@/components/ui/Pagination";
 import { getAccessToken } from "@/lib/auth";
 import { ApiError, type PaginationMeta } from "@/lib/api-client";
+import { DateInput } from "@/components/ui/DateInput";
 import {
   searchActivityLogs,
   getActivityLogFilters,
@@ -152,25 +153,13 @@ export default function ActivityLogPage() {
           <label htmlFor="fromDate" className="text-sm font-medium">
             From
           </label>
-          <input
-            id="fromDate"
-            type="date"
-            value={fromDate}
-            onChange={(e) => applyFilter(() => setFromDate(e.target.value))}
-            className={fieldClassName}
-          />
+          <DateInput id="fromDate" value={fromDate} onChange={(iso) => applyFilter(() => setFromDate(iso))} />
         </div>
         <div className="flex min-w-0 flex-col gap-1">
           <label htmlFor="toDate" className="text-sm font-medium">
             To
           </label>
-          <input
-            id="toDate"
-            type="date"
-            value={toDate}
-            onChange={(e) => applyFilter(() => setToDate(e.target.value))}
-            className={fieldClassName}
-          />
+          <DateInput id="toDate" value={toDate} onChange={(iso) => applyFilter(() => setToDate(iso))} />
         </div>
         <div className="flex min-w-0 flex-col gap-1">
           <label htmlFor="userFilter" className="text-sm font-medium">

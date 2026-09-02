@@ -23,9 +23,7 @@ import {
   type EmployeeOrder,
 } from "@/lib/api/employees";
 import { toDisplayPhoneNumber } from "@/lib/contact";
-
-const fieldClassName =
-  "rounded-md border border-border bg-surface px-3 py-2 text-sm outline-none transition-colors focus:border-primary focus:ring-2 focus:ring-primary/25";
+import { DateInput } from "@/components/ui/DateInput";
 
 /** yyyy-MM-dd off the local calendar, for date inputs and defaults. */
 function todayIsoDate(): string {
@@ -274,13 +272,11 @@ export default function EmployeeViewPage() {
             <label htmlFor="lastWorkingDate" className="text-sm font-medium">
               Last working date
             </label>
-            <input
+            <DateInput
               id="lastWorkingDate"
-              type="date"
               value={lastWorkingDate}
               min={employee.joiningDate}
-              onChange={(e) => setLastWorkingDate(e.target.value)}
-              className={fieldClassName}
+              onChange={setLastWorkingDate}
             />
           </div>
 

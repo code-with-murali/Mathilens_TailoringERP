@@ -12,6 +12,7 @@ import { usePermissions } from "@/lib/use-permissions";
 import { PERMISSIONS } from "@/lib/api/users";
 import { listAllClothPrices, type ClothPrice } from "@/lib/api/clothPrices";
 import { searchClothReceipts, receiveCloth, CLOTH_UNITS, type ClothReceipt, type ClothUnit } from "@/lib/api/inventory";
+import { DateInput } from "@/components/ui/DateInput";
 
 const fieldClassName =
   "rounded-md border border-border bg-surface px-3 py-2 text-sm outline-none transition-colors focus:border-primary focus:ring-2 focus:ring-primary/25";
@@ -250,13 +251,7 @@ export default function InventoryPage() {
               <label htmlFor="receivedOn" className="text-sm font-medium">
                 Received on
               </label>
-              <input
-                id="receivedOn"
-                type="date"
-                value={receivedOn}
-                onChange={(e) => setReceivedOn(e.target.value)}
-                className={fieldClassName}
-              />
+              <DateInput id="receivedOn" value={receivedOn} onChange={setReceivedOn} />
             </div>
           </div>
 
@@ -323,32 +318,28 @@ export default function InventoryPage() {
           <label htmlFor="fromDate" className="text-sm font-medium">
             From
           </label>
-          <input
+          <DateInput
             id="fromDate"
-            type="date"
             value={fromDate}
             max={toDate || undefined}
-            onChange={(e) => {
-              setFromDate(e.target.value);
+            onChange={(iso) => {
+              setFromDate(iso);
               setPage(1);
             }}
-            className={fieldClassName}
           />
         </div>
         <div className="flex flex-col gap-1">
           <label htmlFor="toDate" className="text-sm font-medium">
             To
           </label>
-          <input
+          <DateInput
             id="toDate"
-            type="date"
             value={toDate}
             min={fromDate || undefined}
-            onChange={(e) => {
-              setToDate(e.target.value);
+            onChange={(iso) => {
+              setToDate(iso);
               setPage(1);
             }}
-            className={fieldClassName}
           />
         </div>
       </div>

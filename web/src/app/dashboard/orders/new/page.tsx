@@ -46,6 +46,7 @@ import { toDisplayPhoneNumber } from "@/lib/contact";
 import { ShareViaWhatsAppButton } from "@/components/whatsapp/ShareViaWhatsAppButton";
 import { PaymentMethodPicker } from "@/components/billing/PaymentMethodPicker";
 import { useBranding } from "@/lib/use-branding";
+import { DateInput } from "@/components/ui/DateInput";
 
 /* One field treatment for the whole page, matching the Input component the rest of the app uses:
    white fill, hairline border, blue focus ring, and a disabled state that stays readable rather
@@ -82,31 +83,6 @@ const EMPLOYEE_PAGE_SIZE = 100;
 /** 500 staff is far past any tailoring shop; the cap only exists so a bad meta can't loop forever. */
 const EMPLOYEE_PAGE_LIMIT = 5;
 
-/** "26-08-2026" from "2026-08-26". */
-function toDisplayDate(isoDate: string): string {
-  const [year, month, day] = isoDate.split("-");
-  return year && month && day ? `${day}-${month}-${year}` : "";
-}
-
-/** "2026-08-26" from a displayed "26-08-2026", or "" if it is not a real date. */
-function fromDisplayDate(text: string): string {
-  const digits = text.replace(/\D/g, "");
-  if (digits.length !== 8) {
-    return "";
-  }
-  const day = Number(digits.slice(0, 2));
-  const month = Number(digits.slice(2, 4));
-  const year = Number(digits.slice(4, 8));
-
-  // Round-tripped through Date because the constructor rolls 31-02 forward into March rather than
-  // refusing it — comparing the parts back is what catches a day that does not exist.
-  const candidate = new Date(year, month - 1, day);
-  if (candidate.getFullYear() !== year || candidate.getMonth() !== month - 1 || candidate.getDate() !== day) {
-    return "";
-  }
-  return `${year}-${String(month).padStart(2, "0")}-${String(day).padStart(2, "0")}`;
-}
-
 /** The weekday of the yyyy-MM-dd a date input holds, or null while the field is empty or half-typed. */
 function weekdayOf(isoDate: string): (typeof WEEKDAYS)[number] | null {
   const [year, month, day] = isoDate.split("-").map(Number);
@@ -137,8 +113,6 @@ export default function NewOrderPage() {
   const [employees, setEmployees] = useState<Employee[]>([]);
   const [isLoadingEmployees, setIsLoadingEmployees] = useState(true);
   const [dueAtUtc, setDueAtUtc] = useState("");
-  /** What the DD-MM-YYYY field shows — its own state so a half-typed date survives keystrokes. */
-  const [dueDateText, setDueDateText] = useState("");
   const [orderNotes, setOrderNotes] = useState("");
   const [itemRows, setItemRows] = useState<ItemRow[]>([]);
   // A property of the shop, read from Settings › Business Mode — it used to be a pair of pills in
@@ -203,16 +177,6 @@ export default function NewOrderPage() {
   const mobileFieldRef = useRef<HTMLDivElement>(null);
   const orderSummaryRef = useRef<HTMLDivElement>(null);
   const scheduleRef = useRef<HTMLDivElement>(null);
-  const datePickerRef = useRef<HTMLInputElement>(null);
-
-  useEffect(() => {
-    // Keeps the DD-MM-YYYY field in step with dates that arrive from somewhere other than typing
-    // — the pre-fill, the picker, New order's reset. Left alone when it already spells the same
-    // date, so a cursor mid-entry is never yanked.
-    // eslint-disable-next-line react-hooks/set-state-in-effect
-    setDueDateText((current) => (fromDisplayDate(current) === dueAtUtc ? current : toDisplayDate(dueAtUtc)));
-  }, [dueAtUtc]);
-
   useEffect(() => {
     if (!activeMeasurementItem && !isViewingSummary) {
       return;
@@ -1244,42 +1208,13 @@ export default function NewOrderPage() {
                     changes that ("lang" is ignored). The real date input is still there, kept
                     rendered but invisible behind this one, purely so its picker can be opened. */}
                 <div className="flex items-center gap-3">
-                  <div className="relative shrink-0">
-                    <input
-                      id="dueAtUtc"
-                      type="text"
-                      inputMode="numeric"
-                      autoComplete="off"
-                      placeholder="DD-MM-YYYY"
-                      value={dueDateText}
-                      disabled={isOrderCreated}
-                      // Read-only because the click that opens the picker also takes focus away
-                      // from this field — a caret that can be placed but never typed into is
-                      // worse than a field that plainly belongs to the picker. Enter and Space
-                      // open it too, so this is still reachable without a mouse.
-                      readOnly
-                      onClick={() => datePickerRef.current?.showPicker?.()}
-                      onKeyDown={(e) => {
-                        if (e.key === "Enter" || e.key === " ") {
-                          e.preventDefault();
-                          datePickerRef.current?.showPicker?.();
-                        }
-                      }}
-                      className={`${fieldClassName} w-32 cursor-pointer`}
-                    />
-                    {/* Invisible, not hidden: showPicker throws on an element that is not being
-                        rendered. Sized over the text field so the picker opens against it. */}
-                    <input
-                      ref={datePickerRef}
-                      type="date"
-                      tabIndex={-1}
-                      aria-hidden="true"
-                      value={dueAtUtc}
-                      disabled={isOrderCreated}
-                      onChange={(e) => setDueAtUtc(e.target.value)}
-                      className="pointer-events-none absolute inset-0 h-full w-full opacity-0"
-                    />
-                  </div>
+                  <DateInput
+                    id="dueAtUtc"
+                    value={dueAtUtc}
+                    onChange={setDueAtUtc}
+                    disabled={isOrderCreated}
+                    className="w-32 shrink-0"
+                  />
                   {/* Rendered even when blank, so nothing shifts as the date is typed. */}
                   <span className="min-w-[5.5rem] shrink-0 truncate text-sm font-medium text-foreground/70">
                     {collectionWeekday?.label ?? ""}

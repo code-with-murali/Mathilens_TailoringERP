@@ -1,9 +1,7 @@
 "use client";
 
 import { useState } from "react";
-
-const fieldClassName =
-  "rounded-md border border-border bg-surface px-3 py-2 text-sm outline-none transition-colors focus:border-primary focus:ring-2 focus:ring-primary/25";
+import { DateInput } from "@/components/ui/DateInput";
 
 /**
  * Far enough back to predate any record the shop holds, so "All" needs no special case downstream.
@@ -302,27 +300,13 @@ export function ReportRangeFilter({ range }: { range: ReportRange }) {
             <label htmlFor="fromDate" className="text-sm font-medium">
               From
             </label>
-            <input
-              id="fromDate"
-              type="date"
-              value={fromDate}
-              max={toDate}
-              onChange={(e) => setCustomFrom(e.target.value)}
-              className={fieldClassName}
-            />
+            <DateInput id="fromDate" value={fromDate} max={toDate} onChange={setCustomFrom} />
           </div>
           <div className="flex flex-col gap-1">
             <label htmlFor="toDate" className="text-sm font-medium">
               To
             </label>
-            <input
-              id="toDate"
-              type="date"
-              value={toDate}
-              min={fromDate}
-              onChange={(e) => setCustomTo(e.target.value)}
-              className={fieldClassName}
-            />
+            <DateInput id="toDate" value={toDate} min={fromDate} onChange={setCustomTo} />
           </div>
         </>
       )}

@@ -7,6 +7,7 @@ import { Input } from "@/components/ui/Input";
 import { PhoneNumberInput } from "@/components/ui/PhoneNumberInput";
 import { ApiError } from "@/lib/api-client";
 import { emailError, phoneNumberError, toNationalDigits } from "@/lib/contact";
+import { DateInput } from "@/components/ui/DateInput";
 import {
   EMPLOYMENT_TYPES,
   EMPLOYMENT_TYPE_LABELS,
@@ -170,13 +171,7 @@ export function EmployeeForm({ initialValues = emptyValues, onSubmit, onCancel }
           <label htmlFor="joiningDate" className="text-sm font-medium">
             Joining date
           </label>
-          <input
-            id="joiningDate"
-            type="date"
-            value={joiningDate}
-            onChange={(e) => setJoiningDate(e.target.value)}
-            className="rounded-md border border-border bg-surface px-3 py-2 text-sm outline-none transition-colors focus:border-primary focus:ring-2 focus:ring-primary/25"
-          />
+          <DateInput id="joiningDate" value={joiningDate} onChange={setJoiningDate} />
           {fieldErrors.joiningdate && <p className="text-sm text-danger">{fieldErrors.joiningdate}</p>}
         </div>
       </div>

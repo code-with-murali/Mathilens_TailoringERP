@@ -9,6 +9,7 @@ import { ApiError, type PaginationMeta } from "@/lib/api-client";
 import { searchInvoices, INVOICE_STATUSES, type DateRange, type Invoice, type InvoiceStatus } from "@/lib/api/billing";
 import { getCustomer, type Customer } from "@/lib/api/customers";
 import { formatInvoiceDate } from "@/lib/api/invoice-settings";
+import { DateInput } from "@/components/ui/DateInput";
 
 /**
  * The shop's own reference — "INV-2026-0001".
@@ -199,32 +200,28 @@ export default function InvoicesPage() {
               <label htmlFor="dateFrom" className="text-sm font-medium">
                 From
               </label>
-              <input
+              <DateInput
                 id="dateFrom"
-                type="date"
                 value={customFrom}
                 max={customTo}
-                onChange={(e) => {
-                  setCustomFrom(e.target.value);
+                onChange={(iso) => {
+                  setCustomFrom(iso);
                   setPage(1);
                 }}
-                className={fieldClassName}
               />
             </div>
             <div className="flex flex-col gap-1">
               <label htmlFor="dateTo" className="text-sm font-medium">
                 To
               </label>
-              <input
+              <DateInput
                 id="dateTo"
-                type="date"
                 value={customTo}
                 min={customFrom}
-                onChange={(e) => {
-                  setCustomTo(e.target.value);
+                onChange={(iso) => {
+                  setCustomTo(iso);
                   setPage(1);
                 }}
-                className={fieldClassName}
               />
             </div>
           </>

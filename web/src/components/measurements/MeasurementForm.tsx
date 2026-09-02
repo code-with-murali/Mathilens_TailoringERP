@@ -16,9 +16,17 @@ type MeasurementFormProps = {
   initialValues?: Record<string, MeasurementValue>;
   submitLabel: string;
   onSubmit: (garmentType: GarmentType, values: Record<string, MeasurementValue>) => Promise<void>;
+  /** Closes the dialog this sits in. Omitted where the form is not dismissable. */
+  onCancel?: () => void;
 };
 
-export function MeasurementForm({ garmentType: fixedGarmentType, initialValues, submitLabel, onSubmit }: MeasurementFormProps) {
+export function MeasurementForm({
+  garmentType: fixedGarmentType,
+  initialValues,
+  submitLabel,
+  onSubmit,
+  onCancel,
+}: MeasurementFormProps) {
   const [garmentType, setGarmentType] = useState<GarmentType>(fixedGarmentType ?? "");
   // The shop's own garment list, so a measurement can be taken for a Chudidhar it added. Empty
   // until it arrives; the picker is only shown when this form is creating a measurement anyway.
@@ -125,7 +133,14 @@ export function MeasurementForm({ garmentType: fixedGarmentType, initialValues, 
         </p>
       )}
 
+      {/* Cancel leaves without saving; Clear empties the fields and stays. Two different things,
+          so they are two different buttons rather than one that means whichever the reader guessed. */}
       <div className="flex justify-end gap-3">
+        {onCancel && (
+          <Button type="button" variant="secondary" onClick={onCancel} disabled={isSubmitting}>
+            Cancel
+          </Button>
+        )}
         <Button type="button" variant="secondary" onClick={handleClear} disabled={isSubmitting}>
           Clear
         </Button>
