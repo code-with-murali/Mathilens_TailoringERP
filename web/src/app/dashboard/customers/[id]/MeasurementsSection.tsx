@@ -3,6 +3,7 @@
 import { useCallback, useEffect, useState } from "react";
 import Link from "next/link";
 import { Button } from "@/components/ui/Button";
+import { Modal } from "@/components/ui/Modal";
 import { MeasurementForm } from "@/components/measurements/MeasurementForm";
 import { useToast } from "@/components/ui/ToastProvider";
 import { getAccessToken } from "@/lib/auth";
@@ -58,11 +59,10 @@ export function MeasurementsSection({ customerId }: { customerId: string }) {
     <div className="flex flex-col gap-4 rounded-lg border border-border bg-surface p-6">
       <div className="flex items-center justify-between">
         <h2 className="text-lg font-semibold">Measurements</h2>
-        {formState === null && (
-          <Button type="button" variant="secondary" onClick={() => setFormState({ mode: "create" })}>
-            Add Measurement
-          </Button>
-        )}
+        {/* Always shown now: the form opens over the page rather than in place of this button. */}
+        <Button type="button" variant="secondary" onClick={() => setFormState({ mode: "create" })}>
+          Add Measurement
+        </Button>
       </div>
 
       {isLoading ? (
@@ -71,7 +71,7 @@ export function MeasurementsSection({ customerId }: { customerId: string }) {
         <p role="alert" className="text-sm text-danger">
           {loadError}
         </p>
-      ) : measurements.length === 0 && formState === null ? (
+      ) : measurements.length === 0 ? (
         <p className="text-sm text-foreground/70">No measurements recorded yet.</p>
       ) : (
         <ul className="flex flex-col gap-2">
@@ -102,24 +102,29 @@ export function MeasurementsSection({ customerId }: { customerId: string }) {
         </ul>
       )}
 
-      {formState && (
-        <div className="rounded-md border border-border bg-surface p-4">
+      {/* A dialog rather than a panel below the list: taking a measurement is a form of its own, and
+          inline it pushed the customer's orders and details down the page every time it opened. The
+          garment named in the header is what says which record is being changed. */}
+      <Modal
+        open={formState !== null}
+        title={formState?.mode === "edit" ? "Edit Measurement" : "Add Measurement"}
+        description={formState?.mode === "edit" ? formState.measurement.garmentType : undefined}
+        onClose={() => setFormState(null)}
+      >
+        {/* Guarded because JSX children are built before Modal decides whether to render them. */}
+        {formState && (
           <MeasurementForm
             key={formState.mode === "edit" ? formState.measurement.id : "create"}
             garmentType={formState.mode === "edit" ? formState.measurement.garmentType : undefined}
             initialValues={formState.mode === "edit" ? formState.measurement.values : undefined}
             submitLabel={formState.mode === "create" ? "Add measurement" : "Save changes"}
+            onCancel={() => setFormState(null)}
             onSubmit={(garmentType, values) =>
               formState.mode === "create" ? handleCreate(garmentType, values) : handleUpdate(formState.measurement.id, values)
             }
           />
-          <div className="mt-3">
-            <button type="button" onClick={() => setFormState(null)} className="text-sm text-foreground/70 hover:text-foreground">
-              Cancel
-            </button>
-          </div>
-        </div>
-      )}
+        )}
+      </Modal>
     </div>
   );
 }

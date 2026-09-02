@@ -2,20 +2,16 @@
 
 import { useEffect, useState } from "react";
 import Link from "next/link";
-import { useRouter } from "next/navigation";
 import { CustomerForm } from "../CustomerForm";
 import { MeasurementsSection } from "./MeasurementsSection";
 import { PreviousOrdersSection } from "./PreviousOrdersSection";
-import { useToast } from "@/components/ui/ToastProvider";
 import { getAccessToken } from "@/lib/auth";
 import { useRouteId } from "@/lib/use-route-id";
 import { ApiError } from "@/lib/api-client";
-import { getCustomer, updateCustomer, type Customer, type CustomerInput } from "@/lib/api/customers";
+import { getCustomer, type Customer } from "@/lib/api/customers";
 
-export default function EditCustomerPage() {
+export default function ViewCustomerPage() {
   const customerId = useRouteId();
-  const router = useRouter();
-  const { showToast } = useToast();
   const [customer, setCustomer] = useState<Customer | null>(null);
   const [loadError, setLoadError] = useState<string | null>(null);
 
@@ -40,18 +36,12 @@ export default function EditCustomerPage() {
     };
   }, [customerId]);
 
-  async function handleUpdate(input: CustomerInput) {
-    await updateCustomer(customerId, input, getAccessToken());
-    showToast("Customer updated.");
-    router.push("/dashboard/customers");
-  }
-
   return (
     <div className="flex flex-col gap-6">
       <div className="flex flex-wrap items-center justify-between gap-3">
-        {/* Not "Edit Customer" any more: editing happens in a dialog on the list, and this page is
-            what the list links to for measurements. Their details are still here and still
-            editable — it is just no longer the only way in. */}
+        {/* A view, not an edit form: editing happens in the dialog on the list, where the person
+            being changed is named. This page is what the list links to for their orders and
+            measurements, and it shows their details rather than asking for them. */}
         <h1 className="text-2xl font-semibold">{customer?.fullName ?? "Customer"}</h1>
         <Link href="/dashboard/customers" className="text-sm text-foreground/70 hover:text-foreground">
           Back to customers
@@ -80,8 +70,7 @@ export default function EditCustomerPage() {
                 dateOfBirth: customer.dateOfBirth,
                 weddingDate: customer.weddingDate,
               }}
-              onSubmit={handleUpdate}
-              onCancel={() => router.push("/dashboard/customers")}
+              readOnly
             />
           </div>
 

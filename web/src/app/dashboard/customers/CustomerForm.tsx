@@ -4,6 +4,7 @@ import { useEffect, useRef, useState, type FormEvent } from "react";
 import { Button } from "@/components/ui/Button";
 import { ModalActions } from "@/components/ui/Modal";
 import { Input, Textarea } from "@/components/ui/Input";
+import { DateInput } from "@/components/ui/DateInput";
 import { PhoneNumberInput } from "@/components/ui/PhoneNumberInput";
 import { DuplicateWarningModal } from "@/components/customers/DuplicateWarningModal";
 import { getAccessToken } from "@/lib/auth";
@@ -21,11 +22,21 @@ import {
 
 type CustomerFormProps = {
   initialValues?: CustomerInput;
-  onSubmit: (input: CustomerInput) => Promise<void>;
-  /** Closes the dialog, or navigates back on the standalone pages. */
-  onCancel: () => void;
+  /** Omitted when read-only — a view has nothing to save. */
+  onSubmit?: (input: CustomerInput) => Promise<void>;
+  /** Closes the dialog, or navigates back on the standalone pages. Omitted when read-only. */
+  onCancel?: () => void;
   /** The customer being edited, so the duplicate check doesn't report them against themselves. */
   customerId?: string;
+  /**
+   * Shows the details without offering to change them: every field disabled, no Cancel or Submit,
+   * and no duplicate check — there is no edit in progress for one to warn about.
+   *
+   * The customer page is a view. Editing happens in the dialog on the list, which is where the
+   * person being changed is named. Leaving live fields on a page with no way to save them was the
+   * worse of the two, since it invites an edit that silently goes nowhere.
+   */
+  readOnly?: boolean;
 };
 
 /** Long enough that tabbing straight through phone and email asks once, not twice. */
@@ -54,7 +65,13 @@ const selectClassName =
  * enough to need no scrollbar of its own on a laptop, and stacked and full width on a phone, where
  * side-by-side fields would be the thing forcing a sideways scroll.
  */
-export function CustomerForm({ initialValues = emptyValues, onSubmit, onCancel, customerId }: CustomerFormProps) {
+export function CustomerForm({
+  initialValues = emptyValues,
+  onSubmit,
+  onCancel,
+  customerId,
+  readOnly = false,
+}: CustomerFormProps) {
   const [fullName, setFullName] = useState(initialValues.fullName);
   // Shown as the ten digits the customer would recite. Saved records hold "+918220070363"; the
   // country code is the database's business, not something to make staff read past on every edit.
@@ -91,6 +108,12 @@ export function CustomerForm({ initialValues = emptyValues, onSubmit, onCancel, 
    * to protect. The save itself still enforces the rule.
    */
   function scheduleDuplicateCheck(phone: string, address: string) {
+    // Nothing is being typed on a view, so there is no new duplicate to warn about — and the
+    // fields are disabled, so this cannot fire anyway. Guarded rather than assumed.
+    if (readOnly) {
+      return;
+    }
+
     if (duplicateTimer.current) {
       clearTimeout(duplicateTimer.current);
     }
@@ -123,6 +146,13 @@ export function CustomerForm({ initialValues = emptyValues, onSubmit, onCancel, 
 
   async function handleSubmit(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
+
+    // Enter in a text field submits a form even with no submit button on screen. Without this, a
+    // read-only view would still try to save.
+    if (readOnly || !onSubmit) {
+      return;
+    }
+
     setFormError(null);
     setFieldErrors({});
 
@@ -181,6 +211,7 @@ export function CustomerForm({ initialValues = emptyValues, onSubmit, onCancel, 
           value={fullName}
           onChange={(e) => setFullName(e.target.value)}
           error={fieldErrors.fullname}
+          disabled={readOnly}
         />
         <PhoneNumberInput
           id="phoneNumber"
@@ -188,6 +219,7 @@ export function CustomerForm({ initialValues = emptyValues, onSubmit, onCancel, 
           onChange={setPhoneNumber}
           onBlur={() => scheduleDuplicateCheck(phoneNumber, email)}
           error={fieldErrors.phonenumber}
+          disabled={readOnly}
         />
         <Input
           id="email"
@@ -198,12 +230,19 @@ export function CustomerForm({ initialValues = emptyValues, onSubmit, onCancel, 
           onChange={(e) => setEmail(e.target.value)}
           onBlur={() => scheduleDuplicateCheck(phoneNumber, email)}
           error={fieldErrors.email}
+          disabled={readOnly}
         />
         <div className="flex flex-col gap-1">
           <label htmlFor="gender" className="text-sm font-medium">
             Gender
           </label>
-          <select id="gender" value={gender} onChange={(e) => setGender(e.target.value as Gender | "")} className={selectClassName}>
+          <select
+            id="gender"
+            value={gender}
+            onChange={(e) => setGender(e.target.value as Gender | "")}
+            disabled={readOnly}
+            className={selectClassName}
+          >
             <option value="">Not specified</option>
             {GENDERS.map((option) => (
               <option key={option} value={option}>
@@ -216,7 +255,13 @@ export function CustomerForm({ initialValues = emptyValues, onSubmit, onCancel, 
           <label htmlFor="religion" className="text-sm font-medium">
             Religion
           </label>
-          <select id="religion" value={religion} onChange={(e) => setReligion(e.target.value as Religion | "")} className={selectClassName}>
+          <select
+            id="religion"
+            value={religion}
+            onChange={(e) => setReligion(e.target.value as Religion | "")}
+            disabled={readOnly}
+            className={selectClassName}
+          >
             <option value="">Not specified</option>
             {RELIGIONS.map((option) => (
               <option key={option} value={option}>
@@ -229,25 +274,13 @@ export function CustomerForm({ initialValues = emptyValues, onSubmit, onCancel, 
           <label htmlFor="dateOfBirth" className="text-sm font-medium">
             Date of birth
           </label>
-          <input
-            id="dateOfBirth"
-            type="date"
-            value={dateOfBirth}
-            onChange={(e) => setDateOfBirth(e.target.value)}
-            className={selectClassName}
-          />
+          <DateInput id="dateOfBirth" value={dateOfBirth} onChange={setDateOfBirth} disabled={readOnly} />
         </div>
         <div className="flex flex-col gap-1">
           <label htmlFor="weddingDate" className="text-sm font-medium">
             Wedding date
           </label>
-          <input
-            id="weddingDate"
-            type="date"
-            value={weddingDate}
-            onChange={(e) => setWeddingDate(e.target.value)}
-            className={selectClassName}
-          />
+          <DateInput id="weddingDate" value={weddingDate} onChange={setWeddingDate} disabled={readOnly} />
         </div>
 
         {/* Free text runs the full width in both layouts — an address squeezed into half a dialog
@@ -260,6 +293,7 @@ export function CustomerForm({ initialValues = emptyValues, onSubmit, onCancel, 
             value={address}
             onChange={(e) => setAddress(e.target.value)}
             error={fieldErrors.address}
+            disabled={readOnly}
           />
         </div>
         <div className="sm:col-span-2">
@@ -270,6 +304,7 @@ export function CustomerForm({ initialValues = emptyValues, onSubmit, onCancel, 
             value={notes}
             onChange={(e) => setNotes(e.target.value)}
             error={fieldErrors.notes}
+            disabled={readOnly}
           />
         </div>
       </div>
@@ -280,14 +315,17 @@ export function CustomerForm({ initialValues = emptyValues, onSubmit, onCancel, 
         </p>
       )}
 
-      <ModalActions>
-        <Button type="button" variant="secondary" onClick={onCancel} disabled={isSubmitting}>
-          CANCEL
-        </Button>
-        <Button type="submit" disabled={isSubmitting}>
-          {isSubmitting ? "Saving…" : "SUBMIT"}
-        </Button>
-      </ModalActions>
+      {/* A view offers neither: there is nothing to save, and nothing to cancel out of. */}
+      {!readOnly && (
+        <ModalActions>
+          <Button type="button" variant="secondary" onClick={onCancel} disabled={isSubmitting}>
+            CANCEL
+          </Button>
+          <Button type="submit" disabled={isSubmitting}>
+            {isSubmitting ? "Saving…" : "SUBMIT"}
+          </Button>
+        </ModalActions>
+      )}
 
       {/* Outside the field flow: the warning is about the record as a whole, and it must not push
           the form around while someone is typing in it. */}

@@ -24,6 +24,7 @@ export function PhoneNumberInput({
   onChange,
   onBlur,
   error,
+  disabled,
 }: {
   id: string;
   label?: string;
@@ -32,11 +33,14 @@ export function PhoneNumberInput({
   onChange: (value: string) => void;
   onBlur?: () => void;
   error?: string;
+  /** For a screen that shows a number rather than asks for one. */
+  disabled?: boolean;
 }) {
   return (
     <Input
       id={id}
       label={label}
+      disabled={disabled}
       // type="tel" keeps it a phone number to autofill and screen readers; inputMode="numeric"
       // brings up the digits-only keypad on the tablet at the counter.
       type="tel"
