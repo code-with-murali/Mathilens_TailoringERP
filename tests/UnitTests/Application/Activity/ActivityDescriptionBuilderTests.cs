@@ -50,14 +50,14 @@ public class ActivityDescriptionBuilderTests
     {
         // The trail is written automatically for every command, which makes it exactly the wrong
         // place to end up holding a credential.
-        var login = ActivityDescriptionBuilder.Describe(new LoginCommand("asha@shop.example", password));
+        var login = ActivityDescriptionBuilder.Describe(new LoginCommand("asha_rao", password));
         var register = ActivityDescriptionBuilder.Describe(new RegisterCommand("asha@shop.example", password));
 
         Assert.DoesNotContain(password, login ?? string.Empty, StringComparison.Ordinal);
         Assert.Contains("Password: ●●●●●", login);
         Assert.Contains("Password: ●●●●●", register);
         // The non-secret field is still described.
-        Assert.Contains("Email: asha@shop.example", login);
+        Assert.Contains("User Name: asha_rao", login);
     }
 
     [Fact]

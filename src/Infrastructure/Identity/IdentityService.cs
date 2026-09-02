@@ -45,9 +45,12 @@ public sealed class IdentityService : IIdentityService
         _activeSessions = activeSessions;
     }
 
-    public async Task<Result<AuthTokensDto>> LoginAsync(string email, string password, CancellationToken cancellationToken)
+    public async Task<Result<AuthTokensDto>> LoginAsync(string userName, string password, CancellationToken cancellationToken)
     {
-        var user = await _userManager.FindByEmailAsync(email);
+        // By username, which is what the sign-in screen now asks for. Identity looks this up on the
+        // normalized column behind a unique index, so it is case-insensitive in the way a person
+        // typing their own name at a counter expects.
+        var user = await _userManager.FindByNameAsync(userName);
         if (user is null || user.IsDeleted)
         {
             return Result.Failure<AuthTokensDto>(InvalidCredentialsError());
@@ -74,6 +77,10 @@ public sealed class IdentityService : IIdentityService
                 Error.Conflict("Auth.EmailAlreadyRegistered", "An account with this email already exists."));
         }
 
+        // The bootstrap account signs in with its email address as its username. Registration is the
+        // fresh-database path — there is nobody yet to hand out a username, and asking whoever is
+        // setting the shop up to invent a second identifier before they have an account is a step
+        // with nothing behind it. Every account created afterwards, on the Users screen, picks one.
         var user = new ApplicationUser { UserName = email, Email = email };
         var createResult = await _userManager.CreateAsync(user, password);
         if (!createResult.Succeeded)
@@ -172,6 +179,12 @@ public sealed class IdentityService : IIdentityService
             return Result.Failure<AuthTokensDto>(Error.Validation("Users.ChangePasswordFailed", "This password could not be changed.", details));
         }
 
+        // The account is no longer on a password somebody else knows, so the requirement to change
+        // it is satisfied and lifted. Cleared before the tokens are issued below, or the fresh pair
+        // would still carry the flag and send the user straight back to the same screen.
+        await _userManager.RemoveAuthenticationTokenAsync(
+            user, PasswordResetCodes.Provider, TemporaryPasswords.MustChangeTokenName);
+
         // Everything else signed in with the old password stops here. The caller is handed a fresh
         // pair so the screen they are standing at keeps working — without that, changing your own
         // password would sign you out of it within the access token's lifetime.
@@ -221,6 +234,10 @@ public sealed class IdentityService : IIdentityService
         // Single use. Clearing both parts means a code cannot be replayed even inside its lifetime.
         await _userManager.RemoveAuthenticationTokenAsync(user, PasswordResetCodes.Provider, PasswordResetCodes.CodeHashName);
         await _userManager.RemoveAuthenticationTokenAsync(user, PasswordResetCodes.Provider, PasswordResetCodes.ExpiresName);
+
+        // Redeeming a code means the user chose this password themselves, so there is nothing left
+        // to force. Cleared in case the account also had a temporary password outstanding.
+        await _userManager.RemoveAuthenticationTokenAsync(user, PasswordResetCodes.Provider, TemporaryPasswords.MustChangeTokenName);
 
         await _userManager.UpdateSecurityStampAsync(user);
         await RevokeRefreshTokensAsync(user.Id, cancellationToken);
@@ -275,7 +292,12 @@ public sealed class IdentityService : IIdentityService
         // that never completed.
         await _activeSessions.StartSessionAsync(user.Id, sessionId, cancellationToken);
 
-        return new AuthTokensDto(accessToken, rawRefreshToken, accessTokenExpiresAtUtc);
+        // Read on every issue, not only on sign-in: a refresh must keep saying so, or a user who
+        // waited fifteen minutes on the change-password screen would be let past by a token renewal.
+        var mustChangePassword = await _userManager.GetAuthenticationTokenAsync(
+            user, PasswordResetCodes.Provider, TemporaryPasswords.MustChangeTokenName) is not null;
+
+        return new AuthTokensDto(accessToken, rawRefreshToken, accessTokenExpiresAtUtc, mustChangePassword);
     }
 
     private string GenerateAccessToken(ApplicationUser user, IList<string> roles, DateTime nowUtc, string sessionId, out DateTime expiresAtUtc)
@@ -317,7 +339,7 @@ public sealed class IdentityService : IIdentityService
     /// <summary>Only the hash is ever persisted or looked up (02_DATABASE.md § 10.14).</summary>
     private static string Hash(string value) => Convert.ToBase64String(SHA256.HashData(Encoding.UTF8.GetBytes(value)));
 
-    private static Error InvalidCredentialsError() => Error.Unauthorized("Auth.InvalidCredentials", "Invalid email or password.");
+    private static Error InvalidCredentialsError() => Error.Unauthorized("Auth.InvalidCredentials", "Invalid username or password.");
 
     private static Error InvalidRefreshTokenError() => Error.Unauthorized("Auth.InvalidRefreshToken", "The refresh token is invalid.");
 }

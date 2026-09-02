@@ -131,19 +131,37 @@ public sealed class UsersController : ApiControllerBase
     [ProducesResponseType(typeof(ApiErrorResponse), StatusCodes.Status409Conflict)]
     public async Task<IActionResult> Create([FromBody] CreateUserRequest request, CancellationToken cancellationToken)
     {
-        var result = await _userAdminService.CreateUserAsync(request.Email, request.Password, request.FullName, request.Role, cancellationToken);
+        var result = await _userAdminService.CreateUserAsync(
+            request.UserName,
+            request.Email,
+            request.Password,
+            request.FullName,
+            request.MobileNumber,
+            request.Role,
+            cancellationToken);
+
         return ToActionResult(result);
     }
 
-    /// <summary>Changes what a user is called. Their email, and so how they sign in, is untouched.</summary>
+    /// <summary>
+    /// Changes a user's name, username, email and mobile number. Their role has its own endpoint.
+    /// </summary>
     [HttpPut("{id:guid}")]
     [Authorize(Policy = Permissions.UsersEdit)]
     [ProducesResponseType(StatusCodes.Status204NoContent)]
     [ProducesResponseType(typeof(ApiErrorResponse), StatusCodes.Status400BadRequest)]
     [ProducesResponseType(typeof(ApiErrorResponse), StatusCodes.Status404NotFound)]
-    public async Task<IActionResult> SetName(Guid id, [FromBody] SetUserNameRequest request, CancellationToken cancellationToken)
+    [ProducesResponseType(typeof(ApiErrorResponse), StatusCodes.Status409Conflict)]
+    public async Task<IActionResult> Update(Guid id, [FromBody] UpdateUserRequest request, CancellationToken cancellationToken)
     {
-        var result = await _userAdminService.SetFullNameAsync(id, request.FullName, cancellationToken);
+        var result = await _userAdminService.UpdateUserAsync(
+            id,
+            request.UserName,
+            request.Email,
+            request.FullName,
+            request.MobileNumber,
+            cancellationToken);
+
         return ToActionResult(result);
     }
 
@@ -161,17 +179,20 @@ public sealed class UsersController : ApiControllerBase
     }
 
     /// <summary>
-    /// Sets a new password for a user who has lost theirs, and signs them out everywhere by
-    /// revoking their refresh tokens.
+    /// Resets a user who has lost their password onto a generated temporary one, signs them out
+    /// everywhere, and requires them to choose their own the next time they sign in.
+    ///
+    /// <para>Takes no body: the password is generated, not supplied. It comes back once — only its
+    /// hash is stored, so calling this again issues a different one rather than repeating it.</para>
     /// </summary>
     [HttpPost("{id:guid}/password")]
     [Authorize(Policy = Permissions.UsersPassword)]
-    [ProducesResponseType(StatusCodes.Status204NoContent)]
+    [ProducesResponseType(typeof(ApiResponse<TemporaryPasswordDto>), StatusCodes.Status200OK)]
     [ProducesResponseType(typeof(ApiErrorResponse), StatusCodes.Status400BadRequest)]
     [ProducesResponseType(typeof(ApiErrorResponse), StatusCodes.Status404NotFound)]
-    public async Task<IActionResult> ResetPassword(Guid id, [FromBody] ResetUserPasswordRequest request, CancellationToken cancellationToken)
+    public async Task<IActionResult> ResetPassword(Guid id, CancellationToken cancellationToken)
     {
-        var result = await _userAdminService.ResetPasswordAsync(id, request.NewPassword, cancellationToken);
+        var result = await _userAdminService.ResetPasswordAsync(id, cancellationToken);
         return ToActionResult(result);
     }
 

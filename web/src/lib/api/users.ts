@@ -1,4 +1,4 @@
-import { apiDelete, apiGet, apiGetPaged, apiPost, apiPostNoContent, apiPut, apiPutNoContent } from "@/lib/api-client";
+import { apiDelete, apiGet, apiGetPaged, apiPost, apiPut, apiPutNoContent } from "@/lib/api-client";
 import type { AuthTokens } from "@/lib/auth";
 
 export type CurrentUser = {
@@ -11,7 +11,24 @@ export type CurrentUser = {
   permissions: string[];
 };
 
-export type AppUser = { id: string; email: string; fullName: string | null; role: string | null };
+export type AppUser = {
+  id: string;
+  /** What they sign in as. For an account created before usernames were asked for, this is their email. */
+  userName: string;
+  email: string;
+  fullName: string | null;
+  /** Canonical +91XXXXXXXXXX, or null on an account created before the number was asked for. */
+  mobileNumber: string | null;
+  role: string | null;
+};
+
+/**
+ * Mirrors `UserNameRules.MinimumLength` on the server.
+ *
+ * Duplicated for the same reason the contact rules are: the server is the authority and rejects
+ * anything this misses, but an owner filling the form in wants to be told before the round trip.
+ */
+export const USER_NAME_MIN_LENGTH = 5;
 
 /**
  * What to call someone on screen: their name, or the email they sign in with where there is none.
@@ -101,13 +118,34 @@ export function deleteRole(id: string, token: string | null) {
   return apiDelete(`/api/v1/users/roles/${id}`, token);
 }
 
-/** Signs the user out everywhere as well as changing the password — see the API's ResetPassword. */
-export function resetUserPassword(id: string, newPassword: string, token: string | null) {
-  return apiPostNoContent(`/api/v1/users/${id}/password`, { newPassword }, token);
+/** The generated password, returned once. Only its hash is stored, so it cannot be read back. */
+export type TemporaryPassword = { password: string };
+
+/**
+ * Resets a user onto a generated temporary password and signs them out everywhere.
+ *
+ * Sends nothing: the password is the server's to invent, not the Owner's to choose — one a person
+ * picks for somebody else is one they know. The user is required to replace it the first time they
+ * sign in with it.
+ */
+export function resetUserPassword(id: string, token: string | null) {
+  return apiPost<TemporaryPassword>(`/api/v1/users/${id}/password`, {}, token);
 }
 
-export function createUser(email: string, password: string, fullName: string, role: string, token: string | null) {
-  return apiPost<AppUser>("/api/v1/users", { email, password, fullName, role }, token);
+export function createUser(
+  userName: string,
+  email: string,
+  password: string,
+  fullName: string,
+  mobileNumber: string,
+  role: string,
+  token: string | null,
+) {
+  return apiPost<AppUser>(
+    "/api/v1/users",
+    { userName, email, password, fullName, mobileNumber, role },
+    token,
+  );
 }
 
 /** The API answers 204 here, so this must not go through apiPut — see apiPutNoContent. */
@@ -115,9 +153,21 @@ export function setUserRole(id: string, role: string, token: string | null) {
   return apiPutNoContent(`/api/v1/users/${id}/role`, { role }, token);
 }
 
-/** Renames a person. Their email is how they sign in and is not touched. Answers 204, like setUserRole. */
-export function setUserName(id: string, fullName: string, token: string | null) {
-  return apiPutNoContent(`/api/v1/users/${id}`, { fullName }, token);
+export type UpdateUserInput = {
+  userName: string;
+  email: string;
+  fullName: string;
+  mobileNumber: string;
+};
+
+/**
+ * Edits a person's details. Sent whole, because the server checks the username and email against
+ * every other account and can only do that with both in hand. Their role has its own call.
+ *
+ * Answers 204, like setUserRole.
+ */
+export function updateUser(id: string, input: UpdateUserInput, token: string | null) {
+  return apiPutNoContent(`/api/v1/users/${id}`, input, token);
 }
 
 /** One screen and the actions it defines — some screens are view-only and offer no Manage. */

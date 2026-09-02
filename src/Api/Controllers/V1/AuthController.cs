@@ -32,7 +32,7 @@ public sealed class AuthController : ApiControllerBase
     [ProducesResponseType(typeof(ApiErrorResponse), StatusCodes.Status401Unauthorized)]
     public async Task<IActionResult> Login([FromBody] LoginRequest request, CancellationToken cancellationToken)
     {
-        var result = await _sender.Send(new LoginCommand(request.Email, request.Password), cancellationToken);
+        var result = await _sender.Send(new LoginCommand(request.UserName, request.Password), cancellationToken);
         return ToActionResult(result);
     }
 

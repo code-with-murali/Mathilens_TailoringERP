@@ -10,7 +10,11 @@ namespace MathilensERP.Application.Common.Interfaces;
 /// </summary>
 public interface IIdentityService
 {
-    Task<Result<AuthTokensDto>> LoginAsync(string email, string password, CancellationToken cancellationToken);
+    /// <summary>
+    /// Authenticates by username, not by email address. Accounts predating usernames hold their
+    /// email in that field, so they keep signing in with the address they always used.
+    /// </summary>
+    Task<Result<AuthTokensDto>> LoginAsync(string userName, string password, CancellationToken cancellationToken);
 
     /// <summary>
     /// Creates a new user account and, on success, signs them straight in — matching the

@@ -16,7 +16,7 @@ public class AuthEndpointsTests : IClassFixture<CustomWebApplicationFactory>
     [Fact]
     public async Task Login_WithBlankCredentials_ReturnsValidationErrorEnvelope()
     {
-        var response = await _client.PostAsJsonAsync("/api/v1/auth/login", new { email = "", password = "" });
+        var response = await _client.PostAsJsonAsync("/api/v1/auth/login", new { userName = "", password = "" });
 
         Assert.Equal(HttpStatusCode.BadRequest, response.StatusCode);
 
@@ -27,10 +27,10 @@ public class AuthEndpointsTests : IClassFixture<CustomWebApplicationFactory>
     }
 
     [Fact]
-    public async Task Login_WithMalformedEmail_ReturnsValidationErrorEnvelope()
+    public async Task Login_WithTooShortUserName_ReturnsValidationErrorEnvelope()
     {
         var response = await _client.PostAsJsonAsync(
-            "/api/v1/auth/login", new { email = "not-an-email", password = "somepassword" });
+            "/api/v1/auth/login", new { userName = "asha", password = "somepassword" });
 
         Assert.Equal(HttpStatusCode.BadRequest, response.StatusCode);
 

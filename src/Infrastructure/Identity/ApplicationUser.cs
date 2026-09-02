@@ -23,8 +23,10 @@ public class ApplicationUser : IdentityUser<Guid>, IAuditable, ISoftDeletable
     /// nobody can invent one for them. Screens fall back to the email, which is what they showed
     /// before, so an unnamed account reads exactly as it always did.
     ///
-    /// Not <see cref="IdentityUser{TKey}.UserName"/>: that is set to the email and is what Identity
-    /// looks an account up by, so putting a display name in it would change how signing in works.
+    /// Not <see cref="IdentityUser{TKey}.UserName"/>: that holds the username the person signs in
+    /// with and is what Identity looks an account up by, so putting a display name in it would
+    /// change who could sign in as whom. The mobile number likewise reuses Identity's own
+    /// <see cref="IdentityUser{TKey}.PhoneNumber"/> rather than adding a column beside it.
     /// </summary>
     public string? FullName { get; set; }
 

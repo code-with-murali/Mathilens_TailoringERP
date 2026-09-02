@@ -19,5 +19,5 @@ public sealed class LoginCommandHandler : ICommandHandler<LoginCommand, Result<A
     }
 
     public Task<Result<AuthTokensDto>> Handle(LoginCommand command, CancellationToken cancellationToken) =>
-        _identityService.LoginAsync(command.Email, command.Password, cancellationToken);
+        _identityService.LoginAsync(command.UserName, command.Password, cancellationToken);
 }

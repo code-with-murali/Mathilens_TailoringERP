@@ -11,6 +11,11 @@ export type AuthTokens = {
   accessToken: string;
   refreshToken: string;
   accessTokenExpiresAtUtc: string;
+  /**
+   * The account is on a temporary password an Owner issued, and the user has to choose their own
+   * before going anywhere. Absent on token pairs minted before this existed, hence optional.
+   */
+  mustChangePassword?: boolean;
 };
 
 const ACCESS_TOKEN_KEY = "mathilens.accessToken";
