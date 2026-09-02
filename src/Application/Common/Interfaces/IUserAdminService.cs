@@ -59,6 +59,22 @@ public interface IUserAdminService
         CancellationToken cancellationToken);
 
     /// <summary>
+    /// Removes someone's access to the system.
+    ///
+    /// <para>A soft delete, like every other record here: the account stops being able to sign in
+    /// and stops appearing on the Users screen, but the row stays, so the orders, invoices and
+    /// activity entries stamped with its id still say who took them. Hard-deleting the row would
+    /// leave that history pointing at nobody.</para>
+    ///
+    /// <para>An Owner may remove another Owner — a shop that has changed hands has to be able to
+    /// take the previous owner off the system, and there is nobody above an Owner to ask. Two
+    /// things are still refused: removing the last Owner, which would leave nobody able to grant
+    /// access to anyone, and removing yourself, which is the same trap reached one step at a
+    /// time.</para>
+    /// </summary>
+    Task<Result> DeleteUserAsync(Guid userId, CancellationToken cancellationToken);
+
+    /// <summary>
     /// One person's name, or null where the account has none or does not exist.
     ///
     /// Read on every <c>/users/me</c> rather than carried as a token claim, so a rename shows up on

@@ -21,17 +21,20 @@ public sealed class UserAdminService : IUserAdminService
     private readonly RoleManager<ApplicationRole> _roleManager;
     private readonly Persistence.ApplicationDbContext _dbContext;
     private readonly IPasswordHasher<ApplicationUser> _passwordHasher;
+    private readonly ICurrentUserService _currentUserService;
 
     public UserAdminService(
         UserManager<ApplicationUser> userManager,
         RoleManager<ApplicationRole> roleManager,
         Persistence.ApplicationDbContext dbContext,
-        IPasswordHasher<ApplicationUser> passwordHasher)
+        IPasswordHasher<ApplicationUser> passwordHasher,
+        ICurrentUserService currentUserService)
     {
         _userManager = userManager;
         _roleManager = roleManager;
         _dbContext = dbContext;
         _passwordHasher = passwordHasher;
+        _currentUserService = currentUserService;
     }
 
     public async Task<PagedResult<AppUserDto>> ListUsersAsync(int page, int pageSize, CancellationToken cancellationToken)
@@ -253,6 +256,59 @@ public sealed class UserAdminService : IUserAdminService
             "Users.UpdateFailed",
             message,
             result.Errors.Select(e => new FieldError(FieldFor(e.Code), e.Description)).ToList());
+
+    public async Task<Result> DeleteUserAsync(Guid userId, CancellationToken cancellationToken)
+    {
+        // Goes through the soft-delete query filter, so an account already removed reads as absent
+        // rather than being removed a second time.
+        var user = await _userManager.FindByIdAsync(userId.ToString());
+        if (user is null)
+        {
+            return Result.Failure(Error.NotFound("Users.NotFound", $"No user was found with id '{userId}'."));
+        }
+
+        // Refused before the last-Owner check, so the sole Owner deleting themselves is told the
+        // thing they actually did rather than being pointed at a rule about somebody else.
+        if (_currentUserService.UserId == userId)
+        {
+            return Result.Failure(Error.Conflict(
+                "Users.CannotDeleteSelf", "You cannot remove your own account. Ask another Owner to do it."));
+        }
+
+        // Removing the last Owner leaves nobody able to grant access to anyone, including
+        // themselves — the same unrecoverable state demoting one would cause.
+        var roles = await _userManager.GetRolesAsync(user);
+        if (roles.Contains(AppRoles.Owner))
+        {
+            var owners = await _userManager.GetUsersInRoleAsync(AppRoles.Owner);
+            if (owners.Count <= 1)
+            {
+                return Result.Failure(Error.Conflict(
+                    "Users.LastOwner", "This is the only Owner. Make someone else an Owner first."));
+            }
+        }
+
+        var now = DateTime.UtcNow;
+
+        // Their sessions must not outlive their access. Rolling the stamp happens while the account
+        // is still visible to Identity, and the refresh tokens go with it so nothing can be renewed
+        // — the access token already in a browser stays valid until it expires, which is the same
+        // short window a password reset leaves open.
+        await _userManager.UpdateSecurityStampAsync(user);
+
+        var activeTokens = await _dbContext.RefreshTokens
+            .Where(t => t.UserId == userId && t.RevokedAtUtc == null)
+            .ToListAsync(cancellationToken);
+        foreach (var activeToken in activeTokens)
+        {
+            activeToken.Revoke(now);
+        }
+
+        user.SoftDelete(_currentUserService.UserId ?? SystemUsers.SystemUserId, now);
+        await _dbContext.SaveChangesAsync(cancellationToken);
+
+        return Result.Success();
+    }
 
     public async Task<string?> GetFullNameAsync(Guid userId, CancellationToken cancellationToken) =>
         await _userManager.Users

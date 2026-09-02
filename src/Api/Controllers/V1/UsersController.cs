@@ -165,6 +165,22 @@ public sealed class UsersController : ApiControllerBase
         return ToActionResult(result);
     }
 
+    /// <summary>
+    /// Removes someone's access. A soft delete, so the orders and activity stamped with their id
+    /// still say who took them.
+    ///
+    /// <para>Guarded by Users.Delete, which only Owner holds — an Owner may remove another Owner,
+    /// because a shop that has changed hands has nobody above an Owner to ask. Removing the last
+    /// Owner, or yourself, is refused.</para>
+    /// </summary>
+    [HttpDelete("{id:guid}")]
+    [Authorize(Policy = Permissions.UsersDelete)]
+    [ProducesResponseType(StatusCodes.Status204NoContent)]
+    [ProducesResponseType(typeof(ApiErrorResponse), StatusCodes.Status404NotFound)]
+    [ProducesResponseType(typeof(ApiErrorResponse), StatusCodes.Status409Conflict)]
+    public async Task<IActionResult> Delete(Guid id, CancellationToken cancellationToken) =>
+        ToActionResult(await _userAdminService.DeleteUserAsync(id, cancellationToken));
+
     /// <summary>Changes a user's role. Refused if it would remove the last Owner.</summary>
     [HttpPut("{id:guid}/role")]
     [Authorize(Policy = Permissions.UsersEdit)]

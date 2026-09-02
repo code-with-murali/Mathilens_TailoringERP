@@ -2,6 +2,7 @@
 
 import { useCallback, useEffect, useState, type FormEvent } from "react";
 import { Button } from "@/components/ui/Button";
+import { ConfirmDialog } from "@/components/ui/ConfirmDialog";
 import { Input } from "@/components/ui/Input";
 import { Modal, ModalActions } from "@/components/ui/Modal";
 import { DEFAULT_PAGE_SIZE, Pagination } from "@/components/ui/Pagination";
@@ -17,6 +18,7 @@ import {
   createUser,
   setUserRole,
   updateUser,
+  deleteUser,
   resetUserPassword,
   PERMISSIONS,
   USER_NAME_MIN_LENGTH,
@@ -27,9 +29,12 @@ const fieldClassName =
   "rounded-md border border-border bg-surface px-3 py-2 text-sm outline-none transition-colors focus:border-primary focus:ring-2 focus:ring-primary/25";
 
 /**
- * The role that runs the shop. It is the only one that can hand out access, so its holders are not
- * demotable from this screen — the server refuses to remove the last one anyway, and finding that
- * out after pressing Submit is a worse way to learn it.
+ * The role that runs the shop, and the only one that can hand out access.
+ *
+ * An Owner may now demote or remove another Owner: a shop that has changed hands has to be able to
+ * take the previous owner off the system, and there is nobody above an Owner to ask. The server
+ * still refuses to remove the last one and refuses to let anyone remove themselves — this constant
+ * only decides how loudly the confirmation puts it.
  */
 const OWNER_ROLE = "Owner";
 
@@ -47,7 +52,9 @@ const ROLE_SUMMARY: Record<string, string> = {
 
 export default function UsersPage() {
   const { showToast } = useToast();
-  const { can, isLoaded } = usePermissions();
+  // currentUser, so the row you are signed in as can hide its own Delete. The server refuses a
+  // self-delete regardless; offering a button that always fails is the part worth avoiding.
+  const { can, isLoaded, user: currentUser } = usePermissions();
   const [users, setUsers] = useState<AppUser[]>([]);
   const [meta, setMeta] = useState<PaginationMeta | null>(null);
   const [page, setPage] = useState(1);
@@ -79,9 +86,14 @@ export default function UsersPage() {
   const [editError, setEditError] = useState<string | null>(null);
   const [isSavingRole, setIsSavingRole] = useState(false);
 
+  // Removing targets one user at a time; holding the user here doubles as "the dialog is open".
+  const [deleteTarget, setDeleteTarget] = useState<AppUser | null>(null);
+  const [deleteError, setDeleteError] = useState<string | null>(null);
+  const [isDeleting, setIsDeleting] = useState(false);
+
   // Resetting targets one user at a time; holding the user here doubles as "the dialog is open".
   const [resetTarget, setResetTarget] = useState<AppUser | null>(null);
-  const [confirmEmail, setConfirmEmail] = useState("");
+  const [confirmUserName, setConfirmUserName] = useState("");
   const [resetError, setResetError] = useState<string | null>(null);
   const [isResetting, setIsResetting] = useState(false);
   // The generated password, held only until the dialog closes. Its presence doubles as "this
@@ -92,7 +104,9 @@ export default function UsersPage() {
   const canCreate = can(PERMISSIONS.usersCreate);
   const canEdit = can(PERMISSIONS.usersEdit);
   const canSetPassword = can(PERMISSIONS.usersPassword);
-  const hasRowActions = canEdit || canSetPassword;
+  // Only Owner holds Users.Delete — Manager has Users.View and nothing further on this screen.
+  const canDelete = can(PERMISSIONS.usersDelete);
+  const hasRowActions = canEdit || canSetPassword || canDelete;
 
   const load = useCallback(async () => {
     setIsLoading(true);
@@ -245,12 +259,16 @@ export default function UsersPage() {
   }
 
   /**
-   * Resetting a password asks for the account's own email address first.
+   * Resetting a password asks for the account's own username first.
    *
    * Every row on this screen looks alike, and this is the one action that locks somebody out of
-   * their account. Typing the address is the step that proves the right row was clicked; the
-   * password fields stay disabled until it matches, so a mistyped row cannot be pushed through by
-   * pressing Enter twice.
+   * their account. Typing the username is the step that proves the right row was clicked, and the
+   * button stays disabled until it matches, so a mistyped row cannot be pushed through by pressing
+   * Enter twice.
+   *
+   * The username rather than the email, because the username is what this screen shows. Asking an
+   * Owner to type a value that is nowhere on the page in front of them is asking them to go and
+   * look it up, and the check stops being a check the moment it is inconvenient enough to dodge.
    */
   async function handleResetPassword(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
@@ -260,15 +278,15 @@ export default function UsersPage() {
       return;
     }
 
-    if (confirmEmail.trim().toLowerCase() !== resetTarget.email.toLowerCase()) {
-      setResetError("That is not this user's email address.");
+    if (confirmUserName.trim().toLowerCase() !== resetTarget.userName.toLowerCase()) {
+      setResetError("That is not this user's username.");
       return;
     }
 
     setIsResetting(true);
     try {
       const { password } = await resetUserPassword(resetTarget.id, getAccessToken());
-      showToast(`Password reset for ${resetTarget.email}. They have been signed out everywhere.`);
+      showToast(`Password reset for ${resetTarget.userName}. They have been signed out everywhere.`);
       // The dialog stays open showing the password, rather than closing on success. The server
       // keeps only its hash, so this is the one moment it can be read — a toast that fades while
       // the Owner is reaching for the phone would lose it for good.
@@ -283,29 +301,55 @@ export default function UsersPage() {
 
   function openResetDialog(user: AppUser) {
     setResetTarget(user);
-    setConfirmEmail("");
+    setConfirmUserName("");
     setResetError(null);
     setIssuedPassword(null);
   }
 
   function closeResetDialog() {
     setResetTarget(null);
-    setConfirmEmail("");
+    setConfirmUserName("");
     setResetError(null);
     setIssuedPassword(null);
   }
 
-  const isEmailConfirmed =
-    resetTarget !== null && confirmEmail.trim().toLowerCase() === resetTarget.email.toLowerCase();
+  const isUserNameConfirmed =
+    resetTarget !== null && confirmUserName.trim().toLowerCase() === resetTarget.userName.toLowerCase();
 
-  // The Owner's role is fixed on this screen, so a role change is only an edit for anyone else.
+  /**
+   * Removing a user, once the confirmation is agreed to.
+   *
+   * The server owns both refusals worth knowing about — the last Owner, and deleting yourself — so
+   * its message is shown as it comes back rather than second-guessed here.
+   */
+  async function handleDelete() {
+    if (!deleteTarget) {
+      return;
+    }
+
+    setDeleteError(null);
+    setIsDeleting(true);
+    try {
+      await deleteUser(deleteTarget.id, getAccessToken());
+      showToast(`${deleteTarget.userName} has been removed.`);
+      setDeleteTarget(null);
+      await load();
+    } catch (error) {
+      setDeleteError(error instanceof ApiError ? error.message : "Unable to remove this user.");
+    } finally {
+      setIsDeleting(false);
+    }
+  }
+
+  // Every field counts, the role included: an Owner's role is no longer fixed here, so there is no
+  // longer a case where a changed dropdown is not an edit.
   const hasEdits =
     editTarget !== null &&
     (editName.trim() !== (editTarget.fullName ?? "") ||
       editUserName.trim() !== editTarget.userName ||
       editEmail.trim() !== editTarget.email ||
       editMobile.trim() !== toDisplayPhoneNumber(editTarget.mobileNumber) ||
-      (editTarget.role !== OWNER_ROLE && editRole !== editTarget.role));
+      editRole !== editTarget.role);
 
   if (!isLoaded || isLoading) {
     return <p className="text-sm text-foreground/70">Loading…</p>;
@@ -338,13 +382,12 @@ export default function UsersPage() {
         <table className="stacked w-full text-left text-sm">
           <thead className="border-b border-border bg-surface">
             <tr>
-              {/* First, because it is what the person signs in with — the email below it is a
-                  contact detail and no longer opens the door. */}
+              {/* First, because it is what the person signs in with. Email and role are not
+                  columns: both are on the Edit dialog, where the person they belong to is named,
+                  and a row that carries every detail is a row nobody reads. */}
               <th className="px-4 py-3 font-medium">Username</th>
+              <th className="px-4 py-3 font-medium">Name</th>
               <th className="px-4 py-3 font-medium">Mobile</th>
-              <th className="px-4 py-3 font-medium">Email</th>
-              <th className="px-4 py-3 font-medium">Role</th>
-              <th className="px-4 py-3 font-medium">What they can do</th>
               {hasRowActions && (
                 <th className="px-4 py-3 font-medium">
                   <span className="sr-only">Actions</span>
@@ -358,21 +401,13 @@ export default function UsersPage() {
                 <td data-label="Username" className="px-4 py-3 font-medium">
                   {user.userName}
                 </td>
-                {/* An em dash for the accounts that predate the field — blank would read as a
-                    number nobody has got round to typing in yet. */}
+                {/* An em dash for the accounts that predate these fields — blank would read as
+                    something nobody has got round to typing in yet. */}
+                <td data-label="Name" className="px-4 py-3">
+                  {user.fullName?.trim() || "—"}
+                </td>
                 <td data-label="Mobile" className="px-4 py-3">
                   {toDisplayPhoneNumber(user.mobileNumber) || "—"}
-                </td>
-                <td data-label="Email" className="px-4 py-3">
-                  {user.email}
-                </td>
-                {/* Plain text. Picking a role is done in the Edit dialog, where the person it
-                    applies to is named. */}
-                <td data-label="Role" className="px-4 py-3">
-                  {user.role ?? "No role"}
-                </td>
-                <td data-label="What they can do" className="px-4 py-3 text-foreground/70">
-                  {user.role ? ROLE_SUMMARY[user.role] ?? "As set on User Rights." : "Cannot use the system yet."}
                 </td>
                 {hasRowActions && (
                   <td data-label="" className="px-4 py-3">
@@ -402,6 +437,20 @@ export default function UsersPage() {
                           className="whitespace-nowrap text-foreground/70 hover:text-foreground"
                         >
                           Reset Password
+                        </button>
+                      )}
+                      {/* Not on your own row. The server refuses a self-delete, and a button whose
+                          only outcome is an error is worse than no button. */}
+                      {canDelete && user.id !== currentUser?.id && (
+                        <button
+                          type="button"
+                          onClick={() => {
+                            setDeleteTarget(user);
+                            setDeleteError(null);
+                          }}
+                          className="whitespace-nowrap text-danger/80 hover:text-danger"
+                        >
+                          Delete
                         </button>
                       )}
                     </div>
@@ -553,12 +602,14 @@ export default function UsersPage() {
             <label htmlFor="editRole" className="text-sm font-medium">
               Role
             </label>
+            {/* Enabled for Owners too. A shop that has changed hands has to be able to move the
+                previous owner onto another role, and there is nobody above an Owner to ask. The
+                server still refuses to demote the last one. */}
             <select
               id="editRole"
               value={editRole}
               onChange={(e) => setEditRole(e.target.value)}
-              disabled={editTarget?.role === OWNER_ROLE}
-              className={`${fieldClassName} disabled:cursor-not-allowed disabled:opacity-60`}
+              className={fieldClassName}
             >
               {editTarget?.role === null && <option value="">No role</option>}
               {roles.map((option) => (
@@ -567,9 +618,10 @@ export default function UsersPage() {
                 </option>
               ))}
             </select>
-            {editTarget?.role === OWNER_ROLE ? (
-              <p className="text-xs text-foreground/60">
-                The Owner runs the shop and is the only role that can hand out access, so it is not changed from here.
+            {editTarget?.role === OWNER_ROLE && editRole !== OWNER_ROLE ? (
+              <p className="text-xs text-warning">
+                This removes their power to hand out access, including to themselves. If they are the only Owner, make
+                someone else one first.
               </p>
             ) : (
               ROLE_SUMMARY[editRole] && <p className="text-xs text-foreground/60">{ROLE_SUMMARY[editRole]}</p>
@@ -598,7 +650,9 @@ export default function UsersPage() {
       <Modal
         open={resetTarget !== null}
         title="Reset Password"
-        description={resetTarget?.email}
+        // Who it is, not what they sign in as — the username is the thing being typed below, and
+        // naming the person is what tells an Owner they are on the right row.
+        description={resetTarget?.fullName?.trim() || resetTarget?.email}
         onClose={closeResetDialog}
       >
         {issuedPassword !== null ? (
@@ -644,21 +698,22 @@ export default function UsersPage() {
         ) : (
         <form onSubmit={handleResetPassword} className="flex flex-col">
           <p className="text-sm text-foreground/70">
-            Type this user&rsquo;s email address to confirm. A temporary password is generated for them, and they are
-            asked to choose their own the first time they sign in with it.
+            Type <span className="font-medium text-foreground">{resetTarget?.userName}</span> to confirm. A temporary
+            password is generated for them, and they are asked to choose their own the first time they sign in with it.
           </p>
 
           <div className="mt-3 flex flex-col gap-3">
             {/* Every row on this screen looks alike, and this is the action that locks somebody out
-                of their account. Typing the address is what proves the right row was clicked. */}
+                of their account. Typing the username is what proves the right row was clicked. */}
             <Input
-              id="confirmEmail"
-              label="Email address"
-              type="email"
+              id="confirmUserName"
+              label="Username"
               autoComplete="off"
-              placeholder={resetTarget?.email}
-              value={confirmEmail}
-              onChange={(e) => setConfirmEmail(e.target.value)}
+              autoCapitalize="none"
+              autoCorrect="off"
+              spellCheck={false}
+              value={confirmUserName}
+              onChange={(e) => setConfirmUserName(e.target.value)}
             />
           </div>
 
@@ -677,13 +732,39 @@ export default function UsersPage() {
             <Button type="button" variant="secondary" onClick={closeResetDialog} disabled={isResetting}>
               CANCEL
             </Button>
-            <Button type="submit" disabled={isResetting || !isEmailConfirmed}>
+            <Button type="submit" disabled={isResetting || !isUserNameConfirmed}>
               {isResetting ? "Resetting…" : "RESET PASSWORD"}
             </Button>
           </ModalActions>
         </form>
         )}
       </Modal>
+
+      <ConfirmDialog
+        open={deleteTarget !== null}
+        title={`Remove ${deleteTarget?.fullName?.trim() || deleteTarget?.userName}?`}
+        description={
+          deleteTarget?.role === OWNER_ROLE
+            ? "They are an Owner. Removing them ends their access immediately and takes away their power to hand out access to anyone else. Their orders, invoices and activity stay on record."
+            : "This ends their access immediately. Their orders, invoices and activity stay on record."
+        }
+        confirmLabel="Remove"
+        confirmingLabel="Removing…"
+        isConfirming={isDeleting}
+        onConfirm={handleDelete}
+        onCancel={() => {
+          setDeleteTarget(null);
+          setDeleteError(null);
+        }}
+      >
+        {/* The last-Owner refusal arrives here rather than as a toast: the dialog is still open and
+            still asking, so the reason it will not go through belongs where the button is. */}
+        {deleteError && (
+          <p role="alert" className="text-sm text-danger">
+            {deleteError}
+          </p>
+        )}
+      </ConfirmDialog>
     </div>
   );
 }

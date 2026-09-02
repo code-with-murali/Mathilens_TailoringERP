@@ -75,6 +75,7 @@ export const PERMISSIONS = {
   usersView: "Users.View",
   usersCreate: "Users.Create",
   usersEdit: "Users.Edit",
+  usersDelete: "Users.Delete",
   usersPassword: "Users.Password",
   usersRights: "Users.Rights",
   usersRoles: "Users.Roles",
@@ -168,6 +169,17 @@ export type UpdateUserInput = {
  */
 export function updateUser(id: string, input: UpdateUserInput, token: string | null) {
   return apiPutNoContent(`/api/v1/users/${id}`, input, token);
+}
+
+/**
+ * Removes someone's access. A soft delete server-side, so the orders and activity stamped with
+ * their id still say who took them.
+ *
+ * Only Owner holds Users.Delete, and an Owner may remove another Owner. The server still refuses
+ * to remove the last Owner or the caller themselves.
+ */
+export function deleteUser(id: string, token: string | null) {
+  return apiDelete(`/api/v1/users/${id}`, token);
 }
 
 /** One screen and the actions it defines — some screens are view-only and offer no Manage. */

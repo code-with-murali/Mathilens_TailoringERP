@@ -111,6 +111,7 @@ public static class Permissions
     public const string UsersManage = $"{Modules.Users}.{Manage}";
     public const string UsersCreate = $"{Modules.Users}.{Create}";
     public const string UsersEdit = $"{Modules.Users}.{Edit}";
+    public const string UsersDelete = $"{Modules.Users}.{Delete}";
     public const string UsersPassword = $"{Modules.Users}.{Password}";
     public const string UsersRights = $"{Modules.Users}.{Rights}";
     public const string UsersRoles = $"{Modules.Users}.{Roles}";
@@ -136,7 +137,7 @@ public static class Permissions
             [Modules.Inventory] = [View, Create],
             [Modules.Settings] = [View, Edit],
             [Modules.Activity] = [View],
-            [Modules.Users] = [View, Create, Edit, Password, Rights, Roles],
+            [Modules.Users] = [View, Create, Edit, Delete, Password, Rights, Roles],
         };
 
     /// <summary>The modules in menu order, so the rights grid is not at the mercy of dictionary order.</summary>
