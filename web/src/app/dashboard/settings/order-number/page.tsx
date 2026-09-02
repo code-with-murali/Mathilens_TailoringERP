@@ -17,10 +17,10 @@ const FALLBACK_PREFIX = "ORD";
 /**
  * The code every order number starts with.
  *
- * <p>Only the code is editable. The count beside it is the shop's own running total, handed out by
- * the database one order at a time and never reused — there is no field for it here because there
- * is no safe value a person could type into one. Setting it back would collide with numbers already
- * issued, and setting it forward would burn references for no reason.</p>
+ * <p>Only the code is editable. The letter and the count beside it are the shop's own running
+ * total, handed out by the database one order at a time and never reused — there is no field for
+ * them here because there is no safe value a person could type in. Setting it back would collide
+ * with numbers already issued, and setting it forward would burn references for no reason.</p>
  */
 export default function OrderNumberSettingsPage() {
   const { showToast } = useToast();
@@ -50,7 +50,10 @@ export default function OrderNumberSettingsPage() {
   }, [load]);
 
   const trimmed = prefix.trim();
-  const preview = `${(trimmed === "" ? FALLBACK_PREFIX : trimmed).toUpperCase()}-0001`;
+  /* Mirrors OrderNumberFormat.Format on the server — code, run letter, then four digits starting
+     at 1111. The letter shown is A because that is what a shop's first order gets; a shop already
+     past a full run will see its own letter on the orders themselves. */
+  const preview = `${(trimmed === "" ? FALLBACK_PREFIX : trimmed).toUpperCase()}A-1111`;
 
   async function handleSave(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
@@ -78,9 +81,15 @@ export default function OrderNumberSettingsPage() {
 
       <form onSubmit={handleSave} className="flex max-w-xl flex-col gap-4 rounded-lg border border-border bg-surface p-6">
         <p className="text-sm text-foreground/70">
-          Every order is given a reference of its own, made of this code and a number that counts up
-          by one each time. Staff and customers use it to refer to an order instead of reading out an
-          id nobody can remember.
+          Every order is given a reference of its own, made of this code, a letter, and a number that
+          counts up by one each time. Staff and customers use it to refer to an order instead of
+          reading out an id nobody can remember.
+        </p>
+
+        <p className="text-sm text-foreground/70">
+          The number runs from 1111 to 9999. When it runs out the letter moves on — A to B, and so on
+          — and the number starts at 1111 again, so a reference never grows a fifth digit and never
+          reads as though the shop opened this morning.
         </p>
 
         <Input

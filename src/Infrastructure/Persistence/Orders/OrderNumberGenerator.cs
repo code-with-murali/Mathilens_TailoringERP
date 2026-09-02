@@ -1,5 +1,6 @@
 using MathilensERP.Application.Common.Interfaces;
 using MathilensERP.Shared.Constants;
+using MathilensERP.Shared.Numbering;
 using Microsoft.EntityFrameworkCore;
 
 namespace MathilensERP.Infrastructure.Persistence.Orders;
@@ -27,15 +28,9 @@ public sealed class OrderNumberGenerator : IOrderNumberGenerator
 
     /// <summary>
     /// Used until the shop sets its own on Settings → Order Number. An order taken before anyone
-    /// visits that screen still needs a reference, and one that reads ORD-0007 is serviceable.
+    /// visits that screen still needs a reference, and one that reads ORDA-0007 is serviceable.
     /// </summary>
     public const string FallbackPrefix = "ORD";
-
-    /// <summary>
-    /// Four digits, so the common case sorts and reads as a block. Past 9999 it simply widens to
-    /// five rather than wrapping — an ugly number beats a repeated one.
-    /// </summary>
-    private const string CountFormat = "0000";
 
     private readonly ApplicationDbContext _dbContext;
 
@@ -59,6 +54,8 @@ public sealed class OrderNumberGenerator : IOrderNumberGenerator
             .SqlQueryRaw<long>("SELECT nextval('\"OrderNumberSequence\"') AS \"Value\"")
             .SingleAsync(cancellationToken);
 
-        return $"{prefix}-{count.ToString(CountFormat)}";
+        // The shape of the reference is OrderNumberFormat's business, not this class's: this one
+        // only promises the count is unique, which is the part that needs a database.
+        return OrderNumberFormat.Format(prefix, count);
     }
 }

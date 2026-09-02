@@ -1,7 +1,7 @@
 namespace MathilensERP.Application.Common.Interfaces;
 
 /// <summary>
-/// Issues the next order number — the shop's prefix followed by a running count, "MTL-0001".
+/// Issues the next order number — the shop's code, a run letter, and a running count: "RFA-0001".
 ///
 /// <para>
 /// A port rather than something the handler works out for itself: the count has to be handed out
