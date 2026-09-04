@@ -1,0 +1,341 @@
+@import "tailwindcss";
+
+/*
+  RADHA APPARELS — the house style.
+
+  The palette is lifted from the supplied identity rather than invented: the navy is the field
+  behind the gold lockup in the brand creative, the gold is the letterform gold in the wordmark,
+  and the cream is the shirting the monogram is embroidered onto. Three surfaces do all the work —
+  cream for reading, white for plates and photography, navy for the moments that should feel like
+  the inside of a jacket — and gold is a hairline, never a fill.
+
+  Everything a component needs is a token here. A section that wants a different look changes the
+  surface it sits on, not its own colours; that is what keeps twenty-odd pages reading as one brand.
+*/
+
+@theme {
+  /* Ink — the navy that the identity is built on. */
+  --color-ink: #101c2c;
+  --color-ink-deep: #0a121d;
+  --color-ink-soft: #1c2c42;
+  --color-ink-line: #2a3d57;
+  /* Secondary text on an ink surface — 8.2:1, where cream at 15.5:1 would be too insistent. */
+  --color-ink-muted: #a9b4c2;
+
+  /* Gold — accent only, and the rule is not a style preference but a contrast one.
+     `gold` is 2.7:1 on cream: fine for a hairline or a fill, and it fails WCAG for *anything*
+     legible — body text, large display numerals and meaningful icons alike. So on a light surface
+     gold that has to be read is always `gold-deep` (5.0:1); on ink it is `gold-soft` (9.2:1).
+     Reach for plain `gold` only where the element carries no information. */
+  --color-gold: #c08a3c;
+  --color-gold-soft: #ddb87e;
+  --color-gold-deep: #8a6023;
+
+  /* Paper — the two light surfaces. */
+  --color-cream: #f7f3ec;
+  --color-cream-deep: #ede5d8;
+  --color-paper: #ffffff;
+
+  /* Text on light surfaces. */
+  --color-body: #23303f;
+  --color-muted: #566373;
+  --color-hair: #ded6c8;
+  --color-hair-strong: #c9bfad;
+
+  --font-display: var(--font-cormorant), "Cormorant Garamond", "Times New Roman", serif;
+  --font-sans: var(--font-inter), ui-sans-serif, system-ui, -apple-system, "Segoe UI", sans-serif;
+
+  /* A fluid editorial scale. The display sizes are deliberately large: the brand is carried by
+     type on most pages, because there is very little photography to carry it instead. */
+  --text-hero: clamp(2.9rem, 8.2vw, 6.5rem);
+  --text-hero--line-height: 0.94;
+  --text-display: clamp(2.3rem, 5.4vw, 4rem);
+  --text-display--line-height: 1.04;
+  --text-title: clamp(1.75rem, 3.2vw, 2.6rem);
+  --text-title--line-height: 1.12;
+  --text-subtitle: clamp(1.25rem, 2vw, 1.6rem);
+  --text-subtitle--line-height: 1.3;
+  --text-lead: clamp(1.0625rem, 1.25vw, 1.25rem);
+  --text-lead--line-height: 1.65;
+
+  --spacing-gutter: clamp(1.25rem, 5vw, 4.5rem);
+  --spacing-section: clamp(4.5rem, 9vw, 9rem);
+
+  --ease-brand: cubic-bezier(0.22, 0.61, 0.36, 1);
+}
+
+@layer base {
+  :root {
+    color-scheme: light;
+  }
+
+  html {
+    scroll-behavior: smooth;
+    /* The sticky header must not cover the heading of an anchored section. */
+    scroll-padding-top: 6rem;
+    -webkit-text-size-adjust: 100%;
+  }
+
+  @media (prefers-reduced-motion: reduce) {
+    html {
+      scroll-behavior: auto;
+    }
+  }
+
+  body {
+    background-color: var(--color-cream);
+    color: var(--color-body);
+    font-family: var(--font-sans);
+    font-size: 1rem;
+    line-height: 1.7;
+    -webkit-font-smoothing: antialiased;
+    text-rendering: optimizeLegibility;
+    /* Nothing on this site is meant to be reached sideways. Clip rather than hidden so the
+       sticky header keeps working. */
+    overflow-x: clip;
+  }
+
+  h1,
+  h2,
+  h3,
+  h4 {
+    font-family: var(--font-display);
+    font-weight: 400;
+    letter-spacing: -0.012em;
+    color: var(--color-ink);
+    text-wrap: balance;
+  }
+
+  p {
+    text-wrap: pretty;
+  }
+
+  /* A visible, brand-coloured focus ring everywhere, including for mouse users on links that
+     open dialogs — losing focus visibility is the fastest way to make a site unusable by keyboard. */
+  :focus-visible {
+    outline: 2px solid var(--color-gold);
+    outline-offset: 3px;
+    border-radius: 1px;
+  }
+
+  ::selection {
+    background: color-mix(in srgb, var(--color-gold) 32%, transparent);
+    color: var(--color-ink);
+  }
+
+  img {
+    max-width: 100%;
+    height: auto;
+  }
+}
+
+@layer components {
+  /*
+    Page gutter. One container for the whole site, so a section never invents its own margin and
+    columns line up across sections that know nothing about each other.
+  */
+  .u-container {
+    width: 100%;
+    max-width: 84rem;
+    margin-inline: auto;
+    padding-inline: var(--spacing-gutter);
+  }
+
+  .u-container-narrow {
+    width: 100%;
+    max-width: 46rem;
+    margin-inline: auto;
+    padding-inline: var(--spacing-gutter);
+  }
+
+  /*
+    The letterspaced classical caps from the identity's "FABRIC & TAILORING" line. Used for
+    eyebrows, section numbers and button labels — it is the single most recognisable typographic
+    gesture the brand owns, so it earns its repetition.
+  */
+  .u-eyebrow {
+    font-family: var(--font-sans);
+    font-size: 0.6875rem;
+    font-weight: 500;
+    letter-spacing: 0.22em;
+    text-transform: uppercase;
+    line-height: 1.4;
+  }
+
+  /* A hairline that fades out, used to close a heading block. */
+  .u-rule {
+    height: 1px;
+    background: linear-gradient(
+      to right,
+      var(--color-gold) 0%,
+      color-mix(in srgb, var(--color-gold) 35%, transparent) 45%,
+      transparent 100%
+    );
+  }
+
+  /*
+    A woven-cloth suggestion for panels that have no photograph. Two crossed hairline gradients at
+    a shallow angle read as warp and weft at a glance and as texture at a distance; heavy enough to
+    stop a panel looking empty, light enough that type still sits cleanly on it.
+  */
+  .u-weave {
+    background-image: repeating-linear-gradient(
+        45deg,
+        color-mix(in srgb, currentColor 5%, transparent) 0px,
+        color-mix(in srgb, currentColor 5%, transparent) 1px,
+        transparent 1px,
+        transparent 6px
+      ),
+      repeating-linear-gradient(
+        -45deg,
+        color-mix(in srgb, currentColor 4%, transparent) 0px,
+        color-mix(in srgb, currentColor 4%, transparent) 1px,
+        transparent 1px,
+        transparent 6px
+      );
+  }
+
+  /* A pinstripe, for the wider brand plates. */
+  .u-pinstripe {
+    background-image: repeating-linear-gradient(
+      90deg,
+      color-mix(in srgb, currentColor 8%, transparent) 0px,
+      color-mix(in srgb, currentColor 8%, transparent) 1px,
+      transparent 1px,
+      transparent 14px
+    );
+  }
+
+  /*
+    Editorial body copy for the journal and the long-form brand pages. Kept as a component class
+    rather than a plugin so the measure, rhythm and hanging rules stay in one readable place.
+  */
+  .u-prose {
+    font-size: 1.0625rem;
+    line-height: 1.78;
+    color: var(--color-body);
+  }
+
+  .u-prose > * + * {
+    margin-top: 1.35em;
+  }
+
+  .u-prose h2 {
+    font-size: clamp(1.6rem, 2.6vw, 2.1rem);
+    line-height: 1.2;
+    margin-top: 2.4em;
+    margin-bottom: -0.5em;
+  }
+
+  .u-prose h3 {
+    font-size: clamp(1.25rem, 1.9vw, 1.5rem);
+    line-height: 1.3;
+    margin-top: 2em;
+    margin-bottom: -0.55em;
+  }
+
+  .u-prose ul {
+    list-style: none;
+    padding-left: 0;
+  }
+
+  .u-prose ul > li {
+    position: relative;
+    padding-left: 1.6rem;
+  }
+
+  .u-prose ul > li + li {
+    margin-top: 0.7em;
+  }
+
+  .u-prose ul > li::before {
+    content: "";
+    position: absolute;
+    left: 0.1rem;
+    top: 0.82em;
+    width: 0.6rem;
+    height: 1px;
+    background: var(--color-gold);
+  }
+
+  .u-prose a {
+    color: var(--color-gold-deep);
+    text-underline-offset: 0.2em;
+    text-decoration-thickness: 1px;
+    text-decoration-line: underline;
+  }
+
+  .u-prose a:hover {
+    color: var(--color-ink);
+  }
+}
+
+@layer utilities {
+  /*
+    Scroll reveal. Elements start displaced and are released by an IntersectionObserver adding
+    `data-revealed`. If the script never runs — no JavaScript, or an observer-less browser — the
+    `no-js` fallback below keeps everything visible, so content is never hidden by a broken effect.
+  */
+  [data-reveal] {
+    opacity: 0;
+    transform: translate3d(0, 1.25rem, 0);
+    transition:
+      opacity 0.85s var(--ease-brand),
+      transform 0.85s var(--ease-brand);
+    transition-delay: var(--reveal-delay, 0ms);
+    will-change: opacity, transform;
+  }
+
+  [data-reveal][data-revealed] {
+    opacity: 1;
+    transform: none;
+  }
+
+  @media (prefers-reduced-motion: reduce) {
+    [data-reveal] {
+      opacity: 1;
+      transform: none;
+      transition: none;
+    }
+  }
+
+  /* A slow settle for hero photography, so the first screen has movement without animation. */
+  .u-settle {
+    animation: radha-settle 1.6s var(--ease-brand) both;
+  }
+
+  @keyframes radha-settle {
+    from {
+      opacity: 0;
+      transform: scale(1.04);
+    }
+    to {
+      opacity: 1;
+      transform: none;
+    }
+  }
+
+  @media (prefers-reduced-motion: reduce) {
+    .u-settle {
+      animation: none;
+    }
+  }
+
+  /* Links and buttons that reveal a gold underline from the left on hover. */
+  .u-underline {
+    background-image: linear-gradient(var(--color-gold), var(--color-gold));
+    background-repeat: no-repeat;
+    background-position: 0 100%;
+    background-size: 0 1px;
+    transition: background-size 0.45s var(--ease-brand);
+  }
+
+  .u-underline:hover,
+  .u-underline:focus-visible {
+    background-size: 100% 1px;
+  }
+
+  .u-balance {
+    text-wrap: balance;
+  }
+}

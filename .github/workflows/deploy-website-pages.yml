@@ -1,0 +1,110 @@
+name: Deploy website to GitHub Pages
+
+# The RADHA brand site (website/) as a static export, published to GitHub Pages.
+#
+# Before this can run, two things must be true of the repository:
+#
+#   1. Pages is enabled with "Source: GitHub Actions" (Settings → Pages).
+#   2. Pages is available for this repository at all. GitHub Pages does NOT publish from a
+#      private repository on the Free plan — it needs Pro, Team or Enterprise, or the repository
+#      must be public. See website/README.md for the alternatives if neither applies.
+#
+# Configure these in Settings → Secrets and variables → Actions → Variables:
+#
+#   SITE_URL   required. The public origin, no trailing slash. Canonical URLs, Open Graph tags
+#              and the sitemap are all built from it, so getting it wrong is worse than leaving
+#              the site unpublished.
+#              Custom domain:  https://www.radhaapparels.com
+#              Project page:   https://code-with-murali.github.io/Mathilens_TailoringERP
+#
+#   BASE_PATH  only for a project page served from a sub-path, and it must match the repository
+#              name exactly, with a leading slash and no trailing one: /Mathilens_TailoringERP
+#              Leave it unset for a custom domain or a user page.
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - "website/**"
+      - ".github/workflows/deploy-website-pages.yml"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+  pages: write
+  id-token: write
+
+# Let a running deploy finish rather than cancelling it — a half-published site is worse than a
+# slightly stale one.
+concurrency:
+  group: pages
+  cancel-in-progress: false
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: website
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+          cache-dependency-path: website/package-lock.json
+
+      - run: npm ci
+
+      - name: Fail early if the site URL is not configured
+        run: |
+          if [ -z "${{ vars.SITE_URL }}" ]; then
+            echo "::error::SITE_URL repository variable is not set. Canonical URLs, OG tags and the"
+            echo "::error::sitemap would all be built against localhost. Refusing to publish."
+            exit 1
+          fi
+
+      - run: npm run lint
+      - run: npx tsc --noEmit
+
+      - name: Build static export
+        env:
+          NEXT_PUBLIC_SITE_URL: ${{ vars.SITE_URL }}
+          NEXT_PUBLIC_BASE_PATH: ${{ vars.BASE_PATH }}
+          NEXT_PUBLIC_PHONE: ${{ vars.PHONE }}
+          NEXT_PUBLIC_WHATSAPP: ${{ vars.WHATSAPP }}
+          NEXT_PUBLIC_EMAIL: ${{ vars.EMAIL }}
+          NEXT_PUBLIC_MAP_EMBED_URL: ${{ vars.MAP_EMBED_URL }}
+          NEXT_PUBLIC_MAP_DIRECTIONS_URL: ${{ vars.MAP_DIRECTIONS_URL }}
+          NEXT_PUBLIC_GOOGLE_BUSINESS_URL: ${{ vars.GOOGLE_BUSINESS_URL }}
+          NEXT_PUBLIC_JUSTDIAL_URL: ${{ vars.JUSTDIAL_URL }}
+          NEXT_PUBLIC_INSTAGRAM_URL: ${{ vars.INSTAGRAM_URL }}
+          NEXT_PUBLIC_FACEBOOK_URL: ${{ vars.FACEBOOK_URL }}
+          NEXT_PUBLIC_YOUTUBE_URL: ${{ vars.YOUTUBE_URL }}
+          NEXT_PUBLIC_STORE_URL: ${{ vars.STORE_URL }}
+          NEXT_PUBLIC_ENQUIRY_ENDPOINT: ${{ vars.ENQUIRY_ENDPOINT }}
+          NEXT_PUBLIC_GA4_ID: ${{ vars.GA4_ID }}
+          NEXT_PUBLIC_GOOGLE_SITE_VERIFICATION: ${{ vars.GOOGLE_SITE_VERIFICATION }}
+        run: npm run build
+
+      - name: Verify the artifact is Pages-safe
+        run: |
+          test -f out/.nojekyll || { echo "::error::out/.nojekyll missing — Jekyll would delete _next/"; exit 1; }
+          test -f out/index.html || { echo "::error::out/index.html missing"; exit 1; }
+          test -d out/_next || { echo "::error::out/_next missing"; exit 1; }
+          echo "artifact ok: $(find out -name 'index.html' | wc -l) pages"
+
+      - uses: actions/upload-pages-artifact@v3
+        with:
+          path: website/out
+
+  deploy:
+    needs: build
+    runs-on: ubuntu-latest
+    environment:
+      name: github-pages
+      url: ${{ steps.deployment.outputs.page_url }}
+    steps:
+      - id: deployment
+        uses: actions/deploy-pages@v4
