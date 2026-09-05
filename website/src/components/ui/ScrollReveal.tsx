@@ -9,10 +9,12 @@ import { useEffect } from "react";
  * carrying its own client component — which keeps the whole page tree server-rendered and the
  * JavaScript for this effect at a few hundred bytes.
  *
- * Two safeguards matter more than the animation itself. Content is hidden by CSS only; if this
- * effect never runs, `data-revealed` is set on everything immediately below, so nothing can be
- * left invisible by a script that failed. And a reader who has asked for reduced motion is opted
- * out at the CSS layer as well as here.
+ * Two safeguards matter more than the animation itself. Content is hidden by CSS only, and every
+ * rule that hides it is gated on `:root[data-js]` — set by the inline script in the document head.
+ * So a bundle that never loads, or loads and throws before this mounts, leaves the page readable
+ * instead of blank below the hero; this effect can only ever add the animation, never remove the
+ * content. And a reader who has asked for reduced motion is opted out at the CSS layer as well as
+ * here.
  */
 export function ScrollReveal() {
   useEffect(() => {

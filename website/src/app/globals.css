@@ -273,10 +273,15 @@
 @layer utilities {
   /*
     Scroll reveal. Elements start displaced and are released by an IntersectionObserver adding
-    `data-revealed`. If the script never runs — no JavaScript, or an observer-less browser — the
-    `no-js` fallback below keeps everything visible, so content is never hidden by a broken effect.
+    `data-revealed`.
+
+    Every rule here is gated on `:root[data-js]`, which the inline script in the document head sets
+    before the first paint. Nothing is hidden until JavaScript has proved it is running, so a
+    blocked, failed or still-loading bundle leaves the page fully readable rather than showing the
+    hero above a column of invisible text. The comment that used to sit here claimed a `no-js`
+    fallback existed; it never did, and content below the fold was hidden unconditionally.
   */
-  [data-reveal] {
+  :root[data-js] [data-reveal] {
     opacity: 0;
     transform: translate3d(0, 1.25rem, 0);
     transition:
@@ -286,13 +291,15 @@
     will-change: opacity, transform;
   }
 
-  [data-reveal][data-revealed] {
+  /* Held above the rule that hides it — same attribute gate, one more qualifier. */
+  :root[data-js] [data-reveal][data-revealed] {
     opacity: 1;
     transform: none;
   }
 
   @media (prefers-reduced-motion: reduce) {
-    [data-reveal] {
+    :root[data-js] [data-reveal],
+    :root[data-js] [data-reveal][data-revealed] {
       opacity: 1;
       transform: none;
       transition: none;

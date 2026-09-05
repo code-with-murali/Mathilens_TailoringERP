@@ -51,6 +51,17 @@ export const viewport: Viewport = {
 export default function RootLayout({ children }: { children: React.ReactNode }) {
   return (
     <html lang="en-IN" className={`${cormorant.variable} ${inter.variable}`}>
+      <head>
+        {/*
+          Marks the document as JavaScript-capable before the first paint, which is what every
+          scroll-reveal rule in globals.css is gated on. It has to be inline and it has to be here:
+          a deferred or bundled script would run after paint, so the reveal styles would apply a
+          frame late and the page would flash. If this never runs, nothing is ever hidden.
+        */}
+        <script
+          dangerouslySetInnerHTML={{ __html: 'document.documentElement.setAttribute("data-js","")' }}
+        />
+      </head>
       <body className="flex min-h-dvh flex-col">
         {/* The organisation and website graphs are site-wide facts, so they live here and every
             page inherits them. Page-specific graphs (breadcrumbs, FAQs, articles) are emitted by
