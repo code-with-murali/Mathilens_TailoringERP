@@ -35,7 +35,16 @@ export default function StockDetailsPage() {
       setRows(items);
       setMeta(meta);
     } catch (error) {
-      setLoadError(error instanceof ApiError ? error.message : "Unable to load stock details.");
+      // Says what actually went wrong rather than only that something did. "Unable to load stock
+      // details." was shown for every failure that was not an ApiError, which is precisely the set
+      // of failures nobody can act on without opening the network tab — a request that never
+      // completed, or a response that did not parse. Naming it is the difference between a report
+      // that can be fixed and one that can only be reproduced.
+      setLoadError(
+        error instanceof ApiError
+          ? error.message
+          : `Unable to load stock details. ${error instanceof Error ? `${error.name}: ${error.message}` : String(error)}`,
+      );
     } finally {
       setIsLoading(false);
     }
@@ -60,14 +69,6 @@ export default function StockDetailsPage() {
           receipts.
         </p>
       </div>
-
-      {/* What the figure does and does not cover, said once at the top rather than left to be
-          discovered when a count disagrees with the shelf. */}
-      <p className="rounded-md border border-border bg-background/40 p-3 text-sm text-foreground/70">
-        Available is what was received minus what orders have used. Only shop-supplied fabric on live orders is
-        deducted — customer-supplied cloth was never the shop&apos;s, and cancelling an order releases it. Orders placed
-        before stock tracking, or against a cloth code that is not in Fabric Details, are not counted.
-      </p>
 
       <div className="max-w-md">
         <Input
