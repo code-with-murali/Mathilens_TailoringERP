@@ -6,7 +6,7 @@ import { FaqList } from "@/components/ui/FaqList";
 import { JsonLd } from "@/components/ui/JsonLd";
 import { Container, Section } from "@/components/ui/Section";
 import { SectionHeading } from "@/components/ui/SectionHeading";
-import { brand, contact, onlineStore, social } from "@/content/site";
+import { brand, contact, onlineStore, social, type SocialKey } from "@/content/site";
 import type { Crumb } from "@/content/types";
 import { breadcrumbSchema, faqSchema } from "@/lib/schema";
 import { pageMetadata } from "@/lib/seo";
@@ -66,7 +66,9 @@ const visitNotes = [
 ];
 
 export default function ContactPage() {
-  const hasSocial = Boolean(social.instagram || social.facebook || social.youtube);
+  // Keyed off the record rather than a hand-written list, so a channel added to `social` shows up
+  // here without this line having to be remembered.
+  const hasSocial = (Object.keys(social) as SocialKey[]).some((key) => social[key]);
   const hasListings = Boolean(contact.justdialUrl || contact.googleBusinessUrl);
 
   return (
@@ -138,7 +140,7 @@ export default function ContactPage() {
 
               {hasSocial ? (
                 <div className="mt-12 border-t border-hair pt-8">
-                  <h2 className="u-eyebrow mb-5 text-gold-deep">Follow RADHA</h2>
+                  <h2 className="u-eyebrow mb-5 text-gold-deep">Follow &amp; join RADHA</h2>
                   <SocialLinks />
                 </div>
               ) : null}

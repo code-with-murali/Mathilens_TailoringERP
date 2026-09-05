@@ -77,8 +77,18 @@ export const onlineStore = {
   status: env("NEXT_PUBLIC_STORE_URL") ? ("live" as const) : ("in-development" as const),
 } as const;
 
+/**
+ * Public channels, in the order they are shown.
+ *
+ * The two community entries are invite links to a group, not the shop's own number: joining a
+ * WhatsApp community is a different act from messaging the shop, so it is configured separately
+ * from `contact.whatsapp` and never falls back to it. A community with no invite link simply does
+ * not appear, in keeping with the rule at the top of this file.
+ */
 export const social = {
   instagram: env("NEXT_PUBLIC_INSTAGRAM_URL") as Nullable<string>,
+  whatsappCommunity: env("NEXT_PUBLIC_WHATSAPP_COMMUNITY_URL") as Nullable<string>,
+  telegram: env("NEXT_PUBLIC_TELEGRAM_URL") as Nullable<string>,
   facebook: env("NEXT_PUBLIC_FACEBOOK_URL") as Nullable<string>,
   youtube: env("NEXT_PUBLIC_YOUTUBE_URL") as Nullable<string>,
 } as const;
@@ -87,6 +97,8 @@ export type SocialKey = keyof typeof social;
 
 export const socialLabels: Record<SocialKey, string> = {
   instagram: "Instagram",
+  whatsappCommunity: "WhatsApp community",
+  telegram: "Telegram community",
   facebook: "Facebook",
   youtube: "YouTube",
 };
@@ -123,6 +135,9 @@ export function missingConfiguration(): string[] {
   if (!contact.justdialUrl) missing.push("NEXT_PUBLIC_JUSTDIAL_URL — Justdial listing link");
   if (!onlineStore.url) missing.push("NEXT_PUBLIC_STORE_URL — online store links");
   if (!social.instagram) missing.push("NEXT_PUBLIC_INSTAGRAM_URL");
+  if (!social.whatsappCommunity)
+    missing.push("NEXT_PUBLIC_WHATSAPP_COMMUNITY_URL — WhatsApp community invite");
+  if (!social.telegram) missing.push("NEXT_PUBLIC_TELEGRAM_URL — Telegram community invite");
   if (!social.facebook) missing.push("NEXT_PUBLIC_FACEBOOK_URL");
   if (!social.youtube) missing.push("NEXT_PUBLIC_YOUTUBE_URL");
   if (!enquiryEndpoint) missing.push("NEXT_PUBLIC_ENQUIRY_ENDPOINT — enquiry form delivery");

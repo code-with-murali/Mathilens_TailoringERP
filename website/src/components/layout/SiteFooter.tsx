@@ -65,7 +65,7 @@ export function SiteFooter() {
 
             {hasSocial ? (
               <div className="mt-8">
-                <p className="u-eyebrow mb-4 text-gold-soft">Follow RADHA</p>
+                <p className="u-eyebrow mb-4 text-gold-soft">Follow &amp; join RADHA</p>
                 <SocialLinks tone="dark" />
               </div>
             ) : null}

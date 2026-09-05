@@ -1,0 +1,114 @@
+name: Deploy website to Azure Static Web Apps
+
+# The RADHA brand site (website/) as a static export, published to its own Static Web App.
+#
+# Azure rather than GitHub Pages because Pages does not publish from a private repository on the
+# Free plan, and this repository holds the ERP, the API and the deploy configs — it stays private.
+# Azure also honours the security and cache headers in website/public/staticwebapp.config.json,
+# which Pages silently ignores.
+#
+# Its own Static Web App, not the ERP's: swa-mathilens-erp serves the application at a different
+# origin with a different config, and the brand site sharing it would put the two behind one set
+# of routes.
+#
+# Before the first run, create the Static Web App and add its deployment token:
+#
+#   az staticwebapp create -n swa-radha-website -g <resource-group> -l centralindia
+#   az staticwebapp secrets list -n swa-radha-website --query properties.apiKey -o tsv
+#   gh secret set AZURE_STATIC_WEB_APPS_API_TOKEN_SWA_RADHA_WEBSITE --body "<token>"
+#
+# Then set the site URL, which is baked into canonical URLs, OG tags and the sitemap at build time:
+#
+#   gh variable set SITE_URL --body "https://www.radhaapparels.com"
+
+on:
+  push:
+    branches: [website]
+    paths:
+      - "website/**"
+      - ".github/workflows/deploy-website-swa.yml"
+  workflow_dispatch:
+
+concurrency:
+  # Let a running deploy finish rather than cancelling it — a half-published site is worse than a
+  # slightly stale one.
+  group: deploy-website-swa
+  cancel-in-progress: false
+
+jobs:
+  build_and_deploy:
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: website
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+          cache-dependency-path: website/package-lock.json
+
+      - run: npm ci
+
+      - name: Fail early if the site URL is not configured
+        # Getting this wrong is worse than leaving the site unpublished: every canonical URL, OG
+        # tag and sitemap entry would point at localhost, and search engines would index that.
+        run: |
+          if [ -z "${{ vars.SITE_URL }}" ]; then
+            echo "::error::SITE_URL repository variable is not set. Canonical URLs, OG tags and the"
+            echo "::error::sitemap would all be built against localhost. Refusing to publish."
+            exit 1
+          fi
+
+      - run: npm run lint
+      - run: npx tsc --noEmit
+
+      - name: Build static export
+        env:
+          NEXT_PUBLIC_SITE_URL: ${{ vars.SITE_URL }}
+          NEXT_PUBLIC_PHONE: ${{ vars.PHONE }}
+          NEXT_PUBLIC_WHATSAPP: ${{ vars.WHATSAPP }}
+          NEXT_PUBLIC_EMAIL: ${{ vars.EMAIL }}
+          NEXT_PUBLIC_MAP_EMBED_URL: ${{ vars.MAP_EMBED_URL }}
+          NEXT_PUBLIC_MAP_DIRECTIONS_URL: ${{ vars.MAP_DIRECTIONS_URL }}
+          NEXT_PUBLIC_GOOGLE_BUSINESS_URL: ${{ vars.GOOGLE_BUSINESS_URL }}
+          NEXT_PUBLIC_JUSTDIAL_URL: ${{ vars.JUSTDIAL_URL }}
+          NEXT_PUBLIC_INSTAGRAM_URL: ${{ vars.INSTAGRAM_URL }}
+          NEXT_PUBLIC_WHATSAPP_COMMUNITY_URL: ${{ vars.WHATSAPP_COMMUNITY_URL }}
+          NEXT_PUBLIC_TELEGRAM_URL: ${{ vars.TELEGRAM_URL }}
+          NEXT_PUBLIC_FACEBOOK_URL: ${{ vars.FACEBOOK_URL }}
+          NEXT_PUBLIC_YOUTUBE_URL: ${{ vars.YOUTUBE_URL }}
+          NEXT_PUBLIC_STORE_URL: ${{ vars.STORE_URL }}
+          NEXT_PUBLIC_ENQUIRY_ENDPOINT: ${{ vars.ENQUIRY_ENDPOINT }}
+          NEXT_PUBLIC_GA4_ID: ${{ vars.GA4_ID }}
+          NEXT_PUBLIC_GOOGLE_SITE_VERIFICATION: ${{ vars.GOOGLE_SITE_VERIFICATION }}
+        run: npm run build
+
+      - name: Stage the routing config
+        # Only the export directory is uploaded, so the config has to be inside it. It is kept at
+        # the website/ root rather than in public/ so that `next build` cannot serve it as a public
+        # asset, and copied in here instead.
+        run: cp staticwebapp.config.json out/staticwebapp.config.json
+
+      - name: Verify the artifact
+        run: |
+          test -f out/index.html || { echo "::error::out/index.html missing"; exit 1; }
+          test -d out/_next || { echo "::error::out/_next missing"; exit 1; }
+          test -f out/staticwebapp.config.json \
+            || { echo "::error::out/staticwebapp.config.json missing — headers would not apply"; exit 1; }
+          echo "artifact ok: $(find out -name 'index.html' | wc -l) pages"
+
+      - name: Deploy
+        uses: Azure/static-web-apps-deploy@v1
+        with:
+          azure_static_web_apps_api_token: ${{ secrets.AZURE_STATIC_WEB_APPS_API_TOKEN_SWA_RADHA_WEBSITE }}
+          repo_token: ${{ secrets.GITHUB_TOKEN }}
+          action: "upload"
+          # Already built above, so Oryx must not build it again: its own Next detection would miss
+          # the post-build step that flattens the segment-prefetch files.
+          skip_app_build: true
+          app_location: "website/out"
+          output_location: ""

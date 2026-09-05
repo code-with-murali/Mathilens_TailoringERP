@@ -74,6 +74,14 @@ const socialIcons: Record<SocialKey, (props: { className?: string }) => React.JS
       <circle cx="17.2" cy="6.8" r="1" fill="currentColor" stroke="none" />
     </svg>
   ),
+  // The same glyph as the direct-message button above. The label and the destination distinguish
+  // the community from the shop's own number; two different WhatsApp marks would not.
+  whatsappCommunity: WhatsAppIcon,
+  telegram: ({ className = "" }) => (
+    <svg viewBox="0 0 24 24" className={className} fill="currentColor" aria-hidden="true">
+      <path d="M21.6 4.2 18.9 19c-.2.9-.7 1.1-1.5.7l-4.1-3-2 1.9c-.2.2-.4.4-.8.4l.3-4.2 7.6-6.9c.3-.3-.1-.4-.5-.2l-9.4 5.9-4-1.3c-.9-.3-.9-.9.2-1.3l15.7-6c.7-.3 1.4.2 1.2 1.2Z" />
+    </svg>
+  ),
   facebook: ({ className = "" }) => (
     <svg viewBox="0 0 24 24" className={className} fill="currentColor" aria-hidden="true">
       <path d="M14 8.5V7c0-.8.2-1.2 1.3-1.2H17V3h-2.6C11.3 3 10.4 4.6 10.4 7v1.5H8.5V12h1.9v9H14v-9h2.4l.4-3.5H14Z" />
