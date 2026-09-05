@@ -218,7 +218,31 @@ export default function CustomersPage() {
                     {customer.email ?? "—"}
                   </td>
                   <td data-label="" className="px-4 py-3">
-                    <div className="flex justify-end gap-4">
+                    <div className="flex items-center justify-end gap-4">
+                      {/* A real tel: link rather than a button that copies the number. On the phone
+                          at the counter it opens the dialer with the number already in it, which is
+                          the whole point when an order is ready and the shop is ringing round; on a
+                          desktop it hands off to whatever handles calls there, or does nothing, and
+                          the number is still readable in the first column either way. */}
+                      <a
+                        href={`tel:${customer.phoneNumber}`}
+                        aria-label={`Call ${customer.fullName}`}
+                        title={`Call ${toDisplayPhoneNumber(customer.phoneNumber)}`}
+                        className="text-success hover:text-success/80"
+                      >
+                        <svg
+                          className="h-5 w-5"
+                          viewBox="0 0 24 24"
+                          fill="none"
+                          stroke="currentColor"
+                          strokeWidth="1.8"
+                          strokeLinecap="round"
+                          strokeLinejoin="round"
+                          aria-hidden="true"
+                        >
+                          <path d="M22 16.92v3a2 2 0 0 1-2.18 2 19.79 19.79 0 0 1-8.63-3.07 19.5 19.5 0 0 1-6-6A19.79 19.79 0 0 1 2.12 4.18 2 2 0 0 1 4.11 2h3a2 2 0 0 1 2 1.72c.13.96.36 1.9.7 2.81a2 2 0 0 1-.45 2.11L8.09 9.91a16 16 0 0 0 6 6l1.27-1.27a2 2 0 0 1 2.11-.45c.9.34 1.85.57 2.81.7A2 2 0 0 1 22 16.92Z" />
+                        </svg>
+                      </a>
                       {/* In place, like New. Editing from the list no longer means losing the page
                           and the search term. */}
                       <button
