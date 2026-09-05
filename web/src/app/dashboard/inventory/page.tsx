@@ -220,7 +220,7 @@ export default function InventoryPage() {
             </select>
             {!isLoadingClothPrices && clothPrices.length === 0 && (
               <p className="text-sm text-foreground/60">
-                No cloth codes yet — add them on the Price Detail screen first.
+                No cloth codes yet — add them on the Fabric Details screen first.
               </p>
             )}
           </div>

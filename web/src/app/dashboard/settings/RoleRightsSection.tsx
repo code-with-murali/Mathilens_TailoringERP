@@ -20,7 +20,7 @@ const fieldClassName =
 /** The screen names the shop uses, where the permission module name is not what appears in the menu. */
 const SCREEN_LABELS: Record<string, string> = {
   WhatsApp: "WhatsApp",
-  Pricing: "Price Details",
+  Pricing: "Fabric Details",
   Inventory: "Inventory",
   Activity: "Activity Log",
   Users: "Users",

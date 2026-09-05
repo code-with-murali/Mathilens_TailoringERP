@@ -66,7 +66,7 @@ export default function StockDetailsPage() {
       <p className="rounded-md border border-border bg-background/40 p-3 text-sm text-foreground/70">
         Available is what was received minus what orders have used. Only shop-supplied fabric on live orders is
         deducted — customer-supplied cloth was never the shop&apos;s, and cancelling an order releases it. Orders placed
-        before stock tracking, or against a cloth code that is not in Price Detail, are not counted.
+        before stock tracking, or against a cloth code that is not in Fabric Details, are not counted.
       </p>
 
       <div className="max-w-md">

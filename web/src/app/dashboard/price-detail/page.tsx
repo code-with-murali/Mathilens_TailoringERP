@@ -138,7 +138,7 @@ export default function PriceDetailPage() {
   return (
     <div className="flex flex-col gap-6">
       <div className="flex items-start justify-between gap-4">
-        <h1 className="text-2xl font-semibold">Price Detail</h1>
+        <h1 className="text-2xl font-semibold">Fabric Details</h1>
         <div className="flex items-start gap-2">
           <ImportExportButtons resource="cloth-prices" label="prices" onImported={load} />
           {/* "New", as on Customers — the heading above already says what is being added. The
