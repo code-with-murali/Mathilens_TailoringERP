@@ -1,4 +1,5 @@
 using MathilensERP.Api.Common;
+using MathilensERP.Api.Common.Export;
 using MathilensERP.Shared.Authorization;
 using MathilensERP.Api.Contracts.Common;
 using MathilensERP.Api.Contracts.Orders;
@@ -14,6 +15,7 @@ using MathilensERP.Application.Orders.Commands.TransitionStatus;
 using MathilensERP.Application.Orders.Commands.Update;
 using MathilensERP.Application.Orders.Commands.UpdateItem;
 using MathilensERP.Application.Orders.Queries.GetById;
+using MathilensERP.Application.Orders.Queries.Export;
 using MathilensERP.Application.Orders.Queries.PreviousForCustomer;
 using MathilensERP.Application.Orders.Queries.Search;
 using MathilensERP.Domain.Orders;
@@ -34,6 +36,48 @@ public sealed class OrdersController : ApiControllerBase
     public OrdersController(ISender sender)
     {
         _sender = sender;
+    }
+
+    /// <summary>
+    /// Downloads the filtered order list as a spreadsheet or PDF.
+    ///
+    /// This is deliberately a separate query from <see cref="Search"/>: normal interactive
+    /// requests remain capped at 100 rows, while an export is bounded independently at 5,000.
+    /// </summary>
+    [HttpGet("export")]
+    [ProducesResponseType(typeof(FileContentResult), StatusCodes.Status200OK)]
+    [ProducesResponseType(typeof(ApiErrorResponse), StatusCodes.Status400BadRequest)]
+    public async Task<IActionResult> Export(
+        [FromQuery] Guid? customerId,
+        [FromQuery] OrderStatus? status,
+        [FromQuery] string? search,
+        [FromQuery] string? garmentType,
+        [FromQuery] ExportFormat format = ExportFormat.Xlsx,
+        CancellationToken cancellationToken = default)
+    {
+        var result = await _sender.Send(new ExportOrdersQuery(customerId, status, search, garmentType), cancellationToken);
+        if (result.IsFailure)
+        {
+            return ToActionResult(result);
+        }
+
+        return ExportResultFactory.Create(
+            format,
+            "Orders",
+            "orders",
+            ["Order number", "Status", "Due", "Delivered", "Order value", "Paid", "Balance", "Items", "Notes"],
+            result.Value.Select(order => new object?[]
+            {
+                order.OrderNumber,
+                order.Status.ToString(),
+                order.DueAtUtc,
+                order.DeliveredAtUtc,
+                order.TotalAmount,
+                order.AmountPaid,
+                order.BalanceAmount,
+                string.Join(", ", order.Items.Select(item => $"{item.GarmentType} × {item.Quantity}")),
+                order.Notes,
+            }).ToList());
     }
 
     /// <summary>Creates a new order with its initial garment items (and, optionally, their fabric details).</summary>

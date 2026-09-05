@@ -9,6 +9,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Added
 
+- Orders export: the Orders list now downloads its current status and free-text filter as an Excel spreadsheet or PDF. The dedicated `ExportOrdersQuery` is bounded to 5,000 rows without weakening the normal list endpoint's 100-row pagination limit, and batches payment lookup for the entire file rather than issuing one billing query per order. Exports contain the order number, lifecycle dates/status, order value, paid/balance amounts, garment lines, and notes. One new handler test; 502 unit tests passing.
 - Initial repository structure (docs, prompts, src, tests, scripts, assets, docker, CI workflows) prepared for enterprise product development.
 - Solution scaffolding: Clean Architecture .NET solution (`MathilensERP.Domain`, `.Application`, `.Infrastructure`, `.Api`, `.Shared`, `.UnitTests`, `.IntegrationTests`) with project references enforcing the documented dependency rules ([01_ARCHITECTURE.md § 6](docs/01_ARCHITECTURE.md#6-dependency-diagram)). Swagger via Swashbuckle per the documented API standard.
 - Shared kernel (`MathilensERP.Shared`): `Result`/`Result<T>` and `Error`/`FieldError` types for modeling expected business outcomes without exceptions, `Guard` clauses for Domain invariant enforcement, and `PaginationDefaults` constants — with unit test coverage.

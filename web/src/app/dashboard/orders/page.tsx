@@ -10,6 +10,7 @@ import { RowMenu } from "@/components/ui/RowMenu";
 import { DEFAULT_PAGE_SIZE, Pagination } from "@/components/ui/Pagination";
 import { StatusBadge, ORDER_STATUS_BADGE, orderStatusLabel } from "@/components/ui/StatusBadge";
 import { ConfirmDialog } from "@/components/ui/ConfirmDialog";
+import { ExportButton } from "@/components/ui/ExportButton";
 import { useToast } from "@/components/ui/ToastProvider";
 import { useDebouncedValue } from "@/lib/use-debounced-value";
 import { getAccessToken } from "@/lib/auth";
@@ -502,11 +503,21 @@ export default function OrdersPage() {
 
   return (
     <div className="flex flex-col gap-6">
-      <div className="flex items-center justify-between">
+      <div className="flex items-center justify-between gap-4">
         <h1 className="text-2xl font-semibold">Orders</h1>
-        <Link href="/dashboard/orders/new">
-          <Button type="button">New Order</Button>
-        </Link>
+        <div className="flex items-center gap-3">
+          <ExportButton
+            resource="orders"
+            label="orders"
+            query={{
+              ...(status ? { status } : {}),
+              ...(debouncedSearch.trim() ? { search: debouncedSearch.trim() } : {}),
+            }}
+          />
+          <Link href="/dashboard/orders/new">
+            <Button type="button">New Order</Button>
+          </Link>
+        </div>
       </div>
 
       <div className="flex flex-wrap items-end gap-4">
