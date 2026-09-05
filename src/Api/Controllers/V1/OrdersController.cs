@@ -56,7 +56,8 @@ public sealed class OrdersController : ApiControllerBase
                         i.Fabric.ClothCode, i.Fabric.Unit)))
             .ToList();
 
-        var command = new CreateOrderCommand(request.CustomerId, request.EmployeeId, request.DueAtUtc, items, request.Notes);
+        var command = new CreateOrderCommand(
+            request.CustomerId, request.EmployeeId, request.DueAtUtc, items, request.Notes, request.IsFabricSale);
         var result = await _sender.Send(command, cancellationToken);
         return ToActionResult(result);
     }

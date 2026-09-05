@@ -4,8 +4,9 @@ import { useCallback, useEffect, useMemo, useRef, useState, type FormEvent } fro
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { Button } from "@/components/ui/Button";
-import { Input } from "@/components/ui/Input";
-import { PhoneNumberInput, cleanPhoneNumberInput } from "@/components/ui/PhoneNumberInput";
+// Only the cleaner: the fields it used to serve went with the hand-rolled New Customer form, but
+// what is typed into the search box is still tidied to the same rule before seeding the dialog.
+import { cleanPhoneNumberInput } from "@/components/ui/PhoneNumberInput";
 import { ConfirmDialog } from "@/components/ui/ConfirmDialog";
 import {
   OrderItemsEditor,
@@ -21,7 +22,9 @@ import { useToast } from "@/components/ui/ToastProvider";
 import { useDebouncedValue } from "@/lib/use-debounced-value";
 import { getAccessToken } from "@/lib/auth";
 import { ApiError } from "@/lib/api-client";
-import { searchCustomers, createCustomer, type Customer } from "@/lib/api/customers";
+import { searchCustomers, createCustomer, type Customer, type CustomerInput } from "@/lib/api/customers";
+import { CustomerForm } from "@/app/dashboard/customers/CustomerForm";
+import { Modal } from "@/components/ui/Modal";
 import { searchEmployees, type Employee } from "@/lib/api/employees";
 import { createOrder, type CreateOrderItemInput, type Order } from "@/lib/api/orders";
 import {
@@ -78,6 +81,19 @@ function digitsOnly(value: string): string {
   return value.replace(/\D/g, "");
 }
 
+/** A blank customer, for seeding the New Customer dialog with whatever was typed into the search. */
+const EMPTY_CUSTOMER: CustomerInput = {
+  fullName: "",
+  phoneNumber: "",
+  email: null,
+  address: null,
+  notes: null,
+  gender: null,
+  religion: null,
+  dateOfBirth: null,
+  weddingDate: null,
+};
+
 /** The server rejects anything above 100 (Shared/Constants/PaginationDefaults.cs). */
 const EMPLOYEE_PAGE_SIZE = 100;
 /** 500 staff is far past any tailoring shop; the cap only exists so a bad meta can't loop forever. */
@@ -103,12 +119,13 @@ export default function NewOrderPage() {
   const [mobileMatches, setMobileMatches] = useState<Customer[]>([]);
   const [isMobileDropdownOpen, setIsMobileDropdownOpen] = useState(false);
   const [isAddingNewCustomer, setIsAddingNewCustomer] = useState(false);
-  const [newCustomerName, setNewCustomerName] = useState("");
-  const [newCustomerPhone, setNewCustomerPhone] = useState("");
-  const [newCustomerEmail, setNewCustomerEmail] = useState("");
-  const [newCustomerError, setNewCustomerError] = useState<string | null>(null);
-  const [newCustomerFieldErrors, setNewCustomerFieldErrors] = useState<Record<string, string>>({});
-  const [isCreatingCustomer, setIsCreatingCustomer] = useState(false);
+  /**
+   * Whatever was typed into the search box, carried into the dialog so it is not typed twice.
+   *
+   * One object rather than a field per box, because the form it seeds is the shop's whole customer
+   * form now — the three fields this screen used to ask for were its own smaller copy of it.
+   */
+  const [newCustomerSeed, setNewCustomerSeed] = useState<CustomerInput>(EMPTY_CUSTOMER);
   const [employee, setEmployee] = useState<Employee | null>(null);
   const [employees, setEmployees] = useState<Employee[]>([]);
   const [isLoadingEmployees, setIsLoadingEmployees] = useState(true);
@@ -123,6 +140,15 @@ export default function NewOrderPage() {
   // Starts at the tailoring-only default so the form is never briefly asking for a cloth code it is
   // about to stop asking for.
   const [businessMode, setBusinessMode] = useState<BusinessMode>(DEFAULT_BUSINESS_MODE);
+  /**
+   * This particular customer is buying cloth and having nothing made.
+   *
+   * Per sale, not per shop: the same shop stitches for one customer and sells a length to the next,
+   * sometimes within the same hour. Offered only where the shop sells cloth at all — a
+   * tailoring-only shop has none to sell, so the choice would be a control with one answer.
+   */
+  const [isFabricSale, setIsFabricSale] = useState(false);
+  const canSellFabricOnly = businessMode === "tailoringFabric";
   const [tailoringRates, setTailoringRates] = useState<TailoringRates>({});
   const [garments, setGarments] = useState<Garment[]>([]);
   // What an item row may be for: on the shop's garment list and carrying a stitching price. A
@@ -277,13 +303,13 @@ export default function NewOrderPage() {
   }
 
   function startAddingNewCustomer(query: string, field: "name" | "phone" = "name") {
-    setNewCustomerName(field === "name" ? query : "");
-    // Carried over from the search box, which accepts a name too — so it is cleaned to the same
-    // rule the field enforces rather than dropped in raw.
-    setNewCustomerPhone(field === "phone" ? cleanPhoneNumberInput(query) ?? "" : "");
-    setNewCustomerEmail("");
-    setNewCustomerError(null);
-    setNewCustomerFieldErrors({});
+    setNewCustomerSeed({
+      ...EMPTY_CUSTOMER,
+      fullName: field === "name" ? query : "",
+      // Carried over from the search box, which accepts a name too — so it is cleaned to the same
+      // rule the field enforces rather than dropped in raw.
+      phoneNumber: field === "phone" ? (cleanPhoneNumberInput(query) ?? "") : "",
+    });
     setIsAddingNewCustomer(true);
     setIsMobileDropdownOpen(false);
     setActiveMeasurementItemId(null);
@@ -514,11 +540,7 @@ export default function NewOrderPage() {
     setMobileMatches([]);
     setIsMobileDropdownOpen(false);
     setIsAddingNewCustomer(false);
-    setNewCustomerName("");
-    setNewCustomerPhone("");
-    setNewCustomerEmail("");
-    setNewCustomerError(null);
-    setNewCustomerFieldErrors({});
+    setNewCustomerSeed(EMPTY_CUSTOMER);
     setEmployee(null);
     setDueAtUtc("");
     setItemRows([]);
@@ -540,49 +562,6 @@ export default function NewOrderPage() {
     applyDefaultDueDate();
   }
 
-  async function handleCreateNewCustomer() {
-    setNewCustomerError(null);
-    setNewCustomerFieldErrors({});
-
-    if (!newCustomerName.trim() || !newCustomerPhone.trim()) {
-      setNewCustomerError("Full name and phone number are required.");
-      return;
-    }
-
-    setIsCreatingCustomer(true);
-    try {
-      const created = await createCustomer(
-        {
-          fullName: newCustomerName,
-          phoneNumber: newCustomerPhone,
-          email: newCustomerEmail.trim() === "" ? null : newCustomerEmail,
-          address: null,
-          notes: null,
-          // The quick-add at the counter captures only what's needed to take the order; the rest
-          // of the profile is filled in later on the customer page.
-          gender: null,
-          religion: null,
-          dateOfBirth: null,
-          weddingDate: null,
-        },
-        getAccessToken(),
-      );
-      showToast("Customer created.");
-      selectCustomer(created);
-    } catch (error) {
-      if (error instanceof ApiError) {
-        if (error.details) {
-          setNewCustomerFieldErrors(Object.fromEntries(error.details.map((d) => [d.field.toLowerCase(), d.message])));
-        }
-        setNewCustomerError(error.message);
-      } else {
-        setNewCustomerError("Unable to reach the server. Please try again.");
-      }
-    } finally {
-      setIsCreatingCustomer(false);
-    }
-  }
-
   async function handleCreateOrder(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
 
@@ -596,6 +575,75 @@ export default function NewOrderPage() {
     }
 
     const sellsFabric = businessMode === "tailoringFabric";
+
+    // A counter sale is cloth and nothing else: each line is priced at what the cloth came to, the
+    // quantity is the one length being sold, and there is no stitching charge to add. Quantity stays
+    // 1 rather than the metre count because the API's quantity is a whole number — the metres live
+    // on the fabric record, where they are a decimal and where stock reads them from.
+    if (isFabricSale) {
+      const saleItems: CreateOrderItemInput[] = [];
+      for (const row of itemRows) {
+        if (row.clothCode.trim() === "" && row.metres.trim() === "") {
+          continue;
+        }
+
+        const metres = Number(row.metres);
+        const ratePerMetre = Number(row.ratePerMetre);
+        if (!row.clothCode.trim() || !Number.isFinite(metres) || metres <= 0 || ratePerMetre <= 0) {
+          showToast("Every cloth line needs a code, metres and a rate.", "error");
+          return;
+        }
+
+        saleItems.push({
+          garmentType: row.clothName.trim() === "" ? row.clothCode.trim() : row.clothName,
+          quantity: 1,
+          unitPrice: metres * ratePerMetre,
+          fabric: {
+            fabricType: row.clothName.trim() === "" ? row.clothCode.trim() : row.clothName,
+            source: "ShopSupplied" as const,
+            color: null,
+            quantity: metres,
+            clothCode: row.clothCode.trim(),
+            unit: "Metres" as const,
+          },
+        });
+      }
+
+      if (saleItems.length === 0) {
+        showToast("Add at least one cloth line.", "error");
+        return;
+      }
+
+      if (!Number.isFinite(advanceValue) || advanceValue < 0 || advanceValue > orderTotal) {
+        showToast("Amount paid must be between zero and the sale total.", "error");
+        return;
+      }
+
+      setIsSubmitting(true);
+      try {
+        const order = await createOrder(
+          {
+            customerId: customer.id,
+            // No tailor and no date to promise: the server refuses an employee on a sale, and reads
+            // this moment as when the cloth went across the counter.
+            employeeId: null,
+            dueAtUtc: new Date().toISOString(),
+            notes: orderNotes.trim() === "" ? null : orderNotes,
+            items: saleItems,
+            isFabricSale: true,
+          },
+          getAccessToken(),
+        );
+        setCreatedOrder(order);
+        showToast("Sale recorded.");
+      } catch (error) {
+        showToast(error instanceof ApiError ? error.message : "Unable to reach the server. Please try again.", "error");
+      } finally {
+        setIsSubmitting(false);
+      }
+      return;
+    }
+
     const items: CreateOrderItemInput[] = [];
     for (const row of itemRows) {
       // The form starts with blank placeholder rows so staff don't have to click "+ Add item" for
@@ -722,30 +770,6 @@ export default function NewOrderPage() {
    * on a phone this opens directly under the Customer Details card that asked for it. Only one copy
    * is ever visible, but both are in the DOM, so the field ids take a suffix.
    */
-  function renderNewCustomerForm(idSuffix: string) {
-    return (
-      <div className="orderSection-customer flex shrink-0 flex-col gap-2">
-        <h2 className="order-heading text-base font-semibold">New Customer</h2>
-        <Input id={`newCustomerName-${idSuffix}`} label="Full name" value={newCustomerName} onChange={(e) => setNewCustomerName(e.target.value)} error={newCustomerFieldErrors.fullname} />
-        <PhoneNumberInput id={`newCustomerPhone-${idSuffix}`} value={newCustomerPhone} onChange={setNewCustomerPhone} error={newCustomerFieldErrors.phonenumber} />
-        <Input id={`newCustomerEmail-${idSuffix}`} label="Email (optional)" type="email" value={newCustomerEmail} onChange={(e) => setNewCustomerEmail(e.target.value)} error={newCustomerFieldErrors.email} />
-        {newCustomerError && (
-          <p role="alert" className="text-sm text-danger">
-            {newCustomerError}
-          </p>
-        )}
-        <div className="flex justify-end gap-3">
-          <button type="button" onClick={() => setIsAddingNewCustomer(false)} className="text-sm text-foreground/70 hover:text-foreground">
-            Cancel
-          </button>
-          <Button type="button" variant="secondary" disabled={isCreatingCustomer} onClick={handleCreateNewCustomer}>
-            {isCreatingCustomer ? "Adding…" : "Add customer"}
-          </Button>
-        </div>
-      </div>
-    );
-  }
-
   /**
    * The measurement editor for whichever item is open.
    *
@@ -870,9 +894,40 @@ export default function NewOrderPage() {
         {/* Stitching alone, or stitching plus the shop's own cloth, used to be a pair of pills
             here. It is a property of the shop rather than of one order, so it now lives in
             Settings › Business Mode and this row is just the title and the way back. */}
-        <Link href="/dashboard/orders" className="text-sm font-medium text-primary hover:text-primary-hover">
-          Back to orders
-        </Link>
+        <div className="flex items-center gap-4">
+          {/* Only where the shop sells cloth, and only before the order is saved — what a record is
+              cannot change after it exists. A sale skips the tailor, the collection date and the
+              measurements, because none of them mean anything for a length of cloth. */}
+          {canSellFabricOnly && !isOrderCreated && (
+            <div className="flex overflow-hidden rounded-md border border-border text-sm">
+              <button
+                type="button"
+                onClick={() => setIsFabricSale(false)}
+                aria-pressed={!isFabricSale}
+                className={`px-3 py-1.5 ${!isFabricSale ? "bg-primary/10 font-medium text-primary" : "text-foreground/70 hover:text-foreground"}`}
+              >
+                Stitching
+              </button>
+              <button
+                type="button"
+                onClick={() => {
+                  setIsFabricSale(true);
+                  // Nothing measured and nobody assigned — clear both so a half-filled tailoring
+                  // order cannot be carried into a sale that has no place to put it.
+                  setActiveMeasurementItemId(null);
+                  setEmployee(null);
+                }}
+                aria-pressed={isFabricSale}
+                className={`px-3 py-1.5 ${isFabricSale ? "bg-primary/10 font-medium text-primary" : "text-foreground/70 hover:text-foreground"}`}
+              >
+                Fabric only
+              </button>
+            </div>
+          )}
+          <Link href="/dashboard/orders" className="text-sm font-medium text-primary hover:text-primary-hover">
+            Back to orders
+          </Link>
+        </div>
       </div>
 
       <form onSubmit={handleCreateOrder} className="flex flex-col gap-4">
@@ -960,21 +1015,13 @@ export default function NewOrderPage() {
                 </div>
               </div>
             )}
-            {/* Phone-only: the form opens right here, under the search box and the button that
-                opened it. From lg up it opens in the second column instead, beside this card —
-                see the panel there. Set off by a hairline rather than nested in its own bordered
-                box, which inside a card reads as a card within a card. */}
-            {isAddingNewCustomer && (
-              <div className="border-t border-border pt-3 lg:hidden">
-                {renderNewCustomerForm("inline")}
-              </div>
-            )}
           </div>
 
             <div ref={itemsAreaRef} className="orderSection-items rounded-lg border border-border bg-surface p-4">
               <OrderItemsEditor
                 key={formKey}
                 mode={businessMode}
+                fabricOnly={isFabricSale}
                 tailoringRates={tailoringRates}
                 garments={offerableGarments}
                 onChange={setItemRows}
@@ -1028,14 +1075,6 @@ export default function NewOrderPage() {
                   rendered inline under its own item instead (see renderItemDetail), and this whole
                   card is hidden — see the wrapper's className. */}
               <div className="hidden lg:contents">{renderMeasurementPanel("column")}</div>
-              {/* "+ New Customer" (the button beside the search box, or the prompt under the
-                  dropdown) opens the form here from lg up, in the same top block — mutually
-                  exclusive with the measurement panel above, since starting either one clears the
-                  other's active state. Below lg it opens under Customer Details instead, and this
-                  copy is hidden along with the rest of the card. */}
-              {!activeMeasurementItem && isAddingNewCustomer && (
-                <div className="hidden lg:contents">{renderNewCustomerForm("column")}</div>
-              )}
               {/* Clicking the Order summary cell opens an invoice-style preview here instead of
                   just closing whatever was open — a read-only recap of items/total/advance/balance
                   before committing to Create order. */}
@@ -1351,6 +1390,29 @@ export default function NewOrderPage() {
         onCancel={() => setShowInvoiceConfirm(false)}
       />
     </div>
+
+    {/* The same dialog and the same form as Customers › New Customer, rather than this screen's own
+        smaller copy of it. That copy asked for three fields, so a customer added at the counter
+        arrived with no gender, no religion and no dates — and nothing later prompted for them.
+        Whoever is standing there is the one person who can answer, so they get the whole form.
+
+        One dialog, not two: the old inline version was rendered twice, once under the search box for
+        phones and once in the second column from lg up, because a panel has to live somewhere in the
+        layout. A modal sits above it and needs neither. */}
+    <Modal open={isAddingNewCustomer} title="New Customer" onClose={() => setIsAddingNewCustomer(false)}>
+      <CustomerForm
+        initialValues={newCustomerSeed}
+        onCancel={() => setIsAddingNewCustomer(false)}
+        onSubmit={async (input) => {
+          const created = await createCustomer(input, getAccessToken());
+          showToast("Customer created.");
+          setIsAddingNewCustomer(false);
+          // Straight onto the order they were added for — that is the only reason this dialog was
+          // opened from here rather than from Customers.
+          selectCustomer(created);
+        }}
+      />
+    </Modal>
 
     {/* Rendered outside the print:hidden wrapper above so printing the modal doesn't also try
         to print (and hide) the rest of the New Order form behind it. */}

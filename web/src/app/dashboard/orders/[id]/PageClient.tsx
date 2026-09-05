@@ -40,6 +40,8 @@ const NEXT_STATUSES: Record<OrderStatus, OrderStatus[]> = {
   ReadyForDelivery: ["Delivered", "Cancelled"],
   Delivered: [],
   Cancelled: [],
+  // Cloth already across the counter. Terminal on arrival, so the page offers no next step at all.
+  Sold: [],
 };
 
 const fieldClassName =

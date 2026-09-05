@@ -20,6 +20,10 @@ public sealed class Order : AuditableEntity
         [OrderStatus.ReadyForDelivery] = [OrderStatus.Delivered, OrderStatus.Cancelled],
         [OrderStatus.Delivered] = [],
         [OrderStatus.Cancelled] = [],
+        // Terminal on arrival: the cloth is already across the counter, so there is no later step to
+        // record. Present with an empty list rather than absent, because CanTransitionTo indexes
+        // this map directly and a missing key would throw instead of answering "no".
+        [OrderStatus.Sold] = [],
     };
 
     private readonly List<OrderItem> _items = [];
@@ -72,7 +76,10 @@ public sealed class Order : AuditableEntity
     public IReadOnlyList<OrderItem> Items => _items.Where(i => !i.IsDeleted).ToList();
 
     /// <summary>An order's details, items and fabric can only be changed while it's still open — not once delivered or cancelled.</summary>
-    public bool IsOpen => Status is not (OrderStatus.Delivered or OrderStatus.Cancelled);
+    // Sold belongs here with the other two finished states: a fabric sale is complete the moment it
+    // is recorded, so its items must be as fixed as a delivered order's. Left out, every sale would
+    // read as open work and stay editable forever.
+    public bool IsOpen => Status is not (OrderStatus.Delivered or OrderStatus.Cancelled or OrderStatus.Sold);
 
     /// <summary>
     /// Work cannot start on an unassigned order: <see cref="OrderStatus.InProgress"/> means a named
@@ -120,6 +127,63 @@ public sealed class Order : AuditableEntity
             Status = OrderStatus.Received,
             OrderNumber = orderNumber?.Trim() ?? string.Empty,
         };
+    }
+
+    /// <summary>
+    /// Records cloth sold over the counter, with nothing to stitch.
+    ///
+    /// <para>A separate factory rather than a status argument on <see cref="Create"/>: this is the
+    /// only way an order may begin anywhere other than <see cref="OrderStatus.Received"/>, and a
+    /// caller that could pass any status could start one at Delivered.</para>
+    ///
+    /// <para><c>DueAtUtc</c> is the moment of sale, because a length of cloth is collected as it is
+    /// bought — there is no date to promise. It opens <see cref="OrderStatus.Received"/> like any
+    /// other order so that its lines can be added, and is closed by <see cref="SealAsSale"/> once
+    /// they have been; a sale that began life already Sold could never have been given anything to
+    /// sell, since <c>AddItem</c> refuses a finished order.</para>
+    ///
+    /// <para>No employee: nobody is assigned work that does not exist.</para>
+    /// </summary>
+    public static Order CreateFabricSale(
+        Guid customerId,
+        DateTime soldAtUtc,
+        string? notes = null,
+        string? orderNumber = null)
+    {
+        return new Order(Guid.NewGuid())
+        {
+            CustomerId = Guard.AgainstEmpty(customerId, nameof(customerId)),
+            EmployeeId = null,
+            DueAtUtc = soldAtUtc,
+            Notes = notes,
+            Status = OrderStatus.Received,
+            OrderNumber = orderNumber?.Trim() ?? string.Empty,
+        };
+    }
+
+    /// <summary>
+    /// Closes a counter sale once its cloth lines are on it — the second half of
+    /// <see cref="CreateFabricSale"/>, never called on anything else.
+    ///
+    /// <para>Refused unless the order is still untouched at <see cref="OrderStatus.Received"/> with
+    /// no tailor on it, which is the state <see cref="CreateFabricSale"/> leaves and a real garment
+    /// order leaves the moment anyone works it. That is what stops this being a back door for
+    /// marking a stitching job Sold and skipping its lifecycle.</para>
+    ///
+    /// <para><c>DeliveredAtUtc</c> is set to the same moment: the cloth went across the counter as
+    /// it was paid for. It is filled rather than left null because the revenue and collection
+    /// reports read that column and know nothing about sales.</para>
+    /// </summary>
+    public void SealAsSale(DateTime soldAtUtc)
+    {
+        if (Status != OrderStatus.Received || EmployeeId is not null)
+        {
+            throw new InvalidOperationException("Only a newly created counter sale can be sealed as sold.");
+        }
+
+        Status = OrderStatus.Sold;
+        DeliveredAtUtc = soldAtUtc;
+        WorkCompletedAtUtc ??= soldAtUtc;
     }
 
     /// <summary>

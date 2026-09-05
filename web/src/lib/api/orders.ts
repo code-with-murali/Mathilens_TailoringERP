@@ -2,7 +2,11 @@ import { apiDelete, apiDeleteFor, apiGet, apiGetPaged, apiPost, apiPut } from "@
 import type { GarmentType } from "./measurements";
 import type { ClothUnit } from "./inventory";
 
-export const ORDER_STATUSES = ["Received", "InProgress", "ReadyForDelivery", "Delivered", "Cancelled"] as const;
+/**
+ * Mirrors OrderStatus.cs. "Sold" is last because it is not part of the progression before it: a
+ * fabric sale is created Sold and stays there, and no tailoring order ever reaches it.
+ */
+export const ORDER_STATUSES = ["Received", "InProgress", "ReadyForDelivery", "Delivered", "Cancelled", "Sold"] as const;
 export type OrderStatus = (typeof ORDER_STATUSES)[number];
 
 export const FABRIC_SOURCES = ["CustomerSupplied", "ShopSupplied"] as const;
@@ -65,6 +69,14 @@ export type CreateOrderInput = {
   dueAtUtc: string;
   notes: string | null;
   items: CreateOrderItemInput[];
+  /**
+   * Cloth sold over the counter, with nothing to stitch.
+   *
+   * The order is recorded as Sold and is finished on the spot — no tailor, no lifecycle, and
+   * dueAtUtc read as the moment of sale. Optional so every existing caller keeps taking tailoring
+   * orders unchanged.
+   */
+  isFabricSale?: boolean;
 };
 export type UpdateOrderInput = { customerId: string; employeeId: string | null; dueAtUtc: string; notes: string | null };
 

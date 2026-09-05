@@ -37,6 +37,10 @@ export const ORDER_STATUS_BADGE: Record<string, { label: string; tone: BadgeTone
   ReadyForDelivery: { label: "Ready For Delivery", tone: "primary" },
   Delivered: { label: "Delivered", tone: "success" },
   Cancelled: { label: "Cancelled", tone: "danger" },
+  // Cloth sold over the counter. Green like Delivered, because it is finished for the same reason:
+  // the customer has what they came for. This map is Record<string>, so without an entry "Sold"
+  // would still read correctly but arrive with no tone at all.
+  Sold: { label: "Sold", tone: "success" },
 };
 
 /** The words for a status, falling back to the raw value so an unmapped one is visible, not blank. */

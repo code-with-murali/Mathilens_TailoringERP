@@ -25,7 +25,7 @@ export type ItemRow = {
   /** What the shop charges to stitch one of these. */
   tailoringRate: string;
   fabricSource: FabricSourceMode;
-  /** From the Price Detail catalog; free text is still allowed for cloth not yet in it. */
+  /** From the Fabric Details catalog; free text is still allowed for cloth not yet in it. */
   clothCode: string;
   /** Carried so the order can name the cloth, not just its code. */
   clothName: string;
@@ -102,7 +102,7 @@ type ClothCodeFieldProps = {
   disabled?: boolean;
 };
 
-/** Cloth code picker with search — sourced from the Price Detail catalog. Opening it (focus/click)
+/** Cloth code picker with search — sourced from the Fabric Details catalog. Opening it (focus/click)
  * lists the catalog even with an empty query; typing filters it live. Picking an entry fills in its
  * code and its Selling price per metre (never Cost price, which is for the shop's own margin
  * tracking, not a customer-facing order). Free text is still allowed for cloth not yet in the
@@ -201,6 +201,15 @@ type OrderItemsEditorProps = {
   /** The shop's price list (Settings › Tailoring Cost). Fills a row's Tailoring amount in. */
   tailoringRates: TailoringRates;
   /**
+   * Cloth only, with nothing being stitched.
+   *
+   * Hides the garment, quantity and stitching-cost fields, because on a counter sale none of them
+   * has an answer: there is no garment, the length is the metres below, and nobody is stitching.
+   * Leaving a Tailoring Cost box on screen that the sale then ignores would invite an amount that
+   * silently never reaches the bill.
+   */
+  fabricOnly?: boolean;
+  /**
    * The garments this order may be for: on the shop's list (Settings › Garments) and priced.
    *
    * Empty until both have loaded, so the dropdown is never briefly offering garments that are about
@@ -225,7 +234,7 @@ type OrderItemsEditorProps = {
 
 /** Dynamic garment-line editor for the create-order form. In a tailoring-and-fabric order each
  * line also says whose cloth the garment is cut from, and prices the shop's own. */
-export function OrderItemsEditor({ onChange, mode, tailoringRates, garments, activeItemId, onItemClick, renderItemDetail, disabled = false }: OrderItemsEditorProps) {
+export function OrderItemsEditor({ onChange, mode, tailoringRates, garments, activeItemId, onItemClick, renderItemDetail, disabled = false, fabricOnly = false }: OrderItemsEditorProps) {
   // Two rows to start — a shirt and a trousers is the order a counter takes most often, and a
   // third empty row was one more thing to look past. "+ Add item" covers the rest.
   const [rows, setRows] = useState<ItemRow[]>(() => [emptyRow("Shirt"), emptyRow("Trousers")]);
@@ -374,7 +383,8 @@ export function OrderItemsEditor({ onChange, mode, tailoringRates, garments, act
           {/* One field per line on a phone. Two-across put a 160px box under a label like
               "Tailoring Cost", which is narrow enough that the amount and its heading stop reading
               as a pair; from sm up the five-across row is unchanged. */}
-          <div className={`grid max-w-2xl grid-cols-1 gap-x-3 gap-y-2 ${sellsFabric ? "sm:grid-cols-5" : "sm:grid-cols-4"}`}>
+          <div className={`grid max-w-2xl grid-cols-1 gap-x-3 gap-y-2 ${fabricOnly ? "sm:grid-cols-2" : sellsFabric ? "sm:grid-cols-5" : "sm:grid-cols-4"}`}>
+            {!fabricOnly && (
             <div className="flex flex-col gap-0.5">
               <label className="text-xs text-foreground/70">Garment</label>
               <select
@@ -398,6 +408,8 @@ export function OrderItemsEditor({ onChange, mode, tailoringRates, garments, act
                 ))}
               </select>
             </div>
+            )}
+            {!fabricOnly && (
             <div className="flex flex-col gap-0.5">
               <label className="text-xs text-foreground/70">Quantity</label>
               <input
@@ -410,6 +422,8 @@ export function OrderItemsEditor({ onChange, mode, tailoringRates, garments, act
                 className={fieldClassName}
               />
             </div>
+            )}
+            {!fabricOnly && (
             <div className="flex flex-col gap-0.5">
               {/* Named for what it is. "Unit price" said nothing about which of the two amounts on
                   a fabric order it was. */}
@@ -424,6 +438,7 @@ export function OrderItemsEditor({ onChange, mode, tailoringRates, garments, act
                 className={fieldClassName}
               />
             </div>
+            )}
             {/* Cloth Cost sits beside Tailoring rather than only down in the fabric block, so the
                 two halves of the price are read together and the Item Total below them adds up in
                 plain sight. Shown only when the shop sells cloth — otherwise there is no second
