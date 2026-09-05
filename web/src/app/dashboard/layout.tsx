@@ -10,7 +10,6 @@ import { PERMISSIONS, displayNameOf } from "@/lib/api/users";
 import { Modal } from "@/components/ui/Modal";
 import { ChangePasswordForm } from "@/components/users/ChangePasswordForm";
 import { getUserPhoto, initialsFor } from "@/lib/api/user-profile";
-import { getRecordCounts, type RecordCountKey, type RecordCounts } from "@/lib/api/record-counts";
 
 /**
  * A single navigable screen.
@@ -25,13 +24,6 @@ type NavLeaf = {
   icon: (props: IconProps) => React.ReactElement;
   permission: string | null;
   role?: string;
-  /**
-   * Which record count to show beside the label, for the screens that are a list of something.
-   *
-   * Absent on the rest, and deliberately so: Dashboard, Reports and the settings screens are not
-   * lists, and a number next to them would be answering a question nobody asked.
-   */
-  count?: RecordCountKey;
 };
 
 /** A heading that expands to reveal its children. Groups never navigate anywhere themselves. */
@@ -54,17 +46,17 @@ const isGroup = (entry: NavEntry): entry is NavGroup => "children" in entry;
  */
 const NAV_ITEMS: NavEntry[] = [
   { href: "/dashboard", label: "Dashboard", icon: DashboardIcon, permission: null },
-  { href: "/dashboard/orders", label: "Orders", icon: OrdersIcon, permission: PERMISSIONS.ordersView, count: "orders" },
-  { href: "/dashboard/customers", label: "Customers", icon: CustomersIcon, permission: PERMISSIONS.customersView, count: "customers" },
-  { href: "/dashboard/invoices", label: "Invoices", icon: InvoicesIcon, permission: PERMISSIONS.invoicesView, count: "invoices" },
+  { href: "/dashboard/orders", label: "Orders", icon: OrdersIcon, permission: PERMISSIONS.ordersView },
+  { href: "/dashboard/customers", label: "Customers", icon: CustomersIcon, permission: PERMISSIONS.customersView },
+  { href: "/dashboard/invoices", label: "Invoices", icon: InvoicesIcon, permission: PERMISSIONS.invoicesView },
   {
     label: "Inventory",
     icon: InventoryIcon,
     children: [
-      { href: "/dashboard/price-detail", label: "Fabric Details", icon: PriceDetailIcon, permission: PERMISSIONS.pricingView, count: "fabricPrices" },
+      { href: "/dashboard/price-detail", label: "Fabric Details", icon: PriceDetailIcon, permission: PERMISSIONS.pricingView },
       // "Cloth Receipts", not "Inventory": a child sharing its parent's name told the reader nothing,
       // and recording what arrived is what the screen actually does.
-      { href: "/dashboard/inventory", label: "Cloth Receipts", icon: ReceiptIcon, permission: PERMISSIONS.inventoryView, count: "clothReceipts" },
+      { href: "/dashboard/inventory", label: "Cloth Receipts", icon: ReceiptIcon, permission: PERMISSIONS.inventoryView },
       { href: "/dashboard/stock", label: "Stock Details", icon: StockIcon, permission: PERMISSIONS.inventoryView },
     ],
   },
@@ -90,8 +82,8 @@ const NAV_ITEMS: NavEntry[] = [
     label: "User Management",
     icon: UsersIcon,
     children: [
-      { href: "/dashboard/employees", label: "Employees", icon: EmployeesIcon, permission: PERMISSIONS.employeesView, count: "employees" },
-      { href: "/dashboard/users", label: "Users", icon: UsersIcon, permission: PERMISSIONS.usersView, count: "users" },
+      { href: "/dashboard/employees", label: "Employees", icon: EmployeesIcon, permission: PERMISSIONS.employeesView },
+      { href: "/dashboard/users", label: "Users", icon: UsersIcon, permission: PERMISSIONS.usersView },
       // Which roles exist, as against what each one may do — two separate rights, because adding a
       // role is harmless on its own and granting it rights is not.
       { href: "/dashboard/user-roles", label: "User Role", icon: RoleIcon, permission: PERMISSIONS.usersRoles },
@@ -152,7 +144,6 @@ export default function DashboardLayout({ children }: LayoutProps<"/dashboard">)
   // pre-seeded, which would fight the auto-open below on the very first render.
   const [openGroups, setOpenGroups] = useState<Record<string, boolean>>({});
   const [photo, setPhoto] = useState<string | null>(null);
-  const [recordCounts, setRecordCounts] = useState<RecordCounts>({});
   // Also applies the shop's colour to the theme's CSS variables, which is why it lives in the
   // shell rather than on the Branding page — every screen inside gets it.
   const branding = useBranding();
@@ -171,29 +162,6 @@ export default function DashboardLayout({ children }: LayoutProps<"/dashboard">)
     // eslint-disable-next-line react-hooks/set-state-in-effect
     setChecked(true);
   }, [router]);
-
-  useEffect(() => {
-    /**
-     * The badge numbers, refreshed as the user moves around.
-     *
-     * Keyed on the pathname so taking an order or adding a customer is reflected the moment the
-     * next screen opens, without a socket or a poll. It is one small query per visible screen and
-     * it never blocks anything — getRecordCounts swallows its own failures, because a menu has to
-     * render whether or not the numbers arrived.
-     */
-    if (!user) {
-      return;
-    }
-    let cancelled = false;
-    getRecordCounts(getAccessToken()).then((counts) => {
-      if (!cancelled) {
-        setRecordCounts(counts);
-      }
-    });
-    return () => {
-      cancelled = true;
-    };
-  }, [user, pathname]);
 
   useEffect(() => {
     // The signed-in person's own picture, for the rail. Silent on failure: an avatar that cannot be
@@ -370,7 +338,6 @@ export default function DashboardLayout({ children }: LayoutProps<"/dashboard">)
                   isActive={isCurrent(entry.href)}
                   isCollapsed={isCollapsed}
                   onNavigate={() => setIsDrawerOpen(false)}
-                  count={entry.count ? recordCounts[entry.count] : undefined}
                 />
               );
             }
@@ -423,7 +390,6 @@ export default function DashboardLayout({ children }: LayoutProps<"/dashboard">)
                         isActive={isCurrent(child.href)}
                         isCollapsed={false}
                         onNavigate={() => setIsDrawerOpen(false)}
-                        count={child.count ? recordCounts[child.count] : undefined}
                       />
                     ))}
                   </div>
@@ -468,14 +434,11 @@ function NavLink({
   isActive,
   isCollapsed,
   onNavigate,
-  count,
 }: {
   leaf: NavLeaf;
   isActive: boolean;
   isCollapsed: boolean;
   onNavigate: () => void;
-  /** How many records the screen holds, or undefined while loading or where it has no count. */
-  count?: number;
 }) {
   const Icon = leaf.icon;
   return (
@@ -492,19 +455,7 @@ function NavLink({
       }`}
     >
       <Icon className="h-4 w-4 shrink-0" />
-      <span className={`flex-1 ${isCollapsed ? "lg:hidden" : ""}`}>{leaf.label}</span>
-      {/* Nothing at all until the number arrives, rather than a zero that turns into 214 a moment
-          later — a count that changes under the eye reads as a bug. Hidden when the rail is
-          collapsed, where there is no room for it beside the icon. */}
-      {count !== undefined && (
-        <span
-          className={`shrink-0 rounded-full bg-foreground/10 px-1.5 py-0.5 text-[11px] font-medium tabular-nums text-foreground/60 ${
-            isCollapsed ? "lg:hidden" : ""
-          }`}
-        >
-          {count.toLocaleString()}
-        </span>
-      )}
+      <span className={isCollapsed ? "lg:hidden" : ""}>{leaf.label}</span>
     </Link>
   );
 }
