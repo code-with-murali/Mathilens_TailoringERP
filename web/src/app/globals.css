@@ -193,6 +193,32 @@ body {
   }
 }
 
+/*
+  Stop iOS zooming the page when a field is tapped.
+
+  Mobile Safari zooms the viewport in on focus whenever the focused control's text is smaller than
+  16px, and then leaves it zoomed — so tapping the customer name on New Order threw the whole layout
+  sideways and the next field had to be hunted for. Every control in the app is `text-sm` (14px),
+  which is exactly the trigger.
+
+  16px is a threshold, not a taste: at 16px the zoom does not fire, and one pixel under it does.
+  This applies only below the app's mobile breakpoint, so the denser 14px is untouched on desktop
+  where no zoom happens. The alternative fix — `maximum-scale=1` on the viewport — also stops it,
+  by taking pinch-zoom away from everyone for the life of the page. That is not a trade worth making
+  for a form field.
+
+  Specificity, as with `table.stacked td` above: `:root input` is (0,1,1) and outranks the `text-sm`
+  utility at (0,1,0), so the utility is beaten without !important and without stripping it off 82
+  controls by hand.
+*/
+@media (max-width: 767px) {
+  :root input,
+  :root select,
+  :root textarea {
+    font-size: 16px;
+  }
+}
+
 /* Printed pages (invoices, etc.) should read as plain paper regardless of the active theme —
    dark mode's near-black background would otherwise print as a solid ink block. */
 @media print {
