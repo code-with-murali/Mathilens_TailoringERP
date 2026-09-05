@@ -167,6 +167,14 @@ export default function NewOrderPage() {
   const [customerMeasurements, setCustomerMeasurements] = useState<Measurement[]>([]);
   const [isLoadingMeasurements, setIsLoadingMeasurements] = useState(false);
   const [advanceAmount, setAdvanceAmount] = useState("");
+  /**
+   * Money taken off the bill before anything is paid against it.
+   *
+   * Held here rather than on the item rows: a shop discounts an order — "make it 2000" — not a
+   * garment, and the invoice carries a single discount amount, so splitting it per line would be
+   * inventing a number nothing stores.
+   */
+  const [discountAmount, setDiscountAmount] = useState("");
   const [advanceMethod, setAdvanceMethod] = useState<PaymentMethod>(PAYMENT_METHODS[0]);
   const [measurementValues, setMeasurementValues] = useState<Record<string, string>>({});
   /** The fitting remark for the active item's garment — saved with the values, by the same button. */
@@ -274,8 +282,13 @@ export default function NewOrderPage() {
   // types, unlike handleCreateOrder's strict per-item validation at submit time.
   const itemRowTotal = (row: ItemRow) => rowTotal(row, businessMode);
   const orderTotal = itemRows.reduce((sum, row) => sum + itemRowTotal(row), 0);
+  const discountValue = discountAmount.trim() === "" ? 0 : Number(discountAmount);
+  const safeDiscount = Number.isFinite(discountValue) && discountValue > 0 ? discountValue : 0;
+  // What the customer actually owes, which is what every figure below is measured against: the
+  // advance is paid off this, not off the undiscounted total, and so is the balance.
+  const payableTotal = Math.max(orderTotal - safeDiscount, 0);
   const advanceValue = advanceAmount.trim() === "" ? 0 : Number(advanceAmount);
-  const orderBalance = orderTotal - (Number.isFinite(advanceValue) ? advanceValue : 0);
+  const orderBalance = payableTotal - (Number.isFinite(advanceValue) ? advanceValue : 0);
 
   // The two halves orderTotal is already made of, shown separately so the summary answers "what am
   // I paying for?" rather than only "how much?". Nothing new is calculated: rowTotal is defined as
@@ -553,6 +566,7 @@ export default function NewOrderPage() {
     setActiveMeasurementItemId(null);
     setCustomerMeasurements([]);
     setAdvanceAmount("");
+    setDiscountAmount("");
     setAdvanceMethod(PAYMENT_METHODS[0]);
     setMeasurementValues({});
     setMeasurementNotes("");
@@ -745,7 +759,14 @@ export default function NewOrderPage() {
       // order screen's Generate Invoice always charge the same thing. Discount stays 0 — there is
       // no field for it, and a shop-wide default discount is not a thing a shop wants.
       const { taxRatePercent } = await getInvoiceSettings(getAccessToken()).catch(() => DEFAULT_INVOICE_SETTINGS);
-      const invoice = await createInvoice(createdOrder.id, taxAmountFor(orderTotal, taxRatePercent), 0, getAccessToken());
+      // Tax is charged on what is actually payable, not on the pre-discount total — a discount that
+      // did not reduce the tax would quietly hand part of it back to the taxman.
+      const invoice = await createInvoice(
+        createdOrder.id,
+        taxAmountFor(payableTotal, taxRatePercent),
+        safeDiscount,
+        getAccessToken(),
+      );
       // recordPayment returns the invoice with amountPaid/remainingBalance updated — that's the
       // copy the printable invoice needs, not the pre-payment one from createInvoice.
       const finalInvoice = advanceValue > 0 ? await recordPayment(invoice.id, advanceValue, advanceMethod, getAccessToken()) : invoice;
@@ -1193,6 +1214,25 @@ export default function NewOrderPage() {
                 {/* Label and field on one line. This is a single short figure, not a form section,
                     and stacking it left a full-width label over a box the amount barely fills. The
                     label takes a fixed width so it cannot squeeze the field as the text changes. */}
+                {/* Above the advance, because it comes off the bill before anything is paid against
+                    it — the balance staff quote is the discounted one, and asking for the advance
+                    first would have them quoting a figure that is about to change. */}
+                <div className="flex items-center gap-3">
+                  <label htmlFor="discountAmount" className="w-36 shrink-0 text-sm font-medium">
+                    Discount
+                  </label>
+                  <input
+                    id="discountAmount"
+                    type="number"
+                    min="0"
+                    step="0.01"
+                    value={discountAmount}
+                    disabled={isOrderCreated}
+                    onChange={(e) => setDiscountAmount(e.target.value)}
+                    placeholder="0.00"
+                    className={`${fieldClassName} w-36`}
+                  />
+                </div>
                 <div className="flex items-center gap-3">
                   <label htmlFor="advanceAmount" className="w-36 shrink-0 text-sm font-medium">
                     Advance Received
