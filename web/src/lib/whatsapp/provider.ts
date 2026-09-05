@@ -81,9 +81,20 @@ export function toWhatsAppApp(value: string | null | undefined): WhatsAppApp {
  * Android only, and deliberately so. iOS has no equivalent: both apps register the same universal
  * links and the same `whatsapp://` scheme, and no URL a web page can produce chooses between them.
  * Desktop has no such app to choose. Both get the plain wa.me link, exactly as before.
+ *
+ * <p>Android *and Chromium*, because `intent://` is a Chromium feature rather than an Android one.
+ * Chrome, Samsung Internet, Edge and Opera all handle it; Firefox for Android does not, and would
+ * be handed a URL its engine simply cannot follow — a dead button, where the plain wa.me link at
+ * least opens something. So a browser that cannot use an intent is not given one.</p>
  */
-function isAndroid(): boolean {
-  return typeof navigator !== "undefined" && /android/i.test(navigator.userAgent);
+function canChooseWhatsAppApp(): boolean {
+  if (typeof navigator === "undefined" || !/android/i.test(navigator.userAgent)) {
+    return false;
+  }
+
+  // Chrome and CriOS cover Chrome itself; the other three are the Chromium browsers a shop is
+  // realistically using instead. Firefox ("FxiOS"/"Firefox") matches none of them and falls through.
+  return /Chrome|CriOS|SamsungBrowser|EdgA|OPR/i.test(navigator.userAgent);
 }
 
 /**
@@ -106,10 +117,32 @@ export function createManualWhatsAppProvider(
     async deliver(phoneNumber: string, message: string): Promise<void> {
       const url = buildShareUrl(phoneNumber, message, preferredApp);
 
-      // noopener,noreferrer: without them the opened tab gets a handle on this one through
-      // window.opener and could navigate the ERP somewhere else. _blank keeps the shop's page where
-      // it is, which the whole flow depends on — staff go back to it after pressing Send. It also
-      // means the Android fallback below lands in the new tab rather than replacing the ERP.
+      if (canChooseWhatsAppApp()) {
+        // An intent URL has to be a top-level navigation in the tab the shop is already in.
+        //
+        // It used to go through window.open(url, "_blank"), and that is why naming the package never
+        // worked: Chrome cannot process a non-http scheme in a tab it has just opened blank, so
+        // rather than failing visibly it took the one route that looks like success and followed
+        // S.browser_fallback_url — the plain wa.me link, which is exactly the link that opens
+        // whichever WhatsApp holds the "Always" default. The package was correct all along and was
+        // never given the chance to apply.
+        //
+        // A synthetic anchor click rather than assigning location.href: it keeps the user gesture
+        // the caller is careful to preserve, which is what stops Chrome treating this as an unasked
+        // for redirect to an app.
+        const link = document.createElement("a");
+        link.href = url;
+        link.rel = "noopener noreferrer";
+        document.body.appendChild(link);
+        link.click();
+        link.remove();
+        return;
+      }
+
+      // Desktop and iOS get wa.me in a new tab, unchanged. noopener,noreferrer: without them the
+      // opened tab gets a handle on this one through window.opener and could navigate the ERP
+      // somewhere else. _blank keeps the shop's page where it is, which the flow depends on — staff
+      // go back to it after pressing Send.
       const opened = window.open(url, "_blank", "noopener,noreferrer");
       if (!opened) {
         throw new WhatsAppOpenError();
@@ -180,7 +213,7 @@ export function buildShareUrl(
   message: string,
   preferredApp: WhatsAppApp = DEFAULT_WHATSAPP_APP,
 ): string {
-  return isAndroid()
+  return canChooseWhatsAppApp()
     ? buildAndroidIntentUrl(phoneNumber, message, preferredApp)
     : buildClickToChatUrl(phoneNumber, message);
 }
