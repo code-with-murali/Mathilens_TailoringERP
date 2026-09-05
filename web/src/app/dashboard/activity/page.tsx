@@ -36,7 +36,7 @@ const MENU_LOCATION: Record<string, { module: string; screen: string }> = {
   Billing: { module: "Invoices", screen: "Invoices" },
   Invoices: { module: "Invoices", screen: "Invoices" },
   Pricing: { module: "Inventory", screen: "Fabric Details" },
-  Inventory: { module: "Inventory", screen: "Cloth Receipts" },
+  Inventory: { module: "Inventory", screen: "Inventory Transaction" },
   Reports: { module: "Reports", screen: "Reports" },
   Occasions: { module: "Reports", screen: "Birthday & Wedding" },
   WhatsApp: { module: "WhatsApp", screen: "WhatsApp" },

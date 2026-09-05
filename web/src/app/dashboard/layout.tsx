@@ -54,9 +54,9 @@ const NAV_ITEMS: NavEntry[] = [
     icon: InventoryIcon,
     children: [
       { href: "/dashboard/price-detail", label: "Fabric Details", icon: PriceDetailIcon, permission: PERMISSIONS.pricingView },
-      // "Cloth Receipts", not "Inventory": a child sharing its parent's name told the reader nothing,
-      // and recording what arrived is what the screen actually does.
-      { href: "/dashboard/inventory", label: "Cloth Receipts", icon: ReceiptIcon, permission: PERMISSIONS.inventoryView },
+      // "Inventory Transaction", not "Inventory": a child sharing its parent's name told the reader
+      // nothing, and what the screen records is cloth moving in.
+      { href: "/dashboard/inventory", label: "Inventory Transaction", icon: ReceiptIcon, permission: PERMISSIONS.inventoryView },
       { href: "/dashboard/stock", label: "Stock Details", icon: StockIcon, permission: PERMISSIONS.inventoryView },
     ],
   },
