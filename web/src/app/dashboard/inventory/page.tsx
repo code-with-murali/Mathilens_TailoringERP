@@ -180,7 +180,7 @@ export default function InventoryPage() {
     <div className="flex flex-col gap-6">
       <div className="flex items-start justify-between gap-4">
         <div>
-          <h1 className="text-2xl font-semibold">Inventory</h1>
+          <h1 className="text-2xl font-semibold">Inventory Transaction</h1>
           <p className="mt-1 text-sm text-foreground/70">
             Cloth received into the shop — what arrived, from whom, and what it cost.
           </p>
