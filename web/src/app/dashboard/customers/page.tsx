@@ -118,6 +118,9 @@ export default function CustomersPage() {
               value={searchInput}
               onChange={(e) => handleSearchChange(e.target.value)}
               placeholder="Search customers…"
+              // A query is not a name being recorded — capitalising it as it is typed would
+              // change what is sent to the server, not just how it looks.
+              autoCapitalize="none"
               className="w-full"
             />
           </div>

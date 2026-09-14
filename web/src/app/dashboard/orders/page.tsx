@@ -530,6 +530,7 @@ export default function OrdersPage() {
             value={searchInput}
             onChange={(e) => handleSearchChange(e.target.value)}
             placeholder="e.g. MTL-0007, Asha, 98765…"
+            autoCapitalize="none"
           />
         </div>
 

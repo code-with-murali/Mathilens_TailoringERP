@@ -312,6 +312,7 @@ export default function InventoryPage() {
               setPage(1);
             }}
             placeholder="Search receipts…"
+            autoCapitalize="none"
           />
         </div>
         <div className="flex flex-col gap-1">

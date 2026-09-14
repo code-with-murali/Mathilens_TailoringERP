@@ -80,6 +80,7 @@ export default function StockDetailsPage() {
             setPage(1);
           }}
           placeholder="Search stock…"
+          autoCapitalize="none"
         />
       </div>
 
