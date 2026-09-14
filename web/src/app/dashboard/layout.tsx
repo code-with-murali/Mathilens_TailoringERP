@@ -4,6 +4,7 @@ import { useEffect, useRef, useState } from "react";
 import { useRouter, usePathname } from "next/navigation";
 import Link from "next/link";
 import { isAuthenticated, clearTokens, getAccessToken } from "@/lib/auth";
+import { getBusinessMode, type BusinessMode } from "@/lib/api/business-mode";
 import { useBranding } from "@/lib/use-branding";
 import { usePermissions } from "@/lib/use-permissions";
 import { PERMISSIONS, displayNameOf } from "@/lib/api/users";
@@ -24,6 +25,13 @@ type NavLeaf = {
   icon: (props: IconProps) => React.ReactElement;
   permission: string | null;
   role?: string;
+  /**
+   * A third gate, for the screens that only exist in a shop that sells cloth. A tailoring-only shop
+   * has no fabric to sell, so offering it "Fabric Only" would lead to a screen that bounces it
+   * straight back — the same rule OrderKindScreen enforces on arrival, applied one step earlier so
+   * the menu never shows a door that does not open.
+   */
+  requiresFabricTrade?: boolean;
 };
 
 /** A heading that expands to reveal its children. Groups never navigate anywhere themselves. */
@@ -46,7 +54,39 @@ const isGroup = (entry: NavEntry): entry is NavGroup => "children" in entry;
  */
 const NAV_ITEMS: NavEntry[] = [
   { href: "/dashboard", label: "Dashboard", icon: DashboardIcon, permission: null },
-  { href: "/dashboard/orders", label: "Orders", icon: OrdersIcon, permission: PERMISSIONS.ordersView },
+  {
+    // The three kinds of order the shop writes, each on the menu rather than behind a chooser the
+    // staff had to pass through first. The kind is the question the counter answers before anything
+    // else, so it belongs where the work starts.
+    //
+    // "All Orders" leads the group and is not optional: the list is what the menu item used to be,
+    // and losing it to make room for the new screens would be a poor trade.
+    label: "Orders",
+    icon: OrdersIcon,
+    children: [
+      { href: "/dashboard/orders", label: "All Orders", icon: OrdersIcon, permission: PERMISSIONS.ordersView },
+      {
+        href: "/dashboard/orders/new/fabric",
+        label: "Fabric Only",
+        icon: FabricIcon,
+        permission: PERMISSIONS.ordersCreate,
+        requiresFabricTrade: true,
+      },
+      {
+        href: "/dashboard/orders/new/fabric-tailoring",
+        label: "Fabric + Tailoring",
+        icon: GarmentIcon,
+        permission: PERMISSIONS.ordersCreate,
+        requiresFabricTrade: true,
+      },
+      {
+        href: "/dashboard/orders/new/tailoring",
+        label: "Tailoring",
+        icon: ScissorsIcon,
+        permission: PERMISSIONS.ordersCreate,
+      },
+    ],
+  },
   { href: "/dashboard/customers", label: "Customers", icon: CustomersIcon, permission: PERMISSIONS.customersView },
   { href: "/dashboard/invoices", label: "Invoices", icon: InvoicesIcon, permission: PERMISSIONS.invoicesView },
   {
@@ -144,6 +184,10 @@ export default function DashboardLayout({ children }: LayoutProps<"/dashboard">)
   // pre-seeded, which would fight the auto-open below on the very first render.
   const [openGroups, setOpenGroups] = useState<Record<string, boolean>>({});
   const [photo, setPhoto] = useState<string | null>(null);
+  // Null until the shop's trade has been read. The fabric entries stay hidden meanwhile, which is
+  // the same way round OrderKindScreen fails: a shop that has not said it sells cloth is treated as
+  // one that does not, rather than being shown two screens it may not be able to use.
+  const [businessMode, setBusinessMode] = useState<BusinessMode | null>(null);
   // Also applies the shop's colour to the theme's CSS variables, which is why it lives in the
   // shell rather than on the Branding page — every screen inside gets it.
   const branding = useBranding();
@@ -162,6 +206,24 @@ export default function DashboardLayout({ children }: LayoutProps<"/dashboard">)
     // eslint-disable-next-line react-hooks/set-state-in-effect
     setChecked(true);
   }, [router]);
+
+  useEffect(() => {
+    // Read once for the whole shell rather than per screen — the menu needs it on every page, and
+    // it is a single settings row that does not change while someone is working. Never rejects.
+    if (!checked) {
+      return;
+    }
+    let cancelled = false;
+    getBusinessMode(getAccessToken()).then((mode) => {
+      if (!cancelled) {
+        setBusinessMode(mode);
+      }
+    });
+
+    return () => {
+      cancelled = true;
+    };
+  }, [checked]);
 
   useEffect(() => {
     // The signed-in person's own picture, for the rail. Silent on failure: an avatar that cannot be
@@ -193,7 +255,8 @@ export default function DashboardLayout({ children }: LayoutProps<"/dashboard">)
   const roles = user?.roles ?? [];
   const allows = (leaf: NavLeaf) =>
     (leaf.permission === null || can(leaf.permission)) &&
-    (leaf.role === undefined || roles.includes(leaf.role));
+    (leaf.role === undefined || roles.includes(leaf.role)) &&
+    (leaf.requiresFabricTrade !== true || businessMode === "tailoringFabric");
 
   // A group survives only if at least one of its children does, so nobody is offered a heading that
   // opens onto nothing. The children are filtered too, not just counted — a Manager's User
@@ -208,8 +271,17 @@ export default function DashboardLayout({ children }: LayoutProps<"/dashboard">)
       })
     : [];
 
-  const isCurrent = (href: string) =>
-    href === "/dashboard" ? pathname === href : pathname?.startsWith(href) ?? false;
+  // The most specific entry wins, and only it. Prefix-matching each href independently was fine
+  // while no nav item sat underneath another, but "/dashboard/orders/new/tailoring" is under
+  // "/dashboard/orders" — matched independently, both would light up, and the rail would claim you
+  // were in two places. Longest match also retires the special case Dashboard needed, since
+  // "/dashboard" now only wins when nothing longer matches.
+  const activeHref = NAV_ITEMS.flatMap((entry) => (isGroup(entry) ? entry.children : [entry]))
+    .map((leaf) => leaf.href)
+    .filter((href) => pathname === href || (pathname?.startsWith(`${href}/`) ?? false))
+    .sort((a, b) => b.length - a.length)[0];
+
+  const isCurrent = (href: string) => activeHref === href;
 
   // Below lg the rail is off-canvas, so a control placed inside it would be unreachable precisely
   // when it is needed — this button is the only way back to the nav, which is why it survives the
@@ -735,6 +807,20 @@ function ShopIcon({ className }: IconProps) {
       <path d="M3 9h18l-1.5-5h-15L3 9Z" />
       <path d="M4.5 9v11h15V9" />
       <path d="M10 20v-6h4v6" />
+    </svg>
+  );
+}
+
+/**
+ * A bolt of cloth with a cut edge — cloth as the thing being sold, which is what separates a fabric
+ * order from the shirt (a garment) and the shears (stitching) beside it in the menu.
+ */
+function FabricIcon({ className }: IconProps) {
+  return (
+    <svg className={className} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+      <path d="M3 6h13a3 3 0 0 1 0 6H3V6Z" />
+      <path d="M3 12v6h13a3 3 0 0 0 3-3" />
+      <path d="M16 6v6" />
     </svg>
   );
 }
