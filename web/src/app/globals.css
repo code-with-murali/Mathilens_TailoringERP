@@ -219,6 +219,44 @@ body {
   }
 }
 
+/*
+  A dialog arriving.
+
+  Short and small on purpose — 140ms and eight pixels. A dialog appearing from nowhere reads as the
+  page having jumped; anything longer than this reads as the app being slow, and a big movement
+  reads as decoration. The point is only to say "this is new, and it came from here".
+
+  Honoured by the media query below: an animation is a nicety, and a reader who has asked their
+  system for less motion has asked for exactly this to stop.
+*/
+@keyframes modal-panel-in {
+  from {
+    opacity: 0;
+    transform: translateY(8px) scale(0.985);
+  }
+}
+
+@keyframes modal-backdrop-in {
+  from {
+    opacity: 0;
+  }
+}
+
+.modal-panel {
+  animation: modal-panel-in 0.14s ease-out;
+}
+
+.modal-backdrop {
+  animation: modal-backdrop-in 0.14s ease-out;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .modal-panel,
+  .modal-backdrop {
+    animation: none;
+  }
+}
+
 /* Printed pages (invoices, etc.) should read as plain paper regardless of the active theme —
    dark mode's near-black background would otherwise print as a solid ink block. */
 @media print {
