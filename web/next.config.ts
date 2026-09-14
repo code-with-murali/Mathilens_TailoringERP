@@ -19,6 +19,17 @@ const nextConfig: NextConfig = {
   // handlers, every dynamic bit is a client-side call to the external .NET API), so a
   // static export removes that fragile layer entirely.
   ...(isDevelopment ? {} : { output: "export" as const }),
+
+  // Mobile layout work has to be done on a real phone — iOS focus-zoom, touch targets and the
+  // stacked tables cannot be judged from a desktop browser at a narrow width. That means opening
+  // the dev server over the LAN, and Next blocks cross-origin requests to /_next/* by default, so
+  // the page loads but hot reload silently does not: you edit, nothing happens, and the phone is
+  // showing a stale bundle you then debug for ten minutes.
+  //
+  // Development only, and private ranges only — this never applies to the exported build.
+  ...(isDevelopment
+    ? { allowedDevOrigins: ["192.168.1.5", "192.168.1.*", "10.0.0.*", "172.16.*.*"] }
+    : {}),
 };
 
 export default nextConfig;

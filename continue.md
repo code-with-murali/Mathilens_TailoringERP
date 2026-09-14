@@ -7,11 +7,11 @@ session working through a ten-point change list.
 
 ## State right now
 
-- **Branch:** `main`. Working tree clean.
+- **Branch:** `dev`. Orders export committed as `7c44ac4` (`feat: export filtered orders`).
 - **8 commits ahead of `origin/main`. Nothing pushed.**
 - **Production is untouched** and still running the previous release (`e6b48c8`). Verified live:
   API returns 400 on a validation error, site returns 200.
-- Backend and frontend both build in Release. **398 unit tests pass** (was 382).
+- **502 unit tests pass.** Frontend lint passes; use `NODE_OPTIONS=--max-old-space-size=3072 npm run build` on this 7.7 GB machine.
 - Pushing to `main` auto-deploys both API and web via GitHub Actions. There is no staging.
 
 ```
@@ -90,9 +90,9 @@ but record it as a decision rather than assuming.
 
 ### Export on the remaining screens
 
-Done: Customers · Employees · Price Details · all six reports.
+Done: Customers · Employees · Price Details · Orders · all six reports.
 
-**Not done:** Orders · Invoices · Cloth Receipts · Stock Details · Activity Log · WhatsApp.
+**Not done:** Invoices · Cloth Receipts · Stock Details · Activity Log · WhatsApp.
 
 Each is roughly twenty lines. The pattern:
 
@@ -102,6 +102,10 @@ Each is roughly twenty lines. The pattern:
 3. Return `ExportResultFactory.Create(format, title, fileNameStem, headers, rows, subtitle?)`.
 4. Frontend: drop `<ExportButton resource="..." label="..." query={{ ...currentFilters }} />` into
    the page header.
+
+**Orders implementation note:** `SearchOrdersQuery` intentionally remains capped at 100 rows for
+interactive pagination. `ExportOrdersQuery` is its separate 5,000-row export path; use that shape
+for any list where the normal query validator would reject an export-sized page.
 
 Everything shared already exists in `src/Api/Common/Export/`.
 

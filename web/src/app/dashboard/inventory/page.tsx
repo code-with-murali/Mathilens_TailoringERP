@@ -180,7 +180,7 @@ export default function InventoryPage() {
     <div className="flex flex-col gap-6">
       <div className="flex items-start justify-between gap-4">
         <div>
-          <h1 className="text-2xl font-semibold">Inventory</h1>
+          <h1 className="text-2xl font-semibold">Inventory Transaction</h1>
           <p className="mt-1 text-sm text-foreground/70">
             Cloth received into the shop — what arrived, from whom, and what it cost.
           </p>
@@ -220,7 +220,7 @@ export default function InventoryPage() {
             </select>
             {!isLoadingClothPrices && clothPrices.length === 0 && (
               <p className="text-sm text-foreground/60">
-                No cloth codes yet — add them on the Price Detail screen first.
+                No cloth codes yet — add them on the Fabric Details screen first.
               </p>
             )}
           </div>
@@ -312,6 +312,7 @@ export default function InventoryPage() {
               setPage(1);
             }}
             placeholder="Search receipts…"
+            autoCapitalize="none"
           />
         </div>
         <div className="flex flex-col gap-1">

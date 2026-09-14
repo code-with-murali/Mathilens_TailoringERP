@@ -1,10 +1,10 @@
 "use client";
 
-import { useEffect, useRef, useState, type FormEvent } from "react";
+import { useEffect, useId, useRef, useState, type FormEvent } from "react";
 import { Button } from "@/components/ui/Button";
 import { ModalActions } from "@/components/ui/Modal";
 import { Input, Textarea } from "@/components/ui/Input";
-import { DateInput } from "@/components/ui/DateInput";
+import { DatePartsInput } from "@/components/ui/DatePartsInput";
 import { PhoneNumberInput } from "@/components/ui/PhoneNumberInput";
 import { DuplicateWarningModal } from "@/components/customers/DuplicateWarningModal";
 import { getAccessToken } from "@/lib/auth";
@@ -13,7 +13,6 @@ import { emailError, normalizePhoneNumber, phoneNumberError, toNationalDigits } 
 import {
   findCustomerDuplicates,
   GENDERS,
-  RELIGIONS,
   type CustomerDuplicate,
   type CustomerInput,
   type Gender,
@@ -54,16 +53,26 @@ const emptyValues: CustomerInput = {
   weddingDate: null,
 };
 
-const selectClassName =
-  "rounded-md border border-border bg-surface px-3 py-2 text-sm outline-none transition-colors focus:border-primary focus:ring-2 focus:ring-primary/25";
+/**
+ * The three the counter is actually asked about, shown as their initial. The rest of RELIGIONS
+ * stays available to a record that already holds one — a Sikh customer entered before this list
+ * was shortened keeps their S rather than being quietly re-answered on the next save.
+ */
+const RELIGION_CHOICES: readonly Religion[] = ["Hindu", "Muslim", "Christian"];
+
+/** A segmented control's option: the radio is real, the box around it is what you see. */
+const chipClassName =
+  "block cursor-pointer rounded-md border border-border px-2 py-2 text-center text-sm transition-colors peer-checked:border-primary peer-checked:bg-primary peer-checked:text-primary-foreground peer-focus-visible:ring-2 peer-focus-visible:ring-primary/40 peer-disabled:cursor-not-allowed peer-disabled:opacity-60";
 
 /**
  * Shared by the create and edit customer dialogs — preserves user input on validation failure
  * (00_MASTER_SPEC.md § 9.5 Forms).
  *
- * Two columns from the small breakpoint up, one below it. That is what keeps the dialog short
- * enough to need no scrollbar of its own on a laptop, and stacked and full width on a phone, where
- * side-by-side fields would be the thing forcing a sideways scroll.
+ * Two columns at every width, not just from the small breakpoint up. Nine fields stacked one per
+ * row is three phone screens deep, and a form you have to scroll to read is one where the last
+ * fields get skipped; paired short fields and a compact date control put the whole customer on a
+ * single screen. Cancel and Submit sit above the fields for the same reason — at the bottom of a
+ * form that long they are the part that ends up off screen.
  */
 export function CustomerForm({
   initialValues = emptyValues,
@@ -79,14 +88,23 @@ export function CustomerForm({
   const [email, setEmail] = useState(initialValues.email ?? "");
   const [address, setAddress] = useState(initialValues.address ?? "");
   const [notes, setNotes] = useState(initialValues.notes ?? "");
-  const [gender, setGender] = useState<Gender | "">(initialValues.gender ?? "");
-  const [religion, setReligion] = useState<Religion | "">(initialValues.religion ?? "");
+  // Male and Hindu unless the record says otherwise: it is what most of the counter's customers
+  // answer, and these are the two questions staff otherwise leave blank. A view is exempt — it
+  // must show what was recorded, blank included, rather than inventing an answer for someone.
+  const [gender, setGender] = useState<Gender | "">(initialValues.gender ?? (readOnly ? "" : "Male"));
+  const [religion, setReligion] = useState<Religion | "">(initialValues.religion ?? (readOnly ? "" : "Hindu"));
   const [dateOfBirth, setDateOfBirth] = useState(initialValues.dateOfBirth ?? "");
   const [weddingDate, setWeddingDate] = useState(initialValues.weddingDate ?? "");
   const [fieldErrors, setFieldErrors] = useState<Record<string, string>>({});
   const [formError, setFormError] = useState<string | null>(null);
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [duplicates, setDuplicates] = useState<CustomerDuplicate[]>([]);
+
+  // Named, because Cancel and Submit sit in the dialog's header — outside this form's DOM subtree —
+  // and a submit button reaches its form by id from there. Generated rather than a literal: the
+  // Customers list has a create dialog and an edit dialog mounted at once, and two forms answering
+  // to one id would have the second one's Submit driving the first.
+  const formId = useId();
 
   const duplicateTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
   // Contact details the operator has already been warned about and chosen to keep. Without this
@@ -203,16 +221,41 @@ export function CustomerForm({
   }
 
   return (
-    <form onSubmit={handleSubmit} noValidate className="flex flex-col">
-      <div className="grid gap-3 sm:grid-cols-2">
-        <Input
-          id="fullName"
-          label="Full name"
-          value={fullName}
-          onChange={(e) => setFullName(e.target.value)}
-          error={fieldErrors.fullname}
-          disabled={readOnly}
-        />
+    <form id={formId} onSubmit={handleSubmit} noValidate className="flex flex-col">
+      {/* On the dialog's title line, beside the close button — the pair then costs the form no
+          height at all, which is what gets the whole customer onto one phone screen. Outside a
+          dialog (Customers › New Customer as a page) this falls back to a row above the fields.
+
+          A view offers neither: there is nothing to save, and nothing to cancel out of. */}
+      {!readOnly && (
+        <ModalActions placement="header">
+          <Button
+            type="button"
+            variant="secondary"
+            onClick={onCancel}
+            disabled={isSubmitting}
+            className="px-3 py-1.5"
+          >
+            CANCEL
+          </Button>
+          {/* form=, because the button is no longer inside the form it submits. */}
+          <Button type="submit" form={formId} disabled={isSubmitting} className="px-3 py-1.5">
+            {isSubmitting ? "Saving…" : "SUBMIT"}
+          </Button>
+        </ModalActions>
+      )}
+
+      <div className="grid grid-cols-2 gap-2 sm:gap-3">
+        <div className="col-span-2 sm:col-span-1">
+          <Input
+            id="fullName"
+            label="Customer name"
+            value={fullName}
+            onChange={(e) => setFullName(e.target.value)}
+            error={fieldErrors.fullname}
+            disabled={readOnly}
+          />
+        </div>
         <PhoneNumberInput
           id="phoneNumber"
           value={phoneNumber}
@@ -221,71 +264,79 @@ export function CustomerForm({
           error={fieldErrors.phonenumber}
           disabled={readOnly}
         />
-        <Input
-          id="email"
-          label="Email"
-          type="email"
-          autoComplete="email"
-          value={email}
-          onChange={(e) => setEmail(e.target.value)}
-          onBlur={() => scheduleDuplicateCheck(phoneNumber, email)}
-          error={fieldErrors.email}
-          disabled={readOnly}
-        />
+
+        {/* Two answers, both always on screen: a dropdown for a choice this small costs a tap to
+            open and hides the alternative until it is opened. */}
         <div className="flex flex-col gap-1">
-          <label htmlFor="gender" className="text-sm font-medium">
+          <span id="gender-label" className="text-sm font-medium">
             Gender
-          </label>
-          <select
-            id="gender"
-            value={gender}
-            onChange={(e) => setGender(e.target.value as Gender | "")}
-            disabled={readOnly}
-            className={selectClassName}
-          >
-            <option value="">Not specified</option>
+          </span>
+          <div role="radiogroup" aria-labelledby="gender-label" className="flex items-center gap-3 py-2">
             {GENDERS.map((option) => (
-              <option key={option} value={option}>
+              <label key={option} className="flex cursor-pointer items-center gap-1.5 text-sm">
+                <input
+                  type="radio"
+                  name="gender"
+                  value={option}
+                  checked={gender === option}
+                  onChange={() => setGender(option)}
+                  disabled={readOnly}
+                  className="h-4 w-4 accent-primary"
+                />
                 {option}
-              </option>
+              </label>
             ))}
-          </select>
+          </div>
         </div>
-        <div className="flex flex-col gap-1">
-          <label htmlFor="religion" className="text-sm font-medium">
+
+        {/* Initials rather than words: three full names side by side do not fit half a phone
+            screen, and the full name is on the control for anyone who hovers or listens. */}
+        <div className="col-span-2 flex flex-col gap-1 sm:col-span-1">
+          <span id="religion-label" className="text-sm font-medium">
             Religion
-          </label>
-          <select
-            id="religion"
-            value={religion}
-            onChange={(e) => setReligion(e.target.value as Religion | "")}
-            disabled={readOnly}
-            className={selectClassName}
-          >
-            <option value="">Not specified</option>
-            {RELIGIONS.map((option) => (
-              <option key={option} value={option}>
-                {option}
-              </option>
+          </span>
+          <div role="radiogroup" aria-labelledby="religion-label" className="flex gap-1.5">
+            {(RELIGION_CHOICES.includes(religion as Religion) || religion === ""
+              ? RELIGION_CHOICES
+              : [...RELIGION_CHOICES, religion as Religion]
+            ).map((option) => (
+              <label key={option} className="min-w-11 flex-1 sm:max-w-16" title={option}>
+                <input
+                  type="radio"
+                  name="religion"
+                  value={option}
+                  checked={religion === option}
+                  onChange={() => setReligion(option)}
+                  disabled={readOnly}
+                  aria-label={option}
+                  className="peer sr-only"
+                />
+                <span className={chipClassName}>{option.charAt(0)}</span>
+              </label>
             ))}
-          </select>
+          </div>
         </div>
-        <div className="flex flex-col gap-1">
-          <label htmlFor="dateOfBirth" className="text-sm font-medium">
-            Date of birth
-          </label>
-          <DateInput id="dateOfBirth" value={dateOfBirth} onChange={setDateOfBirth} disabled={readOnly} />
-        </div>
-        <div className="flex flex-col gap-1">
-          <label htmlFor="weddingDate" className="text-sm font-medium">
-            Wedding date
-          </label>
-          <DateInput id="weddingDate" value={weddingDate} onChange={setWeddingDate} disabled={readOnly} />
-        </div>
+
+        <DatePartsInput
+          id="dateOfBirth"
+          label="Date of birth"
+          value={dateOfBirth}
+          onChange={setDateOfBirth}
+          disabled={readOnly}
+          className="col-span-2 sm:col-span-1"
+        />
+        <DatePartsInput
+          id="weddingDate"
+          label="Wedding date"
+          value={weddingDate}
+          onChange={setWeddingDate}
+          disabled={readOnly}
+          className="col-span-2 sm:col-span-1"
+        />
 
         {/* Free text runs the full width in both layouts — an address squeezed into half a dialog
             wraps after three words. */}
-        <div className="sm:col-span-2">
+        <div className="col-span-2">
           <Textarea
             id="address"
             label="Address"
@@ -296,7 +347,7 @@ export function CustomerForm({
             disabled={readOnly}
           />
         </div>
-        <div className="sm:col-span-2">
+        <div className="col-span-2">
           <Textarea
             id="notes"
             label="Notes"
@@ -307,24 +358,28 @@ export function CustomerForm({
             disabled={readOnly}
           />
         </div>
+
+        {/* Last, because it is the field customers most often do not have. Ending on it means the
+            ones that matter are all answered before anybody stalls on this one. */}
+        <div className="col-span-2 sm:col-span-1">
+          <Input
+            id="email"
+            label="Email"
+            type="email"
+            autoComplete="email"
+            value={email}
+            onChange={(e) => setEmail(e.target.value)}
+            onBlur={() => scheduleDuplicateCheck(phoneNumber, email)}
+            error={fieldErrors.email}
+            disabled={readOnly}
+          />
+        </div>
       </div>
 
       {formError && (
         <p role="alert" className="mt-3 text-sm text-danger">
           {formError}
         </p>
-      )}
-
-      {/* A view offers neither: there is nothing to save, and nothing to cancel out of. */}
-      {!readOnly && (
-        <ModalActions>
-          <Button type="button" variant="secondary" onClick={onCancel} disabled={isSubmitting}>
-            CANCEL
-          </Button>
-          <Button type="submit" disabled={isSubmitting}>
-            {isSubmitting ? "Saving…" : "SUBMIT"}
-          </Button>
-        </ModalActions>
       )}
 
       {/* Outside the field flow: the warning is about the record as a whole, and it must not push

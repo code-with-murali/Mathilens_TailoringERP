@@ -54,7 +54,9 @@ public sealed class CreateOrderCommandHandler : ICommandHandler<CreateOrderComma
         // spent on an order that was never going to be created.
         var orderNumber = await _orderNumbers.NextAsync(cancellationToken);
 
-        var order = Order.Create(command.CustomerId, command.DueAtUtc, command.EmployeeId, command.Notes, orderNumber);
+        var order = command.IsFabricSale
+            ? Order.CreateFabricSale(command.CustomerId, command.DueAtUtc, command.Notes, orderNumber)
+            : Order.Create(command.CustomerId, command.DueAtUtc, command.EmployeeId, command.Notes, orderNumber);
 
         foreach (var itemInput in command.Items)
         {
@@ -79,6 +81,13 @@ public sealed class CreateOrderCommandHandler : ICommandHandler<CreateOrderComma
                     fabric.ClothCode,
                     fabric.Unit);
             }
+        }
+
+        // After the lines are on it, not before: the order has to be open to accept them, so a sale
+        // is built like any other order and then closed. See Order.SealAsSale.
+        if (command.IsFabricSale)
+        {
+            order.SealAsSale(command.DueAtUtc);
         }
 
         _orderRepository.Add(order);

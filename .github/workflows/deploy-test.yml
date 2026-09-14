@@ -8,9 +8,13 @@ name: Deploy test to VM
 # Runs on the box itself via a self-hosted runner, so there is no inbound SSH to expose and no
 # deploy key in secrets: the runner polls outbound. "Deploying" is therefore a local file copy.
 
+# Manual only, until the server exists.
+#
+# It ran on every push to dev, which meant every push queued a job for a runner labelled
+# [self-hosted, linux, mathilens-test] that has never been registered — so it sat queued for ever
+# and the dev branch quietly deployed nowhere at all. The workflow is kept because the plan is not
+# abandoned: run setup.sh on the box, register the runner, and put the push trigger back.
 on:
-  push:
-    branches: [dev]
   workflow_dispatch:
 
 concurrency:

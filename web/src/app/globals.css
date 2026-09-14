@@ -193,6 +193,70 @@ body {
   }
 }
 
+/*
+  Stop iOS zooming the page when a field is tapped.
+
+  Mobile Safari zooms the viewport in on focus whenever the focused control's text is smaller than
+  16px, and then leaves it zoomed — so tapping the customer name on New Order threw the whole layout
+  sideways and the next field had to be hunted for. Every control in the app is `text-sm` (14px),
+  which is exactly the trigger.
+
+  16px is a threshold, not a taste: at 16px the zoom does not fire, and one pixel under it does.
+  This applies only below the app's mobile breakpoint, so the denser 14px is untouched on desktop
+  where no zoom happens. The alternative fix — `maximum-scale=1` on the viewport — also stops it,
+  by taking pinch-zoom away from everyone for the life of the page. That is not a trade worth making
+  for a form field.
+
+  Specificity, as with `table.stacked td` above: `:root input` is (0,1,1) and outranks the `text-sm`
+  utility at (0,1,0), so the utility is beaten without !important and without stripping it off 82
+  controls by hand.
+*/
+@media (max-width: 767px) {
+  :root input,
+  :root select,
+  :root textarea {
+    font-size: 16px;
+  }
+}
+
+/*
+  A dialog arriving.
+
+  Short and small on purpose — 140ms and eight pixels. A dialog appearing from nowhere reads as the
+  page having jumped; anything longer than this reads as the app being slow, and a big movement
+  reads as decoration. The point is only to say "this is new, and it came from here".
+
+  Honoured by the media query below: an animation is a nicety, and a reader who has asked their
+  system for less motion has asked for exactly this to stop.
+*/
+@keyframes modal-panel-in {
+  from {
+    opacity: 0;
+    transform: translateY(8px) scale(0.985);
+  }
+}
+
+@keyframes modal-backdrop-in {
+  from {
+    opacity: 0;
+  }
+}
+
+.modal-panel {
+  animation: modal-panel-in 0.14s ease-out;
+}
+
+.modal-backdrop {
+  animation: modal-backdrop-in 0.14s ease-out;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .modal-panel,
+  .modal-backdrop {
+    animation: none;
+  }
+}
+
 /* Printed pages (invoices, etc.) should read as plain paper regardless of the active theme —
    dark mode's near-black background would otherwise print as a solid ink block. */
 @media print {

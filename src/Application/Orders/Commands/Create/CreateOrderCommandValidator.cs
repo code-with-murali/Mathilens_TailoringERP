@@ -22,6 +22,22 @@ public sealed class CreateOrderCommandValidator : AbstractValidator<CreateOrderC
         RuleFor(x => x.Notes)
             .MaximumLength(2000);
 
+        // Refused rather than quietly ignored. Order.CreateFabricSale drops the employee on the
+        // floor, so accepting one here would tell the caller a tailor was assigned to a sale that
+        // has no work in it — and SealAsSale would then throw on an order already half-built.
+        RuleFor(x => x.EmployeeId)
+            .Null()
+            .When(x => x.IsFabricSale)
+            .WithMessage("A fabric sale has no work to assign, so it cannot have an employee.");
+
+        // Cloth sold over the counter is cloth: every line has to say which, and how much of it.
+        // Without this a sale could be recorded with a stitching line on it and no fabric at all,
+        // which is a tailoring order wearing the wrong status.
+        RuleForEach(x => x.Items)
+            .Must(item => item.Fabric is not null)
+            .When(x => x.IsFabricSale)
+            .WithMessage("Every line on a fabric sale must name the cloth being sold.");
+
         RuleForEach(x => x.Items).SetValidator(new CreateOrderItemInputValidator());
     }
 }

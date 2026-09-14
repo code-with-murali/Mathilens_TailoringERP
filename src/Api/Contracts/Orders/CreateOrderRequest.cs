@@ -4,7 +4,18 @@ using MathilensERP.Domain.Orders;
 
 namespace MathilensERP.Api.Contracts.Orders;
 
-public sealed record CreateOrderRequest(Guid CustomerId, Guid? EmployeeId, DateTime DueAtUtc, IReadOnlyList<CreateOrderItemRequest> Items, string? Notes = null);
+/// <param name="IsFabricSale">
+/// Cloth sold over the counter with nothing to stitch. Recorded as Sold and finished on the spot —
+/// no tailor, no lifecycle, and <c>DueAtUtc</c> read as the moment of sale. Defaults to false, so
+/// every caller written before sales existed keeps taking tailoring orders unchanged.
+/// </param>
+public sealed record CreateOrderRequest(
+    Guid CustomerId,
+    Guid? EmployeeId,
+    DateTime DueAtUtc,
+    IReadOnlyList<CreateOrderItemRequest> Items,
+    string? Notes = null,
+    bool IsFabricSale = false);
 
 public sealed record CreateOrderItemRequest(string GarmentType, int Quantity, decimal UnitPrice, CreateOrderItemFabricRequest? Fabric);
 

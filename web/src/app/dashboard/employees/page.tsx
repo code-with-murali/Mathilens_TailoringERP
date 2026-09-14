@@ -126,6 +126,7 @@ export default function EmployeesPage() {
         value={searchInput}
         onChange={(e) => handleSearchChange(e.target.value)}
         placeholder="Search employees…"
+        autoCapitalize="none"
       />
 
       {isLoading ? (
