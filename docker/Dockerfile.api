@@ -1,4 +1,52 @@
-# Mathilens Tailoring ERP — API Dockerfile
+# Mathilens Tailoring ERP — API image.
 #
-# PLACEHOLDER: To be implemented once the API project exists under /src/Api.
-# See docs/07_DEPLOYMENT.md for the deployment strategy.
+# Two stages, because the SDK is roughly five times the size of the runtime and none of it is
+# needed once the assemblies exist. What ships is the aspnet image plus the publish output.
+
+FROM mcr.microsoft.com/dotnet/sdk:10.0 AS build
+WORKDIR /src
+
+# Project files on their own layer, restored before any source is copied. Source changes on nearly
+# every build and the package list almost never does; without this split a one-line edit to a
+# handler re-downloads every NuGet package. Directory.Build.props comes too — it sets the target
+# framework and nullable settings the restore reads.
+COPY Directory.Build.props ./
+COPY src/Shared/MathilensERP.Shared.csproj                 src/Shared/
+COPY src/Domain/MathilensERP.Domain.csproj                 src/Domain/
+COPY src/Application/MathilensERP.Application.csproj       src/Application/
+COPY src/Infrastructure/MathilensERP.Infrastructure.csproj src/Infrastructure/
+COPY src/Api/MathilensERP.Api.csproj                       src/Api/
+RUN dotnet restore src/Api/MathilensERP.Api.csproj
+
+COPY src/ src/
+RUN dotnet publish src/Api/MathilensERP.Api.csproj \
+    --configuration Release \
+    --no-restore \
+    --output /app
+
+FROM mcr.microsoft.com/dotnet/aspnet:10.0 AS runtime
+WORKDIR /app
+COPY --from=build /app ./
+
+# All interfaces, not loopback as the systemd unit uses. On the VM nginx shares the host's network
+# namespace with Kestrel, so 127.0.0.1 reaches it; here the proxy is a different container and
+# loopback would refuse every connection. The port is still private — nothing publishes it, so the
+# only thing that can reach it is something on the same Docker network.
+ENV ASPNETCORE_URLS=http://0.0.0.0:8080
+
+# Anything but Development, so Program.cs applies migrations and seeds roles on boot rather than
+# serving against whatever schema happens to be there. Matches the systemd unit deliberately.
+ENV ASPNETCORE_ENVIRONMENT=Test
+
+# See docker/nginx.conf: the proxy in front forwards the scheme the browser actually used, and
+# this is what makes Kestrel read it instead of reporting the plain HTTP hop it received.
+ENV ASPNETCORE_FORWARDEDHEADERS_ENABLED=true
+
+ENV DOTNET_PrintTelemetryMessage=false
+
+# Non-root, using the UID the base image already defines for the purpose. The app writes nothing
+# outside /tmp — publish output is read-only at runtime.
+USER $APP_UID
+
+EXPOSE 8080
+ENTRYPOINT ["dotnet", "MathilensERP.Api.dll"]
